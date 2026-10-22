@@ -147,3 +147,17 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Generated performance reports, profiles, and playtest captures
+/artifacts/
+
+# Playwright output (including runs with default output paths)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Operating system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
