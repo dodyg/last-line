@@ -1,0 +1,140 @@
+{
+  "waves": [
+    {
+      "label": "First Contact",
+      "composition": [{ "archetype": "rifle", "count": 4 }],
+      "spawnIntervalSeconds": 2.2
+    },
+    {
+      "label": "Patrol",
+      "composition": [{ "archetype": "rifle", "count": 6 }],
+      "spawnIntervalSeconds": 2.0
+    },
+    {
+      "label": "Skirmish Line",
+      "composition": [{ "archetype": "rifle", "count": 8 }],
+      "spawnIntervalSeconds": 1.9
+    },
+    {
+      "label": "Shock Troops",
+      "composition": [
+        { "archetype": "rifle", "count": 5 },
+        { "archetype": "assault", "count": 3 }
+      ],
+      "spawnIntervalSeconds": 1.8,
+      "telegraph": "Assault infantry carry smoke grenades. Watch for a marked smoke screen, then an infantry push. Pin the thrower to disrupt deployment."
+    },
+    {
+      "label": "Push",
+      "composition": [
+        { "archetype": "assault", "count": 5 },
+        { "archetype": "rifle", "count": 4 },
+        { "archetype": "sapper", "count": 1 }
+      ],
+      "spawnIntervalSeconds": 1.7,
+      "telegraph": "Enemy engineers carry wire cutters. They stop firing while cutting; pin or eliminate them before they open a breach."
+    },
+    {
+      "label": "Combined Arms",
+      "composition": [
+        { "archetype": "troop_transport", "count": 1 },
+        { "archetype": "assault", "count": 4 },
+        { "archetype": "gun_truck", "count": 1 }
+      ],
+      "spawnIntervalSeconds": 1.6,
+      "telegraph": "A troop transport carrying six riflemen is advancing with a machine-gun truck. Destroy the transport before it unloads to eliminate everyone aboard."
+    },
+    {
+      "label": "Armor",
+      "composition": [
+        { "archetype": "vehicle", "count": 1 },
+        { "archetype": "rifle", "count": 6 }
+      ],
+      "spawnIntervalSeconds": 1.7,
+      "telegraph": "ENGINE REPORT: armored vehicle approaching. Anti-armor rockets required - small arms will barely scratch it."
+    },
+    {
+      "label": "Spearhead",
+      "composition": [
+        { "archetype": "vehicle", "count": 1 },
+        { "archetype": "assault", "count": 3 },
+        { "archetype": "rifle", "count": 2 },
+        { "archetype": "sapper", "count": 1 }
+      ],
+      "spawnIntervalSeconds": 1.6,
+      "telegraph": "Sapper team inbound: one demolition specialist and two rifle escorts. Watch the marked target. Pin or eliminate the sapper before he arms a charge; an armed fuse keeps burning."
+    },
+    {
+      "label": "Human Wave",
+      "composition": [
+        { "archetype": "rifle", "count": 4 },
+        { "archetype": "troop_transport", "count": 1 },
+        { "archetype": "assault", "count": 5 }
+      ],
+      "spawnIntervalSeconds": 1.4
+    },
+    {
+      "label": "Panzers Two-Step",
+      "composition": [
+        { "archetype": "vehicle", "count": 2 },
+        { "archetype": "rifle", "count": 8 }
+      ],
+      "spawnIntervalSeconds": 1.5,
+      "telegraph": "Two armored vehicles inbound. Dig in and ready your rockets."
+    },
+    {
+      "label": "Raiders",
+      "composition": [
+        { "archetype": "assault", "count": 7 },
+        { "archetype": "rifle", "count": 2 },
+        { "archetype": "vehicle", "count": 1 },
+        { "archetype": "sapper", "count": 1 }
+      ],
+      "spawnIntervalSeconds": 1.3
+    },
+    {
+      "label": "All Fronts",
+      "composition": [
+        { "archetype": "vehicle", "count": 2 },
+        { "archetype": "assault", "count": 6 },
+        { "archetype": "troop_transport", "count": 1 },
+        { "archetype": "observer", "count": 1 }
+      ],
+      "spawnIntervalSeconds": 1.3
+    },
+    {
+      "label": "Grinding Assault",
+      "composition": [
+        { "archetype": "rifle", "count": 11 },
+        { "archetype": "assault", "count": 8 },
+        { "archetype": "observer", "count": 1 },
+        { "archetype": "sapper", "count": 1 }
+      ],
+      "spawnIntervalSeconds": 1.2
+    },
+    {
+      "label": "Iron Rain",
+      "composition": [
+        { "archetype": "vehicle", "count": 3 },
+        { "archetype": "assault", "count": 8 },
+        { "archetype": "observer", "count": 1 }
+      ],
+      "spawnIntervalSeconds": 1.2,
+      "telegraph": "Three vehicles on the approach. Concentrate your anti-armor fire."
+    },
+    {
+      "label": "The Last Push",
+      "composition": [
+        { "archetype": "vehicle", "count": 2 },
+        { "archetype": "rifle", "count": 3 },
+        { "archetype": "troop_transport", "count": 1 },
+        { "archetype": "assault", "count": 10 },
+        { "archetype": "gun_truck", "count": 2 },
+        { "archetype": "observer", "count": 1 },
+        { "archetype": "sapper", "count": 1 }
+      ],
+      "spawnIntervalSeconds": 1.1,
+      "telegraph": "Final Axis offensive detected. Hold everything you have - this is the last line."
+    }
+  ]
+}

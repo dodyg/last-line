@@ -1,0 +1,204 @@
+{
+  "friendly": {
+    "rifleman": {
+      "label": "Rifleman",
+      "health": 100,
+      "speed": 34,
+      "weapon": "rifle",
+      "radius": 9,
+      "initialAccuracySkill": 0.92,
+      "threat": 1,
+      "grenades": 4,
+      "blurb": "U.S. Army rifleman armed with an M1 Garand service rifle."
+    },
+    "mg": {
+      "label": "Machine Gunner",
+      "health": 115,
+      "speed": 27,
+      "weapon": "mg",
+      "radius": 10,
+      "initialAccuracySkill": 0.82,
+      "threat": 2.2,
+      "blurb": "Carries the M1918A2 Browning Automatic Rifle (BAR), the U.S. squad's automatic rifle. Heavy weapon, slower movement, and strong suppression."
+    },
+    "medic": {
+      "label": "Medic",
+      "health": 100,
+      "speed": 37,
+      "weapon": null,
+      "radius": 9,
+      "initialAccuracySkill": 0.68,
+      "threat": 2.5,
+      "heal": {
+        "amount": 25,
+        "range": 42,
+        "cooldownSeconds": 3,
+        "seekRange": 190
+      },
+      "blurb": "Carries medical supplies and treats the nearest wounded soldier. Cannot revive or shoot in this game."
+    },
+    "supply_officer": {
+      "label": "Supply Officer",
+      "health": 90,
+      "speed": 34,
+      "weapon": "rifle",
+      "radius": 9,
+      "initialAccuracySkill": 0.84,
+      "threat": 2,
+      "blurb": "Carries an M1 Garand and ammunition supplies. Refills riflemen's and combat engineers' grenades, bazooka rockets, and mortar bombs. Serves requests in order."
+    },
+    "at": {
+      "label": "Anti-Tank",
+      "health": 100,
+      "speed": 32,
+      "weapon": "at",
+      "rockets": 4,
+      "radius": 9,
+      "initialAccuracySkill": 0.88,
+      "threat": 3,
+      "blurb": "Carries an M1A1 Bazooka with four rockets and an M1 Garand for use when rockets run out. A Supply Officer refill restores bazooka fire. Slow rockets with splash are the answer to vehicles."
+    },
+    "sniper": {
+      "label": "Sniper",
+      "health": 80,
+      "speed": 28,
+      "weapon": "sniper",
+      "radius": 9,
+      "initialAccuracySkill": 1.12,
+      "threat": 2.4,
+      "blurb": "Uses the M1903A4 Springfield sniper rifle with a telescopic sight. Long-range and precise against infantry; weak against armor. More accurate in daylight, less accurate at night unless the target is lit by a flare."
+    },
+    "engineer": {
+      "label": "Combat Support Engineer",
+      "health": 105,
+      "speed": 32,
+      "weapon": "sten",
+      "radius": 9,
+      "initialAccuracySkill": 0.89,
+      "threat": 1.4,
+      "grenades": 4,
+      "blurb": "Carries a STEN Submachine Gun for close-range burst fire. Builds sandbags, trenches, bunkers, mortar pits, barbed wire and pontoon bridges, and lays mines."
+    },
+    "radio_engineer": {
+      "label": "Combat Radio Engineer",
+      "health": 90,
+      "speed": 31,
+      "weapon": "sten",
+      "radius": 9,
+      "initialAccuracySkill": 0.88,
+      "threat": 2.8,
+      "blurb": "Carries a STEN Submachine Gun for close-range burst fire and operates the field radio. The only role that can call artillery strikes and air support."
+    },
+    "officer": {
+      "label": "Officer",
+      "health": 90,
+      "speed": 33,
+      "weapon": "rifle",
+      "radius": 9,
+      "initialAccuracySkill": 0.9,
+      "threat": 1.8,
+      "blurb": "Carries an M1 Garand. Keeps nearby soldiers' morale up and helps them recover from suppression faster."
+    },
+    "mortarman": {
+      "label": "Mortarman",
+      "mortarBombs": 6,
+      "health": 82,
+      "speed": 27,
+      "weapon": null,
+      "radius": 9,
+      "initialAccuracySkill": 0.78,
+      "threat": 3.2,
+      "blurb": "Operates a U.S. M2 60 mm mortar with six bombs, switching to an M1 Garand when empty. A Supply Officer refill restores mortar fire. Fires an inaccurate bomb every 16 seconds while stationary. A mortar pit improves protection and reload time. Blast can hit friendlies."
+    },
+    "gun_truck": {
+      "label": "Machine Gun Truck",
+      "health": 155,
+      "speed": 38,
+      "weapon": "mounted_mg_allied",
+      "radius": 13,
+      "initialAccuracySkill": 0.88,
+      "threat": 3.6,
+      "blurb": "An open-bed U.S. Army truck with a crew-served M1919 Browning machine gun. Travels twice as fast on roads as on open ground. Dangerous against infantry, but vulnerable to all fire."
+    }
+  },
+  "enemy": {
+    "sapper": {
+      "label": "German Combat Engineer",
+      "health": 75,
+      "speed": 28,
+      "weapon": "enemy_rifle",
+      "radius": 9,
+      "initialAccuracySkill": 0.74,
+      "killValue": 15,
+      "breakthroughDamage": 1,
+      "threat": 1.8
+    },
+    "troop_transport": {
+      "label": "German Troop Transport",
+      "health": 130,
+      "speed": 78,
+      "weapon": null,
+      "radius": 15,
+      "initialAccuracySkill": 0.7,
+      "killValue": 25,
+      "breakthroughDamage": 1,
+      "threat": 3
+    },
+    "rifle": {
+      "label": "German Rifle Infantry",
+      "health": 70,
+      "speed": 26,
+      "weapon": "enemy_rifle",
+      "radius": 9,
+      "initialAccuracySkill": 0.8,
+      "killValue": 10,
+      "breakthroughDamage": 1,
+      "threat": 1
+    },
+    "assault": {
+      "label": "German Assault Infantry",
+      "health": 80,
+      "speed": 34,
+      "weapon": "smg",
+      "radius": 9,
+      "initialAccuracySkill": 0.75,
+      "killValue": 15,
+      "breakthroughDamage": 1,
+      "threat": 1.3
+    },
+    "vehicle": {
+      "label": "German Armored Vehicle",
+      "health": 280,
+      "speed": 11,
+      "weapon": "shell",
+      "radius": 14,
+      "initialAccuracySkill": 0.82,
+      "killValue": 40,
+      "breakthroughDamage": 3,
+      "threat": 3,
+      "immuneToSuppression": true
+    },
+    "gun_truck": {
+      "label": "German Machine Gun Truck",
+      "health": 150,
+      "speed": 27,
+      "weapon": "mounted_mg_axis",
+      "radius": 13,
+      "initialAccuracySkill": 0.76,
+      "killValue": 28,
+      "breakthroughDamage": 2,
+      "threat": 3.4
+    },
+    "observer": {
+      "label": "German Artillery Observer",
+      "health": 48,
+      "speed": 23,
+      "weapon": "enemy_rifle",
+      "radius": 9,
+      "initialAccuracySkill": 0.62,
+      "killValue": 12,
+      "breakthroughDamage": 1,
+      "threat": 2.4
+    }
+  }
+}

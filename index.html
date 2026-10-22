@@ -1,0 +1,673 @@
+<!doctype html>
+
+<html lang="en">
+
+  <head>
+
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <meta name="description" content="Last Line - choose an Allied campaign in France, Belgium, Italy, Germany, Luxembourg, or the Netherlands." />
+
+    <title>Last Line</title>
+
+  </head>
+
+  <body>
+
+    <div id="app">
+
+      <header id="hud-top" hidden>
+
+        <div class="hud-stat" title="Tactical points - spend on recruits, fortifications and artillery"><span class="stat-label">Points</span><span id="hud-points" class="stat-value">0</span></div>
+
+        <div class="hud-stat" title="Current map and sectors secured. March every soldier to the northern edge to move on; waves on the new map start again at 1"><span class="stat-label">Map</span><span id="hud-map" class="stat-value">-</span></div>
+
+        <div class="hud-stat" title="Current wave and phase"><span class="stat-label">Wave</span><span id="hud-wave" class="stat-value">-</span></div>
+
+        <div class="hud-stat" title="Preparation time left / wave state"><span class="stat-label">Status</span><span id="hud-phase" class="stat-value">-</span></div>
+
+        <div class="hud-stat" title="Line integrity - defeat at zero"><span class="stat-label">Line</span><span id="hud-integrity" class="stat-value">-</span></div>
+
+        <div class="hud-stat" title="Current score"><span class="stat-label">Score</span><span id="hud-score" class="stat-value">0</span></div>
+
+        <div class="hud-stat battlefield-stat" title="Current randomized battlefield"><span class="stat-label">Setting</span><span id="hud-setting" class="stat-value">-</span></div>
+
+        <div class="hud-spacer"></div>
+
+        <span id="hud-paused-badge" class="paused-badge" hidden>PAUSED</span>
+
+        <button id="btn-pause" class="hud-button" title="Pause / resume (Space)">Pause</button>
+
+        <button id="btn-help" class="hud-button" title="Help and controls">Help</button>
+
+        <button id="btn-settings" class="hud-button" title="Settings">Settings</button>
+
+        <button id="btn-menu" class="hud-button" title="Quit to main menu">Menu</button>
+
+      </header>
+
+
+
+      <div id="main-area">
+
+        <div id="stage">
+
+          <div id="game-frame">
+
+            <div id="game" aria-label="European campaign battlefield"></div>
+
+            <div id="terrain-tooltip" class="terrain-tooltip" role="status" hidden></div>
+
+          </div>
+
+
+
+          <aside id="hud-side" hidden>
+
+            <div class="hud-tabs" role="tablist" aria-label="Command panel">
+
+              <button id="tab-squad" class="hud-tab" type="button" role="tab" aria-selected="true" aria-controls="panel-squad" tabindex="0">Squad</button>
+
+              <button id="tab-army" class="hud-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-army" tabindex="-1">Army</button>
+
+              <button id="tab-support" class="hud-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-support" tabindex="-1">Support</button>
+
+            </div>
+
+            <button id="btn-cancel-mode" class="action-button subtle" title="Cancel the current placement/targeting mode (Esc)" hidden>Cancel mode (Esc)</button>
+
+            <div id="mode-hint" class="mode-hint" hidden></div>
+
+            <div id="satchel-status" class="mode-hint" hidden></div>
+
+            <section id="panel-squad" class="hud-tab-panel" role="tabpanel" aria-labelledby="tab-squad">
+
+              <h2 class="panel-title">Squad <span id="squad-count"></span></h2>
+
+              <div id="squad-roster" class="squad-roster" role="group" aria-label="Squad roster"></div>
+
+              <h2 class="panel-title">Selected unit</h2>
+
+              <div id="selection-panel">
+
+              <p id="sel-empty" class="subtle">No unit selected. Drag a box over the field, or shift-click, to select several.</p>
+
+              <div id="sel-multi" hidden>
+
+                <p id="sel-multi-count" class="sel-name"></p>
+
+                <ul id="sel-multi-list" class="sel-multi-list"></ul>
+
+                <p class="subtle">Right-click to walk; double right-click to run. Shift-click a soldier to add or remove it.</p>
+
+              </div>
+
+              <div id="sel-details" hidden>
+
+                <p id="sel-name" class="sel-name"></p>
+
+                <p id="sel-rank" class="rank-badge"></p>
+
+                <p id="sel-role" class="sel-role"></p>
+
+                <div class="bar-row"><span class="bar-label">HP</span><div class="bar"><div id="sel-hp" class="bar-fill hp"></div></div><span id="sel-hp-text" class="bar-text"></span></div>
+
+                <div class="bar-row"><span class="bar-label">Supp.</span><div class="bar"><div id="sel-supp" class="bar-fill supp"></div></div><span id="sel-supp-text" class="bar-text"></span></div>
+
+                <div class="bar-row"><span class="bar-label" title="Combat confidence">Morale</span><div class="bar"><div id="sel-morale" class="bar-fill morale"></div></div><span id="sel-morale-text" class="bar-text"></span></div>
+
+                <div id="stamina-row" class="bar-row" title="Running endurance. Walking recovers stamina; resting recovers it faster."><span class="bar-label">Stam.</span><div class="bar"><div id="sel-stamina" class="bar-fill stamina"></div></div><span id="sel-stamina-text" class="bar-text"></span></div>
+
+                <p id="sel-xp" class="subtle"></p>
+
+                <p id="sel-action" class="sel-action"></p>
+
+                  <p id="sel-grenades" class="subtle" hidden></p>
+
+                  <p id="sel-rockets" class="subtle" hidden></p>
+
+                  <p id="sel-mortar-bombs" class="subtle" hidden></p>
+
+                <p id="sel-contact" class="subtle" hidden></p>
+
+              </div>
+
+              <div class="unit-command-buttons" aria-label="Selected unit commands">
+
+                <button id="btn-fire-order" class="action-button icon-action" type="button" aria-label="Fire order: Auto" title="Fire order: Auto" hidden>
+
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/></svg>
+
+                </button>
+
+                <button id="btn-ambush" class="action-button icon-action" type="button" aria-label="Set ambush" aria-pressed="false" title="Set an ambush direction and range" hidden>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20 3 4a19 19 0 0 1 18 0Z"/><path d="M12 20V8m-3 3 3-3 3 3"/></svg>
+                </button>
+                <button id="btn-stance" class="action-button icon-action" type="button" aria-label="Stance: Standing" title="Cycle standing, crouching, and prone" hidden>
+
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="4" r="2"/><path d="M12 6.5v6m0-3 4 2m-4-2-3 3m3 0-3 7m3-7 4 7"/></svg>
+
+                </button>
+
+                <button id="btn-crawl" class="action-button icon-action" type="button" aria-label="Crawl: Off" title="Toggle crawling" hidden>
+
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="7" r="2"/><path d="m15.5 9-5 2-3 4m3-4 3 4 5 1m-11-1-4 4m10-3-1 4"/></svg>
+
+                </button>
+
+                <button id="btn-run" class="action-button icon-action" type="button" aria-label="Run" aria-pressed="false" title="Run for a limited time" hidden>
+
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="15" cy="4" r="2"/><path d="m5 12 4-5 4 2 3 4 4 1m-7-5-4 6-5 1m5-1 5 2 1 4M3 5h4M2 9h3"/></svg>
+
+                </button>
+
+              </div>
+
+              <select id="ambush-arc" aria-label="Ambush arc width" title="Choose the firing arc width before setting an ambush" hidden>
+                <option value="mixed" disabled>Ambush arc: Mixed</option>
+                <option value="45">Ambush arc: Narrow (45°)</option>
+                <option value="90" selected>Ambush arc: Standard (90°)</option>
+                <option value="120">Ambush arc: Wide (120°)</option>
+              </select>
+              <button id="btn-patrol" class="action-button" type="button" aria-pressed="false" hidden>Patrol area</button>
+
+              <button id="btn-headlights" class="action-button" hidden>Headlights: On</button>
+
+              <button id="btn-light-fire" class="action-button" type="button" hidden>Light small fire</button>
+
+              <div id="building-controls" hidden>
+
+                <p id="building-status" class="subtle" aria-live="polite"></p>
+
+                <label for="building-level">Fighting position</label>
+
+                <select id="building-level" aria-label="Building fighting position" title="Choose a window direction. Each side has room for two soldiers. Balconies face south; rooftops offer all-round fire."></select>
+
+                <button id="btn-leave-building" class="action-button">Leave building</button>
+
+              </div>
+
+              <div id="specialization-controls" hidden>
+
+                <select id="sel-specialization" aria-label="Veteran specialization"></select>
+
+                <button id="btn-specialization" class="action-button">Choose specialization</button>
+
+              </div>
+
+              </div>
+
+              <h2 class="panel-title">Weapon upgrades</h2>
+
+              <button id="btn-upgrade-accuracy" class="action-button">Aim training</button>
+
+              <button id="btn-upgrade-reload" class="action-button">Faster reload</button>
+
+              <button id="btn-upgrade-damage" class="action-button">Improved ammunition</button>
+
+            </section>
+
+            <section id="panel-army" class="hud-tab-panel" role="tabpanel" aria-labelledby="tab-army" hidden>
+
+              <h2 class="panel-title">U.S. Army Recruitment</h2>
+
+              <div id="recruit-buttons" class="recruit-grid"></div>
+
+            </section>
+
+            <section id="panel-support" class="hud-tab-panel" role="tabpanel" aria-labelledby="tab-support" hidden>
+
+              <h2 class="panel-title">Support</h2>
+
+              <div class="support-grid">
+
+              <!--
+
+                Labels and tooltips, prices and build times included, are rendered
+
+                from content/config.ts by Hud.buildSupportButtons(). The names here
+
+                are only a fallback for the instant before the HUD is constructed.
+
+              -->
+
+              <button id="btn-barbed-wire" class="action-button">Barbed wire</button>
+
+              <button id="btn-sandbag" class="action-button">Sandbag</button>
+
+              <button id="btn-trench" class="action-button">Trench</button>
+
+              <button id="btn-bunker" class="action-button">Bunker</button>
+
+              <button id="btn-mortar-pit" class="action-button">Mortar pit</button>
+
+              <button id="btn-bridge" class="action-button">Pontoon bridge</button>
+
+              <button id="btn-mine-ap" class="action-button">AP mine</button>
+
+              <button id="btn-mine-at" class="action-button">AT mine</button>
+
+              <div id="construction-status" class="cooldown-note" hidden></div>
+
+              <button id="btn-artillery" class="action-button">Artillery</button>
+
+              <button id="btn-air-support" class="action-button">Air Support</button>
+
+              <button id="btn-flare" class="action-button">Flares</button>
+
+              <button id="btn-food-supplies" class="action-button">Radio for Rations</button>
+
+              <button id="btn-smoke" class="action-button">Smoke grenade</button>
+
+              <button id="btn-satchel" class="action-button" type="button" hidden>Satchel charge · 10s fuse</button>
+
+              <div id="artillery-cd" class="cooldown-note" hidden></div>
+
+              <div id="air-support-cd" class="cooldown-note" hidden></div>
+
+              <div id="flare-cd" class="cooldown-note" hidden></div>
+
+              <div id="food-supply-cd" class="cooldown-note" hidden></div>
+
+              </div>
+
+            </section>
+
+
+
+          </aside>
+
+        </div>
+
+
+
+        <div id="radio-chatter" aria-live="polite" aria-atomic="true" hidden></div>
+
+        <div id="notices" aria-live="polite"></div>
+
+      </div>
+
+    </div>
+
+
+
+    <div id="overlay-root">
+
+      <div id="overlay-title" class="overlay" hidden>
+
+        <div class="panel title-panel">
+
+          <h1 class="game-title">LAST LINE</h1>
+
+          <p class="tagline">Europe, 1943–1945 · Choose an Allied campaign against Nazi Germany.</p>
+
+          <div class="button-stack">
+
+            <button id="btn-new" class="menu-button primary">New Game</button>
+
+            <button id="btn-continue" class="menu-button" disabled>Continue</button>
+
+            <button id="btn-help-title" class="menu-button">Help &amp; Controls</button>
+
+            <button id="btn-settings-title" class="menu-button">Settings</button>
+
+          </div>
+
+          <p id="title-best" class="subtle"></p>
+
+          <p id="save-status" class="subtle"></p>
+
+          <p class="controls-hint">Left-click: select &middot; Shift-click: add to selection &middot; Drag: box-select &middot; Right-click: walk &middot; Double right-click: run &middot; Right-click empty ground: inspect terrain &middot; Space: pause &middot; Esc: cancel</p>
+
+        </div>
+
+      </div>
+
+
+
+      <div id="overlay-campaign" class="overlay" hidden>
+
+        <div class="panel campaign-panel" role="dialog" aria-labelledby="campaign-heading" aria-modal="true">
+
+          <h2 id="campaign-heading">Choose your campaign</h2>
+
+          <p class="subtle">Fight through sectors in one country. Each has its own landscapes, local building names, and street signs.</p>
+
+          <div id="campaign-choices" class="campaign-choices" role="group" aria-label="Campaign country"></div>
+
+          <div class="campaign-actions">
+
+            <button id="btn-campaign-back" class="menu-button">Back</button>
+
+            <button id="btn-campaign-start" class="menu-button primary">Start France campaign</button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <div id="overlay-pause" class="overlay" hidden>
+
+        <div class="panel">
+
+          <h2>Paused</h2>
+
+          <p class="subtle">While paused you may inspect the battlefield, but orders are not accepted. The tab auto-pauses when hidden and stays paused until you resume.</p>
+
+          <div class="button-stack">
+
+            <button id="btn-resume" class="menu-button primary">Resume</button>
+
+            <button id="btn-restart" class="menu-button">Restart Run</button>
+
+            <button id="btn-settings-pause" class="menu-button">Settings</button>
+
+            <button id="btn-quit" class="menu-button">Quit to Menu</button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <div id="overlay-results" class="overlay" hidden>
+
+        <div class="panel results-panel">
+
+          <h2 id="res-title">Victory</h2>
+
+          <div id="res-summary" class="results-summary"></div>
+
+          <div class="button-stack">
+
+            <button id="btn-endless" class="menu-button primary" hidden>Continue Endless</button>
+
+            <button id="btn-results-new" class="menu-button">New Game</button>
+
+            <button id="btn-results-menu" class="menu-button">Main Menu</button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <div id="overlay-sector-supply" class="overlay" hidden>
+
+        <div class="panel">
+
+          <h2>Sector secured</h2>
+
+          <p class="subtle">Choose one reward for the squad before the next wave begins.</p>
+
+          <div class="button-stack">
+
+            <button id="btn-sector-points" class="menu-button primary">Take field supplies · +8 points</button>
+
+          </div>
+
+          <h3>Medical resupply</h3>
+
+          <p id="sector-medical-note" class="subtle"></p>
+
+          <div id="sector-medical-options" class="button-stack"></div>
+
+        </div>
+
+      </div>
+
+
+
+      <div id="overlay-help" class="overlay" hidden>
+
+        <div class="panel help-panel">
+
+          <h2>Help &amp; Controls</h2>
+
+          <div class="help-columns">
+
+            <section>
+
+              <h3>Controls</h3>
+
+              <ul>
+
+                <li><strong>New Game</strong> opens the country chooser: France, Belgium, Italy, Germany, Luxembourg, or the Netherlands. All sectors in that run stay in the chosen country, including after saving or restarting. Building names and street signs follow the sector's local language.</li>
+
+                <li><strong>Weapon roster · Western Europe, 1944.</strong> This campaign represents U.S. Army defenders against German forces. Riflemen carry the M1 Garand; Combat Support Engineers and Combat Radio Engineers carry the STEN Submachine Gun, firing eight-round bursts at short range; the Machine Gunner carries the M1918A2 Browning Automatic Rifle (BAR), used here as a squad support weapon; Anti-Tank soldiers use the M1A1 Bazooka; snipers use the M1903A4 Springfield; and mortarmen operate the M2 60 mm mortar (normally a crew-served weapon, represented here by one unit). The medic carries medical supplies and does not fire. German rifle infantry and artillery observers use the Karabiner 98k; assault infantry use the MP 40. The armored vehicle is a generic German type, so its cannon model is deliberately unspecified.</li>
+
+                <li><strong>Left-click</strong> a soldier to select; click empty ground to clear.</li>
+
+                <li><strong>Shift-click</strong> a soldier (on the field or in the roster) to add or remove it from the selection, or <strong>drag a box</strong> on the field to select everyone inside it.</li>
+
+                <li><strong>Right-click</strong> ground with soldiers selected to walk the whole group, which spreads into a formation around the point you click. <strong>Double right-click</strong> to run there, subject to stamina and terrain. With nothing selected, right-click empty ground to toggle terrain inspection, then hover to read object details.</li>
+
+                <li>Right-click a soldier in the squad roster or selected-unit details to open options. Choose <strong>Call medic</strong> to shout for help and request treatment. Medics take calls <strong>first come, first served</strong>; calls wait in the queue while medics are busy or pinned. Each medic treats their assigned soldier until fully healed, then takes the next call. A new move, patrol, or building order cancels that medic's current call.</li>
+
+                <li>Recruit a <strong>Supply Officer</strong> for 6 points to replenish ammunition during battle. Right-click a <strong>Rifleman</strong>, <strong>Anti-Tank soldier</strong>, or <strong>Mortarman</strong> and choose <strong>Grenade supplies</strong>, <strong>Rocket supplies</strong>, or <strong>Mortar supplies</strong>. The officer reaches that soldier and refills their loadout: four grenades, four bazooka rockets, or six mortar bombs, including on building floors. All ammunition requests share a first-come queue and wait while officers are busy or pinned. A move, building, or run-to-gunfire order cancels an officer's current delivery. Ammo counts appear in the selected soldier's details and survive save/Continue.</li>
+
+                <li><strong>Regroup between waves.</strong> After clearing a wave, you have 30 seconds to reposition, heal, resupply, and build before the next attack. The Status countdown shows the preparation time remaining.</li>
+
+                <li><strong>Destructible trees.</strong> Missed rounds can splinter trunks and branches. Explosions strip crowns or snap trees into jagged stumps and fallen timber. Felled trees lose their foliage concealment and movement penalty. Tree damage survives save/Continue.</li>
+
+                <li><strong>Disturbed earth.</strong> Mortars leave small pits, artillery leaves jagged craters with radial debris, and bombs leave broad torn-earth scars and heavier dust. Bombing runs scar the ground along their path. Earth marks remain on the current map and survive save/Continue. These visual scars do not change movement or cover.</li>
+
+                <li><strong>Veteran support calls.</strong> At 3 XP (Sergeant), infantry automatically call a medic when wounded. Riflemen and Combat Support Engineers request a Supply Officer when grenades run out; Anti-Tank soldiers request rockets and mortarmen request bombs when empty. Recruit the needed support soldier first. These calls join the normal first-come queues and survive save/Continue. Veterans never duplicate pending requests and wait ten seconds between calls. A replacement order for the support soldier also delays a new automatic call for ten seconds. The selected soldier's XP line shows Auto support when unlocked. Combat engineers can also request Grenade supplies manually from their roster menu.</li>
+
+                <li><strong>Enemy troop transports</strong> arrive from wave six. These fast, unarmed trucks carry <strong>six riflemen</strong> and stop briefly to unload near the defenders. Destroy a truck before its passengers dismount to kill all six aboard. Dismounted soldiers fight independently; empty trucks withdraw north. Troop transports are vulnerable to ordinary gunfire and count as vehicles for mines and movement.</li>
+
+                <li><strong>Seasons.</strong> Every map has one fixed season, shown beside its setting. Spring has fresh green leaves and blossom; summer has full foliage and ripe fields; autumn has warm leaf colors and fallen leaves; winter has bare trees, snowy pines, snow-covered ground and roofs. Winter snow cover remains in clear weather. Weather changes within the season, with snowfall in winter. The next generated map receives its own season, and saving preserves the current one.</li>
+
+                <li>Select one or more <strong>Riflemen, Snipers, or Medics</strong>, press <strong>Patrol area</strong>, then click two opposite corners. They walk a repeating route inside the area. Fighters stop to engage enemies; medics pause to treat nearby wounded soldiers at the same floor height, then resume their route. <strong>Stop patrol</strong>, a move order, or a building order ends the patrol. Esc or right-click cancels marking the area.</li>
+
+                <li>Soldiers normally <strong>walk</strong>. <strong>Double right-click</strong> a destination, or press <strong>Run</strong> while moving, for up to eight seconds at 1.8× walking speed. Running stands soldiers upright and spends stamina; exhaustion or arrival restores walking. Walking recovers stamina, and resting recovers it faster. Use <strong>Stance</strong> to cycle standing, crouching, and prone, or <strong>Crawl</strong> to move slowly while prone. Pinned soldiers stay down, and steep slopes require crawling.</li>
+
+                <li><strong>Space</strong> pauses/resumes (ignored while typing or a button has focus).</li>
+
+                <li>Use the mouse wheel or the keyboard <strong>+</strong>/<strong>−</strong> keys to zoom the battlefield. Hold <strong>Ctrl</strong> and left-drag to pan while zoomed in. Press <strong>0</strong> to restore the full-field view.</li>
+
+                <li><strong>Esc</strong> cancels recruit/sandbag/trench/bunker/artillery targeting first, then opens the pause menu.</li>
+
+                <li>Most units fire automatically while stationary; moving units hold fire except Machine Gun Trucks, which can shoot at 60% accuracy while moving and full accuracy while stopped. Mortarmen need to be stationary and have an enemy 120–1,560 pixels away, and their blasts can hit friendlies. Pinned units neither move nor fire.</li>
+
+                <li>Select a named soldier from the <strong>Squad roster</strong> to inspect health and morale. Rank badges reflect combat XP, from Private to Technical Sergeant.</li>
+
+              </ul>
+
+              <h3>Pause behavior</h3>
+
+              <ul>
+
+                <li>While paused you can inspect the squad, but gameplay commands are rejected.</li>
+
+                <li>Switching to another tab pauses the run; press Resume when you return.</li>
+
+              </ul>
+
+            </section>
+
+            <section>
+
+              <h3>Mechanics</h3>
+
+              <ul>
+
+                <li>Axis forces cross the southern line to damage its integrity. Defeat at zero integrity.</li>
+
+                <li><strong>Marching north.</strong> Clear all 15 waves to secure the sector. Then order every soldier into the pale exit strip to advance; the next map starts again at wave 1. On arrival, choose either 8 supply points or medical resupply for one wounded soldier (up to 35 HP). You may evacuate early to preserve the squad, but an uncleared sector earns no campaign credit. Veterans keep their wounds, experience, kills and upgrades. Field defenses and enemies stay behind.</li>
+
+                <li><strong>Ambush orders.</strong> Select armed infantry, choose an ambush arc width, click the ambush icon, then click the battlefield to set direction and trigger range. After 3 seconds preparing, soldiers hold guns and grenades until a visible enemy enters the cone. Their first burst gains 35% accuracy and double suppression, then normal fire resumes. Smoke and blocked sight prevent triggering. Moving, changing fire orders, or clicking Cancel ambush cancels it. Preparation and opening bonuses survive Continue.</li>
+                <li><strong>Enemy sapper teams.</strong> From wave 8, a marked demolition specialist advances with two rifle escorts. They target bunkers, occupied buildings and bridges. Planting takes 4 seconds: pin the sapper to pause it, or kill him to cancel. An armed charge has an 8-second fuse that keeps burning after the team dies. Evacuate the red blast ring! The charge demolishes its targeted bunker or bridge and heavily damages its targeted building. Demolished bridges become water crossings; engineers can build replacement pontoons.</li>
+                <li><strong>Barbed wire.</strong> A Combat Support Engineer builds a 72-pixel east–west segment for 4 points in 4 seconds. All infantry cross at 30% speed; vehicles pass freely. Leave gaps to channel attackers into clear lanes. Enemy engineers arrive from wave 5 and stop firing to cut wire. Suppression that pins a cutter pauses the work; eliminate him before the 6-second breach is complete. Cutting progress persists if interrupted. Wire provides no cover and does not block bullets.</li>
+
+                <li><strong>Fortifications.</strong> Sandbags cost 3 points and take 2.5 seconds to build; they give soldiers immediately behind them (south side) cover from fire arriving from the north, reducing incoming hit chance to 45%. Trenches cost 6 points and take 6 seconds; they protect a longer stretch from northern fire, reducing hit chance to 25%, and Machine Gunners fire more effectively from them. Bunkers cost 10 points and take 12 seconds; soldiers within 24 pixels get all-direction protection from direct fire, reducing hit chance to 30%, but artillery still damages them. Use sandbags for quick, inexpensive cover, trenches to hold a line, and bunkers where enemies may flank.</li>
+
+                <li><strong>Mortar pits.</strong> Combat Support Engineers build one for 8 points in 9 seconds. A mortarman within 18 pixels has a 78% lower chance of being hit by bullets, takes 65% less artillery damage, and reloads 30% faster (11.2 seconds instead of 16). Other soldiers do not gain the protection or faster reload.</li>
+
+                <li><strong>Buildings</strong> — churches, field hospitals and houses — are solid: they block movement, line of sight, and bullets. Small arms barely scratch them; artillery, rockets and tank shells bring them down. Wall cracks, roof scars, broken windows and fallen masonry show increasing damage as HP drops. A destroyed building becomes a walkable ruin, so the wall you demolish is the hole your attack pours through.</li>
+
+                <li><strong>Weather and visibility.</strong> Maps can start clear, rainy, foggy, or snowy. Conditions change every five minutes, cycling through clear, light/steady/heavy rain, light/steady/heavy fog, then light/steady/heavy snowstorms. Weather affects both armies: rain reduces spotting range/movement speed by 6%/5%, 16%/15%, or 30%/30%; fog by 12%/3%, 32%/10%, or 52%/18%; snowstorms by 10%/8%, 26%/22%, or 50%/40%. Snowflakes, wind, and haze intensify during stronger storms. Rain drives river current up to 2.8 times its clear-weather speed; snow leaves current unchanged. These effects also apply to Axis observer spotting. Weather and its next-change timer are saved with the run. Hover the Setting stat for the current effect.</li>
+
+                <li><strong>Day and night.</strong> The five-minute cycle starts after you clear three waves, then brings dusk, night, dawn, and daylight. Night reduces both armies' spotting and firing range by 25%, accuracy by 20%, and movement speed by 25%; muzzle flashes and tracer rounds reveal firing positions, while gunfire sounds provide a short-lived bearing even through cover. Both armies use these clues; moving or staying silent breaks contact, and rain and snow mask distant sounds. Sound-guided fire is less accurate and still cannot pass through walls or smoke. The selected soldier shows the clue and compass bearing. Trucks and tanks cast headlight beams ahead of them. Select a Machine Gun Truck to toggle its headlights: on restores daytime speed but makes it easier for enemies to spot and hit; off keeps the night speed penalty and conceals it. Time pauses with the battle and continues across campaign maps.</li>
+
+                <li><strong>River and mud.</strong> Roughly three maps in five have a river; the rest are dry and more open. River maps have one or two wooden bridges that provide a firm, unpenalized crossing. Most of the water is wadeable but slows movement and hurts firing; foaming rapids are much worse, cutting movement to 32% and accuracy to 48%. Use a bridge or find a calmer reach. Mud patches sit off the water and are worse ground still. The <strong>Setting</strong> stat tells you whether the current battlefield has water. Right-click empty ground with nothing selected to toggle terrain inspection, then hover a tile to read its effects.</li>
+
+                <li><strong>Under bridges.</strong> Infantry can pass below raised map bridges by approaching from the side of the span. Approach from a road end to cross on top. Water below still slows soldiers; vehicles use the deck. Combat Support Engineers build simple floating pontoon bridges with a low plank deck and no passage underneath. The deck of a raised bridge fades when troops are underneath, and their status shows which level they occupy.</li>
+
+                <li><strong>High ground.</strong> Battlefields have multiple terrain levels and sloping approaches. Climbing costs time. Infantry automatically crawl up and down steep faces, then return to their chosen posture on gentler ground. Vehicles need gentler routes. Ridges block sight and rifle fire; terrain shading, contours, and ground tooltips help you read the slopes.</li>
+
+                <li><strong>Buildings.</strong> Select infantry and right-click a standing building to enter. In the Squad panel, choose a floor to fire from its windows, a balcony, or a rooftop where access is available. Stairs take time. Windows and parapets give cover; enemy infantry also occupy buildings. Right-click open ground or choose Leave building to exit. Artillery can collapse a building and injure its occupants.</li>
+
+                <li><strong>Trees and countryside.</strong> Oak, beech, birch, pine, and fruit trees have distinct shapes, alongside low hedgerows, shrubs, and tall grass. Foliage is passable but slows soldiers. Troops beneath it are harder to spot and hit; each patch between shooter and target further reduces sighting range and rifle accuracy. Trees provide partial protection, so nearby enemies can still engage you. Low fieldstone fences, rocky outcrops, churches, farmhouses, and village ruins offer other cover.</li>
+
+                <li><strong>Combat Support Engineers</strong> carry STEN Submachine Guns and are the only soldiers who can build fortifications. Place a project within 112 pixels of an available engineer; work pauses if no unpinned engineer stays nearby. <strong>Combat Radio Engineers</strong> also carry STENs and operate the field radio for artillery and air support.</li>
+
+                <li><strong>Combat Radio Engineers</strong> are the only soldiers who can call artillery, air support, or flares. Keep one alive and unpinned to request support.</li>
+
+                <li><strong>Mortarmen</strong> carry six bombs. Keep them stationary with an enemy 120–1,560 pixels away; they fire an imprecise mortar bomb about every 16 seconds at a random enemy position until empty, then switch to their M1 Garand rifle. Right-click the mortarman in the roster and choose <strong>Mortar supplies</strong> for a Supply Officer refill and a return to mortar fire. Bazooka soldiers also switch to an M1 Garand when their four rockets run out and resume bazooka fire after resupply. Rifle shots do not spend heavy ammunition. Mortar blasts can hit friendlies. A nearby mortar pit shortens the reload.</li>
+
+                <li><strong>Machine Gun Trucks</strong> are mobile mounted-gun platforms, faster than the average soldier. On normal roads, they travel twice as fast as on open ground. They can fire at infantry within 330 pixels while moving at 60% accuracy, or stop for full accuracy. The mounted gun is weak against armor, and the truck is exposed to enemy fire.</li>
+
+                <li><strong>Small fires.</strong> At night, select any infantry soldier outdoors and choose Light small fire. A free fire burns at their position for 60 seconds, lighting a 70-pixel radius. Both armies can see and hit soldiers in its light more easily, including your own. Each soldier can keep one fire burning at a time. Fires go out at dawn and stay behind when you move to a new map.</li>
+
+                <li><strong>Smoke.</strong> Riflemen and engineers carry one smoke grenade. Select one, choose Smoke grenade, then click a landing point within 220 pixels. Smoke blocks rifle fire for eight seconds; explosives still pass through.</li>
+
+                <li><strong>Enemy smoke-screen assaults.</strong> From wave 4, assault troops can throw one smoke grenade to cover a nearby infantry squad. An amber marker identifies the thrower and a ground ring warns of the screen 1.5 seconds before it deploys. Pin or kill the thrower to disrupt it. The attackers then advance at normal speed under eight seconds of smoke, which blocks small arms for both sides. Move around the screen or counter with bazookas, mortars, or artillery.</li>
+
+                <li><strong>Fire orders.</strong> Select soldiers and cycle automatic, anti-armor, stop breakthroughs, hold grenades, and run to gunfire. Run to gunfire sends armed infantry toward the nearest heard enemy shot, day or night; they stop to engage a located enemy and walk when stamina runs out. Direct move, patrol, and building orders cancel pursuit. Medics, mortarmen, and vehicles cannot use this order; vehicles also cannot hold grenades.</li>
+
+                <li><strong>Veteran specializations.</strong> At 3 XP, choose one permanent perk. Every role can choose Forced March (+20% movement speed) or Camouflage (enemies and observers first detect the soldier at 25% shorter range). Role perks improve combat, medicine, engineering, or artillery. Radio Engineers can cut artillery cooldown by 20% as a Signal Officer or reduce call-in time by 30% as a Forward Observer. Medics earn XP by healing and engineers by finishing construction.</li>
+
+                <li><strong>Food supplies</strong> can be radioed in by an unpinned Combat Radio Engineer. Each delivery adds 5 supply points and takes 60 seconds to request again.</li>
+
+                <li><strong>Weapon upgrades</strong> apply only to the selected soldier. Aim training adds 6% accuracy, reload drills shorten reloads by 8%, and improved ammunition adds 12% damage per level. Each can be purchased up to three times per soldier. The improvement is banked immediately, but the weapon then spends <strong>3 seconds in pieces</strong> while it is fitted: the soldier cannot fire or throw during that time (he can still be moved), and cannot start a second upgrade until the first is done. The panel counts the work down and the buttons grey out.</li>
+
+                <li><strong>Machine Gunners</strong> use the M1918A2 BAR to suppress and pin infantry. <strong>Medics</strong> heal the nearest wounded soldier (no reviving, no shooting). Inside a building, a medic can treat the whole floor and a balcony at the same height, but cannot heal through floors or while climbing. <strong>M1A1 Bazookas</strong> are the answer to vehicles; M1903A4 snipers pick off infantry at range but struggle against armor.</li>
+
+                <li><strong>Artillery</strong> hits an area after a short delay and damages <em>everyone</em> in the blast, including your own troops. It costs 8 points and has a 24-second cooldown.</li>
+
+                <li><strong>Air support</strong> costs 12 points and has a 45-second cooldown. Mark a target for a quick run of three bombs in a line; each blast is smaller than artillery, so use it against a spread-out formation. The marked circles show where they will land. Bombs damage friendlies too. A Forward Observer shortens the call-in delay.</li>
+
+                <li><strong>Flares</strong> cost 4 points and have a 30-second cooldown. At night, mark an area to illuminate a 180-pixel radius for 30 seconds; friendly soldiers can spot enemies there from farther away and ignore the night accuracy penalty.</li>
+
+                <li><strong>Axis artillery.</strong> From wave 12, an observer who can see your squad calls the enemy barrage. Kill or suppress the observer to stop new fire missions; shells already incoming will still land. The shells can hit Axis infantry too.</li>
+
+                <li>Soldiers start with individual marksmanship. Kills improve their aim and nearby allies gain confidence; nearby casualties and suppression lower morale. Low morale reduces accuracy and movement speed. Morale recovers while safe, faster near allies.</li>
+
+                <li>Kills improve aim and reload speed; range, cover, suppression, and morale affect every shot. Missed cannon and anti-tank rounds scatter.</li>
+
+              </ul>
+
+            </section>
+
+          </div>
+
+          <button id="btn-help-close" class="menu-button primary">Close</button>
+
+        </div>
+
+      </div>
+
+
+
+      <div id="overlay-settings" class="overlay" hidden>
+
+        <div class="panel">
+
+          <h2>Settings</h2>
+
+          <p class="scenario-note"><strong>European campaigns · 1943–1945</strong><br>U.S. Army defensive line against a German assault.</p>
+
+          <div class="scenario-forces"><span class="force-tag allied">U.S. Army defenders</span><span class="force-tag axis">German attackers</span></div>
+
+          <div class="settings-row">
+
+            <label for="set-volume">Volume</label>
+
+            <input id="set-volume" type="range" min="0" max="100" step="1" value="80" />
+
+            <span id="set-volume-value" class="subtle">80%</span>
+
+          </div>
+
+          <div class="settings-row">
+
+            <label for="set-mute">Mute all sound</label>
+
+            <input id="set-mute" type="checkbox" />
+
+          </div>
+
+          <div class="settings-row">
+
+            <label for="set-shake">Screen shake</label>
+
+            <input id="set-shake" type="checkbox" checked />
+
+          </div>
+
+          <p id="reduced-motion-note" class="subtle" hidden>System reduced-motion preference detected; screen shake defaults to off.</p>
+
+          <div class="settings-tools">
+
+            <h3>Map review</h3>
+
+            <p class="subtle">Generate and inspect another battlefield without changing a saved campaign.</p>
+
+            <button id="btn-map-review" class="menu-button">Open map generator review</button>
+
+          </div>
+
+          <button id="btn-settings-close" class="menu-button primary">Close</button>
+
+        </div>
+
+      </div>
+
+
+
+      <div id="overlay-map-review" class="overlay map-review-overlay" hidden>
+
+        <div class="panel map-review-panel">
+
+          <h2>Map generator review</h2>
+
+          <p class="subtle">Inspect a generated battlefield. Generate another map to compare layouts.</p>
+
+          <div class="map-review-controls">
+
+            <label for="map-review-country">Country</label>
+
+            <select id="map-review-country"></select>
+
+            <button id="btn-map-review-generate" class="menu-button primary">Generate another map</button>
+
+          </div>
+
+          <p id="map-review-info" class="map-review-info" aria-live="polite">Choose a country to begin.</p>
+
+          <button id="btn-map-review-close" class="menu-button">Back to Settings</button>
+
+        </div>
+
+      </div>
+
+    </div>
+
+
+
+    <script type="module" src="/src/main.ts"></script>
+
+  </body>
+
+</html>
+
