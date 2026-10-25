@@ -6,7 +6,7 @@ export function isInfantry(unit: Unit): boolean {
 }
 
 export function canRun(unit: Unit): boolean {
-  return isInfantry(unit) && !unit.pinned && !unit.buildingPosition
+  return isInfantry(unit) && !['at_gun','heavy_mg','mg_team'].includes(unit.role) && !unit.pinned && !unit.buildingPosition
     && !unit.terrainCrawling && !unit.crawling && (unit.stance ?? 'standing') === 'standing'
     && (unit.stamina ?? 1) > 0;
 }

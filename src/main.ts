@@ -8,6 +8,10 @@ import { Menus } from './ui/menus';
 
 const storage = new Storage();
 const prefs: Preferences = loadPrefs(storage);
+if (storage.get('lastline/prefs/v1') === null && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  prefs.reducedMotion = true;
+  prefs.screenShake = false;
+}
 const audio = new AudioSys();
 audio.setPrefs(prefs);
 
@@ -22,6 +26,8 @@ const menus = new Menus({
   onCloseHelp: () => menus.closeHelp(),
   onPrefsChanged: (p) => controller.applyPrefs(p),
   onUnlockAudio: () => controller.unlockAudio(),
+  onVoicePreview: () => audio.previewAmericanVoice(),
+  onResetCamera: () => controller.resetCamera(),
   onSectorSupply: (choice, unitId) => controller.chooseSectorSupply(choice, unitId),
   onMapReviewOpen: () => controller.openMapReview(),
   onMapReviewGenerate: (country) => controller.generateMapReview(country),
@@ -50,6 +56,7 @@ const hud = new Hud({
   onLightFire: () => controller.lightSelectedFire(),
   onAmbush: (arcDegrees) => controller.toggleAmbush(arcDegrees),
   onAmbushArcChange: (arcDegrees) => controller.updateAmbushArc(arcDegrees),
+  onRoleAbility: () => controller.useRoleAbility(),
   onFireOrder: () => controller.cycleFireOrder(),
   onStance: () => controller.cycleStance(),
   onBuildingLevel: (level, facing) => controller.chooseBuildingLevel(level, facing),
@@ -63,11 +70,12 @@ const hud = new Hud({
   onCancelMode: () => controller.cancelMode(),
   onPauseToggle: () => controller.togglePause(),
   onHelp: () => menus.showHelp(),
-  onSettings: () => menus.showSettings(),
+  onSettings: () => controller.openSettings(),
   onMenu: () => controller.quitToTitle(),
 });
 
 controller = new GameController({ storage, prefs, audio, hud, menus });
+controller.applyPrefs(prefs);
 
 let runtime: BattleRuntime | null = null;
 const gameContainer = document.getElementById('game');
@@ -87,3 +95,11 @@ try {
 if (new URLSearchParams(window.location.search).has('e2e')) {
   void import('./e2e-hook').then((m) => m.installE2EHooks(controller, () => runtime));
 }
+
+const commandToggle = document.getElementById('btn-toggle-commands')!;
+commandToggle.addEventListener('click', () => {
+  const collapsed = document.body.classList.toggle('commands-collapsed');
+  commandToggle.setAttribute('aria-expanded', String(!collapsed));
+  document.getElementById('hud-side')?.setAttribute('inert', '');
+  if (!collapsed) document.getElementById('hud-side')?.removeAttribute('inert');
+});

@@ -45,7 +45,7 @@
       "radius": 9,
       "initialAccuracySkill": 0.84,
       "threat": 2,
-      "blurb": "Carries an M1 Garand and ammunition supplies. Refills riflemen's and combat engineers' grenades, bazooka rockets, and mortar bombs. Serves requests in order."
+      "blurb": "Carries an M1 Garand and ammunition supplies. Refills riflemen, engineers and assault infantry with grenades, plus bazooka rockets and mortar bombs. Serves requests in order."
     },
     "at": {
       "label": "Anti-Tank",
@@ -119,6 +119,47 @@
       "initialAccuracySkill": 0.88,
       "threat": 3.6,
       "blurb": "An open-bed U.S. Army truck with a crew-served M1919 Browning machine gun. Travels twice as fast on roads as on open ground. Dangerous against infantry, but vulnerable to all fire."
+    },
+    "scout": {
+      "label": "Scout",
+      "health": 75,
+      "speed": 42,
+      "weapon": "scout_carbine",
+      "radius": 9,
+      "initialAccuracySkill": 0.88,
+      "threat": 1.5,
+      "blurb": "Fast reconnaissance infantry. Spots concealed enemies within 420 and halves mortar scatter on observed targets. Can patrol; smoke and solid obstacles block observation."
+    },
+    "heavy_mg": {
+      "label": "Heavy Machine Gun Crew",
+      "health": 120,
+      "speed": 21,
+      "weapon": "heavy_mg",
+      "radius": 12,
+      "initialAccuracySkill": 0.86,
+      "threat": 3.4,
+      "blurb": "Tripod M1919. Packs for 2 seconds before moving, deploys for 3 seconds, and covers a 70-degree arc. Turns and redeploys to engage flanking targets."
+    },
+    "assault_infantry": {
+      "label": "Assault Infantry",
+      "health": 105,
+      "speed": 36,
+      "weapon": "thompson",
+      "radius": 9,
+      "initialAccuracySkill": 0.9,
+      "threat": 2,
+      "blurb": "Thompson SMG and six grenades. Order into a hostile building to approach an entrance, clear occupants in close combat, then garrison. Vulnerable in the open.",
+      "grenades": 6
+    },
+    "at_gun": {
+      "label": "Anti-Tank Gun Crew",
+      "health": 135,
+      "speed": 15,
+      "weapon": "at_gun",
+      "radius": 12,
+      "initialAccuracySkill": 0.96,
+      "threat": 3.8,
+      "blurb": "57 mm anti-tank gun. Packs for 3 seconds, deploys for 4 seconds and covers a 50-degree arc. Slow traverse; prioritizes vehicles. Cannot garrison buildings."
     }
   },
   "enemy": {
@@ -199,6 +240,61 @@
       "killValue": 12,
       "breakthroughDamage": 1,
       "threat": 2.4
+    },
+    "mg_team": {
+      "label": "German Machine Gun Team",
+      "health": 100,
+      "speed": 21,
+      "weapon": "enemy_heavy_mg",
+      "radius": 9,
+      "initialAccuracySkill": 0.8,
+      "killValue": 22,
+      "breakthroughDamage": 1,
+      "threat": 3
+    },
+    "sharpshooter": {
+      "label": "German Sharpshooter",
+      "health": 60,
+      "speed": 25,
+      "weapon": "enemy_sniper",
+      "radius": 9,
+      "initialAccuracySkill": 1.05,
+      "killValue": 20,
+      "breakthroughDamage": 1,
+      "threat": 2.5
+    },
+    "field_officer": {
+      "label": "German Field Officer",
+      "health": 80,
+      "speed": 29,
+      "weapon": "enemy_rifle",
+      "radius": 9,
+      "initialAccuracySkill": 0.8,
+      "killValue": 20,
+      "breakthroughDamage": 1,
+      "threat": 2.7
+    },
+    "at_infantry": {
+      "label": "German Anti-Tank Infantry",
+      "health": 80,
+      "speed": 27,
+      "weapon": "panzerschreck",
+      "radius": 9,
+      "initialAccuracySkill": 0.85,
+      "killValue": 22,
+      "breakthroughDamage": 1,
+      "threat": 2.8
+    },
+    "infiltrator": {
+      "label": "German Infiltrator",
+      "health": 55,
+      "speed": 37,
+      "weapon": "smg",
+      "radius": 9,
+      "initialAccuracySkill": 0.68,
+      "killValue": 18,
+      "breakthroughDamage": 1,
+      "threat": 1.2
     }
   }
 }

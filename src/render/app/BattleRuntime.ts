@@ -16,6 +16,11 @@ export class BattleRuntime {
   private lastRightPress: { x: number; y: number; time: number; selection: string } | null = null;
   private stopped = false;
   private lost = false;
+  private hoverPoint: { x: number; y: number } | null = null;
+
+  private cameraBlocked(): boolean {
+    return document.querySelector('.overlay:not([hidden]):not(.map-review-overlay)') !== null;
+  }
 
   constructor(private readonly controller: GameController, private readonly container: HTMLElement) {
     this.canvas = document.createElement('canvas');
@@ -49,6 +54,14 @@ export class BattleRuntime {
     this.lastFrame = time;
     if (!document.hidden) this.renderer.updateFrameTime(elapsed);
     this.controller.frame(delta);
+    if (!this.cameraBlocked() && this.renderer.getZoom() > 1 && this.controller.prefs.edgeScrolling && this.hoverPoint && this.activePointer === null) {
+      const bounds = this.canvas.getBoundingClientRect(), edge = 24;
+      const x = this.hoverPoint.x - bounds.left, y = this.hoverPoint.y - bounds.top;
+      const dx = x < edge ? 1 - x / edge : x > bounds.width - edge ? -(x - bounds.width + edge) / edge : 0;
+      const dy = y < edge ? 1 - y / edge : y > bounds.height - edge ? -(y - bounds.height + edge) / edge : 0;
+      const speed = delta * .6 * this.controller.prefs.panSpeed;
+      this.renderer.panByScreenPixels(dx * speed, dy * speed, bounds.width, bounds.height);
+    }
     this.raf = requestAnimationFrame(this.onFrame);
   };
 
@@ -106,19 +119,22 @@ export class BattleRuntime {
 
   private preventContextMenu = (event: Event): void => event.preventDefault();
   private onWheel = (event: WheelEvent): void => {
+    if (this.cameraBlocked()) return;
     event.preventDefault();
-    this.applyZoom(this.renderer.getZoom() * Math.exp(-event.deltaY * 0.001));
+    this.applyZoom(this.renderer.getZoom() * Math.exp(-event.deltaY * 0.001 * this.controller.prefs.zoomSensitivity));
   };
   private onZoomKey = (event: KeyboardEvent): void => {
-    if (event.key === '+' || event.key === '=') {
+    if (this.cameraBlocked()) return;
+    const keys = this.controller.prefs.keys;
+    if (event.code === keys.zoomIn) {
       event.preventDefault();
       this.applyZoom(this.renderer.getZoom() * 1.2);
-    } else if (event.key === '-' || event.key === '_') {
+    } else if (event.code === keys.zoomOut) {
       event.preventDefault();
       this.applyZoom(this.renderer.getZoom() / 1.2);
-    } else if (event.key === '0') {
+    } else if (event.code === keys.resetCamera) {
       event.preventDefault();
-      this.applyZoom(1);
+      this.renderer.resetCamera();
     }
   };
   private applyZoom(zoom: number): void {
@@ -126,9 +142,10 @@ export class BattleRuntime {
     this.renderer.setZoom(zoom);
   }
   private onPointerDown = (event: PointerEvent): void => {
+    if (this.cameraBlocked()) return;
     if (event.button !== 0 && event.button !== 2) return;
     if (event.button === 0) this.lastRightPress = null;
-    if (event.ctrlKey && event.button === 0 && this.renderer.getZoom() > 1) {
+    if (event.ctrlKey && event.button === 0) {
       event.preventDefault();
       this.activePointer = event.pointerId;
       this.activeButton = event.button;
@@ -144,6 +161,7 @@ export class BattleRuntime {
     this.controller.unlockAudio();
     this.activePointer = event.pointerId;
     this.activeButton = event.button;
+    this.lastPanPoint = { x: event.clientX, y: event.clientY };
     this.canvas.setPointerCapture(event.pointerId);
     if (event.button === 2) {
       const destination = this.renderer.buildingAt(event.clientX, event.clientY) ?? point;
@@ -160,15 +178,26 @@ export class BattleRuntime {
     else this.controller.pointerLeft(point.x, point.y, event.shiftKey, this.renderer.friendlyUnitAt(event.clientX, event.clientY) ?? undefined);
   };
   private onPointerMove = (event: PointerEvent): void => {
+    this.hoverPoint = { x: event.clientX, y: event.clientY };
+    if (this.cameraBlocked()) return;
     if (this.activePointer === event.pointerId && this.activeButton === 0) {
+      // Allow Ctrl to be pressed after the mouse button, too. Cancel the
+      // selection gesture before moving the camera so release cannot select.
+      if (!this.panDragging && event.ctrlKey) {
+        this.controller.pointerCancel();
+        this.panDragging = true;
+        this.canvas.classList.add('pan-active');
+      }
       if (this.panDragging && this.lastPanPoint !== null) {
+        event.preventDefault();
         const rect = this.canvas.getBoundingClientRect();
-        this.renderer.panByScreenPixels(event.clientX - this.lastPanPoint.x, event.clientY - this.lastPanPoint.y, rect.width, rect.height);
+        this.renderer.panByScreenPixels((event.clientX - this.lastPanPoint.x) * this.controller.prefs.panSpeed, (event.clientY - this.lastPanPoint.y) * this.controller.prefs.panSpeed, rect.width, rect.height);
         this.lastPanPoint = { x: event.clientX, y: event.clientY };
         return;
       }
       const point = this.groundPoint(event, true);
       if (point) this.controller.pointerMove(point.x, point.y);
+      this.lastPanPoint = { x: event.clientX, y: event.clientY };
       return;
     }
     const point = this.groundPoint(event);
@@ -195,8 +224,8 @@ export class BattleRuntime {
   };
   private onPointerCancel = (event: PointerEvent): void => { if (this.activePointer === event.pointerId) this.clearGesture(); };
   private onLostCapture = (event: PointerEvent): void => { if (this.activePointer === event.pointerId) this.clearGesture(); };
-  private onPointerLeave = (): void => this.controller.pointerLeave();
-  private onBlur = (): void => this.clearGesture();
+  private onPointerLeave = (): void => { this.hoverPoint = null; this.controller.pointerLeave(); };
+  private onBlur = (): void => { this.hoverPoint = null; this.clearGesture(); };
   private clearGesture(): void { this.activePointer = null; this.activeButton = null; this.panDragging = false; this.lastPanPoint = null; this.lastRightPress = null; this.canvas.classList.remove('pan-active'); this.controller.pointerCancel(); }
 
   worldToClient(pos: Vec2, height = 0): { x: number; y: number } | null { return this.renderer.simulationToClient(pos, height); }

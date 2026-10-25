@@ -3,7 +3,7 @@ import { findPath } from './navigation';
 import type { PatrolArea, Terrain, Vec2 } from './types';
 
 export function isPatrolRole(role: string): boolean {
-  return role === 'rifleman' || role === 'sniper' || role === 'medic';
+  return role === 'scout' || role === 'rifleman' || role === 'sniper' || role === 'medic';
 }
 
 export function patrolArea(from: Vec2, to: Vec2): PatrolArea {

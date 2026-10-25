@@ -7,6 +7,17 @@ import { hasLineOfSight, foliageAlongLine, generateTerrain, isFoliageKind, isRiv
 import { findPath } from '../src/simulation/navigation';
 import type { Building, SimEvent, SimSnapshot, Terrain, Unit, Vec2 } from '../src/simulation/types';
 
+/** Isolated rule fixtures must not inherit seeded water, buildings or cover. */
+function openField(seed: number): Simulation {
+  const data = generateTerrain(seed, false, 2);
+  data.kinds.fill(TERRAIN_KIND.open);
+  data.terrain.blocked.fill(0);
+  data.terrain.baseBlocked?.fill(0);
+  data.zones = { river: null, bridges: [], rapids: [], mud: [] };
+  data.terrain.bridges = [];
+  return new Simulation(seed, undefined, data, false);
+}
+
 interface ScriptAction {
   tick: number;
   run(sim: Simulation): void;
@@ -93,8 +104,7 @@ describe('enemy movement policy', () => {
    * it moving, which would mask the movement policy under test.
    */
   function arena(seed: number, role: 'rifle' | 'assault' | 'vehicle', enemyY = 60) {
-    const sim = new Simulation(seed);
-    sim.state.terrain.blocked.fill(0);
+    const sim = openField(seed);
     sim.state.points = 0;
     sim.state.scheduler.phase = 'prep';
     sim.state.scheduler.prepTicksLeft = 1_000_000; // hold off wave spawning
@@ -659,7 +669,7 @@ describe('work sites in progress', () => {
 
   /** A simulation whose whole squad is one engineer, standing at the front. */
   function loneEngineer(seed = 81, points = 40) {
-    const sim = new Simulation(seed);
+    const sim = openField(seed);
     sim.state.points = points;
     sim.state.scheduler.phase = 'prep';
     sim.state.scheduler.prepTicksLeft = 1_000_000;
@@ -1276,6 +1286,8 @@ describe('river and mud', () => {
   /** One soldier, alone on the map, standing where it was put. */
   function loneSoldier(seed: number, at: { x: number; y: number }): { sim: Simulation; soldier: Unit } {
     const sim = new Simulation(seed);
+    // Isolate the base ground tuning from the additional wet-ground penalty.
+    sim.state.weather = 'clear'; sim.state.weatherChangeTick = 100_000;
     const soldier = sim.state.units[0]!;
     // Interference from the rest of the squad - separation shoves and suppressive
     // fire aimed at someone else - would make a movement measurement noisy.
@@ -1327,7 +1339,7 @@ describe('river and mud', () => {
     const share = withRiver / 120;
     expect(share).toBeGreaterThan(CONFIG.terrain.river.presenceChance - 0.2);
     expect(share).toBeLessThan(CONFIG.terrain.river.presenceChance + 0.2);
-  }, 15_000); // Generating 120 complete landscapes exceeds the default timeout under parallel load.
+  }, 30_000); // Generating 120 complete landscapes exceeds the default timeout under parallel load.
 
   it('never marks a blocked cell as water or mud', () => {
     for (const seed of [11, 88, 777]) {

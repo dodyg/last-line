@@ -1,3 +1,4 @@
+import type { VehicleTrack } from './battle-wear';
 /** Shared simulation types. Plain data only - JSON-serializable except terrain, which is regenerated from the seed. */
 
 export interface Vec2 {
@@ -21,8 +22,8 @@ export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 /** `rain` is the steady, medium intensity retained for older saves. */
 export type WeatherKind = 'clear' | 'lightRain' | 'rain' | 'heavyRain' | 'lightFog' | 'fog' | 'heavyFog' | 'lightSnow' | 'snow' | 'heavySnow';
 
-export type FriendlyRole = 'rifleman' | 'mg' | 'medic' | 'supply_officer' | 'at' | 'sniper' | 'engineer' | 'radio_engineer' | 'officer' | 'mortarman' | 'gun_truck';
-export type EnemyArchetype = 'rifle' | 'assault' | 'vehicle' | 'observer' | 'gun_truck' | 'troop_transport' | 'sapper';
+export type FriendlyRole = 'rifleman' | 'mg' | 'medic' | 'supply_officer' | 'at' | 'sniper' | 'engineer' | 'radio_engineer' | 'officer' | 'mortarman' | 'gun_truck' | 'scout' | 'heavy_mg' | 'assault_infantry' | 'at_gun';
+export type EnemyArchetype = 'rifle' | 'assault' | 'vehicle' | 'observer' | 'gun_truck' | 'troop_transport' | 'sapper' | 'mg_team' | 'sharpshooter' | 'field_officer' | 'at_infantry' | 'infiltrator';
 export type UnitRole = FriendlyRole | EnemyArchetype;
 export type WeaponUpgradeType = 'accuracy' | 'reload' | 'damage';
 export type TankComponent = 'tracks' | 'turret' | 'machineGun';
@@ -56,6 +57,13 @@ export interface AmbushOrder {
 }
 
 export interface Unit {
+  /** Weapon crews pack, turn and deploy before firing. Angles use simulation XY. */
+  deployment?: { ticks: number; facing: number; packingTicks: number };
+  aim?: { targetId: number; ticks: number };
+  revealedUntil?: number;
+  detectedUntil?: number;
+  clearBuilding?: { buildingId: number; level: BuildingLevel; facing?: BuildingFacing; ticks: number };
+
   /** Surviving tank crew remain ordinary infantry for targeting and wave counts. */
   tankCrew?: { tankId: number; behavior: 'retreat' | 'fight'; exit: Vec2; retryTick: number; bailoutTicks: number };
   /** Permanent subsystem failures on enemy tanks; absent means fully operational. */
@@ -70,6 +78,9 @@ export interface Unit {
   dodgingStrike?: boolean;
   /** Repeating area patrol; direct movement and building orders replace it. */
   patrol?: PatrolOrder;
+  roleDuty?: RoleDuty;
+  roleCooldown?: number;
+  scoutReports?: ScoutReport[];
   /** Independent upper/lower route while within a bridge footprint. */
   bridgePosition?: BridgePosition;
   /** Personal last-known firing positions; silence and movement break contact. */
@@ -192,11 +203,14 @@ export interface Unit {
   headlightsOn?: boolean;
 }
 
+export interface RoleDuty { kind: 'rally' | 'observe' | 'supply' | 'repair' | 'suppress'; origin: Vec2; ticksRemaining: number; stock: number; target?: Vec2 }
+export interface ScoutReport { unitId: number; role: UnitRole; pos: Vec2; tick: number }
+
 export type FireOrder = 'auto' | 'antiArmor' | 'stopBreakthrough' | 'holdGrenades' | 'seekGunfire';
 export const FIRE_ORDERS: readonly FireOrder[] = ['auto', 'antiArmor', 'stopBreakthrough', 'holdGrenades', 'seekGunfire'];
 export function fireOrdersForRole(role: UnitRole): readonly FireOrder[] {
   if (role === 'gun_truck' || role === 'vehicle' || role === 'troop_transport') return ['auto', 'antiArmor', 'stopBreakthrough'];
-  return role === 'medic' || role === 'mortarman' ? FIRE_ORDERS.filter((order) => order !== 'seekGunfire') : FIRE_ORDERS;
+  return role === 'medic' || role === 'mortarman' || role === 'heavy_mg' || role === 'at_gun' ? FIRE_ORDERS.filter((order) => order !== 'seekGunfire') : FIRE_ORDERS;
 }
 export type Specialization = 'steadyAim' | 'fastReload' | 'tankHunter' | 'fieldMedic' | 'surgeon' | 'rapidBuilder' | 'heavyCharges' | 'spotter' | 'forwardObserver' | 'signalOfficer' | 'suppressor' | 'forcedMarch' | 'camouflage';
 
@@ -533,6 +547,7 @@ export interface BridgeSurface {
   type: 'timber' | 'stone' | 'bailey' | 'pontoon';
   halfWidth: number;
   halfLength: number;
+  junction?: boolean;
 }
 
 export interface BridgePosition {
@@ -579,7 +594,7 @@ export interface SimSnapshot {
   /** Absent on older saves, which retain their original landscape generator. */
   campaignCountry?: CampaignCountry;
   /** Missing on older saves, which retain the original terrain generator. */
-  terrainLayoutVersion?: 1 | 2 | 3;
+  terrainLayoutVersion?: 1 | 2 | 3 | 4;
   battleRecord: BattleRecord;
   schemaVersion: number;
   seed: number;
@@ -607,6 +622,7 @@ export interface SimSnapshot {
   destroyedBridgeKeys?: string[];
   strikes: Strike[];
   groundImpacts?: GroundImpact[];
+  vehicleTracks?: VehicleTrack[];
   treeDamage?: TreeDamage[];
   sandbags: Sandbag[];
   trenches: Trench[];
@@ -689,6 +705,7 @@ export interface SimState {
   destroyedBridgeKeys: string[];
   strikes: Strike[];
   groundImpacts?: GroundImpact[];
+  vehicleTracks?: VehicleTrack[];
   treeDamage?: TreeDamage[];
   sandbags: Sandbag[];
   trenches: Trench[];
@@ -751,6 +768,8 @@ export interface SimState {
 }
 
 export type SimEvent =
+  | { type: 'roleAbilityStarted'; unitId: number; kind: RoleDuty['kind']; pos: Vec2 }
+  | { type: 'scoutContact'; unitId: number; role: UnitRole; pos: Vec2 }
   | { type: 'tankCrewBailedOut'; tankId: number; crewIds: number[]; retreating: number; fighting: number; pos: Vec2 }
   | { type: 'tankCrewEscaped'; unitId: number; tankId: number; pos: Vec2 }
   | { type: 'tankComponentDisabled'; unitId: number; component: TankComponent; pos: Vec2 }
@@ -864,6 +883,7 @@ export type Command =
   | { type: 'foodSupplies' }
   | { type: 'smoke'; unitId: number; pos: Vec2 }
   | { type: 'satchel'; unitId: number; pos: Vec2 }
+  | { type: 'roleAbility'; unitId: number; pos?: Vec2 }
   | { type: 'lightFire'; unitId: number }
   | { type: 'ambush'; unitIds: readonly number[]; aim: Vec2; arcDegrees: number }
   | { type: 'cancelAmbush'; unitIds: readonly number[] }
@@ -1316,6 +1336,9 @@ export interface GameConfig {
    * takes a real effort to level and a house does not.
    */
   buildings: {
+    /** Collapse damage as a fraction of the occupant's maximum health. */
+    collapseDamageMinMult: number;
+    collapseDamageMaxMult: number;
     /** Footprint in terrain cells, per kind. */
     footprints: Record<BuildingKind, { cols: number; rows: number }>;
     health: Record<BuildingKind, number>;

@@ -1,4 +1,6 @@
-import type { Preferences } from '../persistence';
+import { Soundscape, type AtmosphereContext } from './soundscape';
+import { DEFAULT_PREFS, type Preferences } from '../persistence';
+import type { WeatherKind } from '../simulation/types';
 import type { RadioCue } from './radio';
 
 const alliedRadioRecordings = [
@@ -28,7 +30,11 @@ export type SoundName = 'rifle' | 'mg' | 'smg' | 'rocket' | 'explosion' | 'morta
 export class AudioSys {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
-  private prefs: Preferences = { volume: 0.8, muted: false, screenShake: true };
+  private prefs: Preferences = { ...DEFAULT_PREFS };
+  private effectsBus: GainNode | null = null;
+  private voiceBus: GainNode | null = null;
+  private soundscape: Soundscape | null = null;
+  private voiceDuckUntil = 0;
   private shotWindow: number[] = [];
   private unlocked = false;
   private lastVoiceURI = '';
@@ -60,17 +66,34 @@ export class AudioSys {
     if (prefs.muted || prefs.volume <= 0) this.cancelChatter();
     if (this.master !== null && this.ctx !== null) {
       this.master.gain.setTargetAtTime(this.effectiveVolume(), this.ctx.currentTime, 0.02);
+      this.effectsBus?.gain.setTargetAtTime(prefs.effectsVolume, this.ctx.currentTime, .02);
+      this.voiceBus?.gain.setTargetAtTime(prefs.voiceVolume, this.ctx.currentTime, .02);
     }
   }
 
+  previewAmericanVoice(): string {
+    this.unlock();
+    const voice = this.chooseRadioVoice('friendly', -4);
+    if (!voice || typeof SpeechSynthesisUtterance === 'undefined') return 'No American male voice is available. Install a US English voice in your system speech settings.';
+    this.speakChatter('American radio check. Ready for orders.', 'friendly', 'tense', -4, 'clear');
+    return `${voice.name} · ${voice.lang}${this.prefs.muted || this.prefs.voiceVolume === 0 ? ' · audio is muted' : ''}`;
+  }
+
+  setAtmosphere(weather: WeatherKind, active: boolean, context: AtmosphereContext = { pressure: 0, night: false, sheltered: false }): void {
+    if (!this.ctx || !this.master) return;
+    if (active && !this.soundscape) this.soundscape = new Soundscape(this.ctx, this.master);
+    this.soundscape?.update(weather, active && !this.prefs.muted, this.prefs, { ...context, ducked: this.ctx.currentTime < this.voiceDuckUntil });
+  }
+
   /** Human recorded interjections lead into a soldier-specific spoken report. */
-  speakChatter(text: string, team: 'friendly' | 'enemy', delivery: 'shout' | 'tense' | 'panic' = 'shout', speakerId = 0, cue: RadioCue = 'contact', confirmation?: string): void {
+  speakChatter(text: string, team: 'friendly' | 'enemy', delivery: 'shout' | 'tense' | 'panic' = 'shout', speakerId = 0, cue: RadioCue = 'contact', confirmation?: string, channel: 'field' | 'radio' = 'radio', reply?: { text: string; speakerId: number }): void {
     if (this.prefs.muted || this.effectiveVolume() <= 0) return;
     this.cancelChatter(false);
-    this.radioSquelch(team);
+    if (channel === 'radio') this.radioSquelch(team);
+    if (this.ctx) this.voiceDuckUntil = this.ctx.currentTime + Math.min(12, 1 + text.length / 12);
     const generation = this.chatterGeneration;
     const utteranceSupported = typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
-    const clip = this.chooseRecordedClip(team, cue, speakerId);
+    const clip = channel === 'radio' ? this.chooseRecordedClip(team, cue, speakerId) : null;
     if (clip !== null) this.playRecordedClip(clip, team, generation);
     if (!utteranceSupported) return;
     try {
@@ -85,10 +108,12 @@ export class AudioSys {
       const shouting = delivery !== 'tense';
       utterance.rate = (panic ? 1.12 : shouting ? 1.045 : 0.96) + (Math.random() - 0.5) * (panic ? 0.12 : 0.08);
       utterance.pitch = (team === 'friendly' ? 0.98 : 0.92) + (Math.random() - 0.5) * (panic ? 0.24 : 0.14);
-      utterance.volume = Math.min(1, this.effectiveVolume() * (panic ? 1 : shouting ? 0.94 : 0.78));
-      utterance.onstart = () => { if (generation === this.chatterGeneration) this.startRadioStatic(team); };
+      utterance.volume = Math.min(1, this.effectiveVolume() * this.prefs.voiceVolume * (panic ? 1 : shouting ? 0.94 : 0.78));
+      utterance.onstart = () => { if (generation === this.chatterGeneration && channel === 'radio') this.startRadioStatic(team); };
       utterance.onend = () => {
         if (generation !== this.chatterGeneration) return;
+        if (this.ctx) this.voiceDuckUntil = this.ctx.currentTime;
+        if (reply) { this.speakChatter(reply.text, team, 'tense', reply.speakerId, cue, undefined, 'field'); return; }
         if (confirmation !== undefined) this.speakRadioConfirmation(confirmation, generation);
         else this.endRadioStatic();
       };
@@ -123,11 +148,13 @@ export class AudioSys {
     }
 
     this.cancelChatter(false);
+    if (this.ctx) this.voiceDuckUntil = this.ctx.currentTime + 20;
     const generation = this.chatterGeneration;
     let completed = false;
     const finish = (confirmed: boolean): void => {
       if (completed || generation !== this.chatterGeneration) return;
       completed = true;
+      this.voiceDuckUntil = 0;
       if (this.pendingRadioExchangeCancel !== null) this.pendingRadioExchangeCancel = null;
       this.endRadioStatic();
       onComplete(confirmed);
@@ -138,7 +165,7 @@ export class AudioSys {
     reply.lang = responseVoice.lang;
     reply.rate = 0.88;
     reply.pitch = 0.84;
-    reply.volume = Math.min(1, this.effectiveVolume() * 0.66);
+    reply.volume = Math.min(1, this.effectiveVolume() * this.prefs.voiceVolume * 0.66);
     reply.onstart = () => { if (generation === this.chatterGeneration) this.startRadioStatic('enemy', true); };
     reply.onend = () => {
       if (generation !== this.chatterGeneration) return;
@@ -153,7 +180,7 @@ export class AudioSys {
     call.lang = requestVoice.lang;
     call.rate = 1;
     call.pitch = 0.98;
-    call.volume = Math.min(1, this.effectiveVolume() * 0.86);
+    call.volume = Math.min(1, this.effectiveVolume() * this.prefs.voiceVolume * 0.86);
     call.onstart = () => { if (generation === this.chatterGeneration) this.startRadioStatic('friendly'); };
     call.onend = () => {
       if (generation !== this.chatterGeneration) return;
@@ -194,7 +221,7 @@ export class AudioSys {
       // voice with a stronger receiver bed makes the acknowledgment feel distant.
       utterance.rate = 0.88;
       utterance.pitch = 0.84;
-      utterance.volume = Math.min(1, this.effectiveVolume() * 0.66);
+      utterance.volume = Math.min(1, this.effectiveVolume() * this.prefs.voiceVolume * 0.66);
       utterance.onstart = () => { if (generation === this.chatterGeneration) this.startRadioStatic('enemy', true); };
       utterance.onend = () => {
         if (generation !== this.chatterGeneration) return;
@@ -209,6 +236,7 @@ export class AudioSys {
   }
 
   cancelChatter(includeMedicCalls = true): void {
+    this.voiceDuckUntil = 0;
     if (includeMedicCalls) {
       this.medicCallGeneration++;
       for (const source of this.medicCallSources) {
@@ -230,15 +258,17 @@ export class AudioSys {
   }
 
   private chooseRadioVoice(team: 'friendly' | 'enemy', speakerId: number): SpeechSynthesisVoice | null {
-    const language = team === 'friendly' ? 'en' : 'de';
+    const language = team === 'friendly' ? 'en-us' : 'de';
     const languageVoices = this.availableVoices.filter((voice) =>
-      voice.lang.toLowerCase().startsWith(language),
+      voice.lang.toLowerCase().replaceAll('_', '-').startsWith(language),
     );
     // Browser speech APIs rarely expose voice gender consistently. Prefer a
     // recognizable male voice, but don't disable German speech when the
     // installed German voice has no gender metadata or known name.
     const maleVoices = languageVoices.filter(isMaleVoice);
-    const voices = maleVoices.length > 0 || language === 'en' ? maleVoices : languageVoices;
+    // Keep player soldiers and Control American, even when other English
+    // locales offer more natural voices or a previously assigned voice.
+    const voices = maleVoices.length > 0 || team === 'friendly' ? maleVoices : languageVoices;
     if (voices.length === 0) return null;
     const assignedUri = this.soldierVoiceURIs.get(speakerId);
     const assigned = assignedUri === undefined ? undefined : voices.find((voice) => voice.voiceURI === assignedUri);
@@ -276,7 +306,7 @@ export class AudioSys {
 
   private playRecordedClip(clip: RecordedClip, team: 'friendly' | 'enemy', generation: number): void {
     const ctx = this.ctx;
-    const master = this.master;
+    const master = this.voiceBus;
     if (ctx === null || master === null || generation !== this.chatterGeneration) return;
     try {
       const source = ctx.createBufferSource();
@@ -348,7 +378,7 @@ export class AudioSys {
   private shoutFieldCall(url: string, pan: number): void {
     if (this.prefs.muted || this.effectiveVolume() <= 0) return;
     this.unlock();
-    const ctx = this.ctx, master = this.master, generation = this.medicCallGeneration;
+    const ctx = this.ctx, master = this.voiceBus, generation = this.medicCallGeneration;
     if (!ctx || !master) return;
     void ctx.resume().catch(() => { /* Audio may be blocked by the browser. */ });
     void this.loadFieldCall(url).then((buffer) => {
@@ -371,7 +401,7 @@ export class AudioSys {
 
   private startRadioStatic(team: 'friendly' | 'enemy', remoteChannel = false): void {
     const ctx = this.ctx;
-    const master = this.master;
+    const master = this.voiceBus;
     if (ctx === null || master === null || this.prefs.muted || this.effectiveVolume() <= 0) return;
     this.endRadioStatic();
     try {
@@ -423,8 +453,8 @@ export class AudioSys {
     const ctx = this.ctx;
     if (ctx === null || this.master === null || this.prefs.muted || this.effectiveVolume() <= 0) return;
     const pan = team === 'friendly' ? -0.22 : 0.22;
-    this.noise(0.075, 0.055, 2200, pan);
-    this.tone(team === 'friendly' ? 1040 : 760, 0.045, 0.025);
+    this.noise(0.075, 0.055, 2200, pan, false, 0, this.voiceBus);
+    this.tone(team === 'friendly' ? 1040 : 760, 0.045, 0.025, 0, this.voiceBus);
   }
 
   private effectiveVolume(): number {
@@ -441,6 +471,8 @@ export class AudioSys {
       this.master = this.ctx.createGain();
       this.master.gain.value = this.effectiveVolume();
       this.master.connect(this.ctx.destination);
+      this.effectsBus = this.ctx.createGain(); this.effectsBus.gain.value = this.prefs.effectsVolume; this.effectsBus.connect(this.master);
+      this.voiceBus = this.ctx.createGain(); this.voiceBus.gain.value = this.prefs.voiceVolume; this.voiceBus.connect(this.master);
       this.unlocked = true;
       void this.loadMedicCall();
       void this.loadFieldCall(grenadeSupplyRecording);
@@ -463,7 +495,7 @@ export class AudioSys {
 
   play(name: SoundName, pan = 0): void {
     const ctx = this.ctx;
-    const master = this.master;
+    const master = this.effectsBus;
     if (ctx === null || master === null || this.prefs.muted || this.effectiveVolume() <= 0) return;
     try {
       switch (name) {
@@ -528,9 +560,9 @@ export class AudioSys {
     }
   }
 
-  private noise(duration: number, gain: number, filterFreq: number, pan: number, lowpass = false, delay = 0): void {
+  private noise(duration: number, gain: number, filterFreq: number, pan: number, lowpass = false, delay = 0, bus = this.effectsBus): void {
     const ctx = this.ctx;
-    const master = this.master;
+    const master = bus;
     if (ctx === null || master === null) return;
     const frames = Math.floor(ctx.sampleRate * duration);
     const buffer = ctx.createBuffer(1, frames, ctx.sampleRate);
@@ -572,7 +604,7 @@ export class AudioSys {
 
   private gunBody(freq: number, gain: number, pan: number): void {
     const ctx = this.ctx;
-    const master = this.master;
+    const master = this.effectsBus;
     if (ctx === null || master === null) return;
     const t0 = ctx.currentTime;
     const osc = ctx.createOscillator();
@@ -589,9 +621,9 @@ export class AudioSys {
     osc.stop(t0 + 0.1);
   }
 
-  private tone(freq: number, duration: number, gain: number, delay = 0): void {
+  private tone(freq: number, duration: number, gain: number, delay = 0, bus = this.effectsBus): void {
     const ctx = this.ctx;
-    const master = this.master;
+    const master = bus;
     if (ctx === null || master === null) return;
     const osc = ctx.createOscillator();
     osc.type = 'triangle';
@@ -608,7 +640,7 @@ export class AudioSys {
 
   private thump(freq: number, gain: number): void {
     const ctx = this.ctx;
-    const master = this.master;
+    const master = this.effectsBus;
     if (ctx === null || master === null) return;
     const osc = ctx.createOscillator();
     osc.type = 'sine';
@@ -625,7 +657,7 @@ export class AudioSys {
   /** A layered propeller-engine pass with a softer rush and clear flyby motion. */
   private aircraftFlyby(pan: number): void {
     const ctx = this.ctx;
-    const master = this.master;
+    const master = this.effectsBus;
     if (ctx === null || master === null) return;
     const start = ctx.currentTime;
     const pass = start + 1.05;

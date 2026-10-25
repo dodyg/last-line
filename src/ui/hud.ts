@@ -1,5 +1,7 @@
+import { ROLE_ABILITIES } from '../simulation/role-abilities';
 import { supportsAmbush } from '../simulation/ambush';
 import { CONFIG } from '../content/config';
+import type { PreviewInfo } from '../game/render-contract';
 
 import { campfireError } from '../simulation/campfires';
 
@@ -122,6 +124,7 @@ export interface HudCallbacks {
   onAmbush(arcDegrees: number): void;
   onAmbushArcChange(arcDegrees: number): void;
   onFireOrder(): void;
+  onRoleAbility(): void;
 
   onStance(): void;
 
@@ -408,6 +411,10 @@ function setCommandIcon(button: HTMLButtonElement, state: string, paths: string)
 }
 
 const SPECIALIZATION_CHOICES: Record<FriendlyRole, Array<{ value: Specialization; label: string }>> = {
+  scout: [{ value: 'steadyAim', label: 'Steady aim (+12% accuracy)' }, { value: 'forcedMarch', label: 'Forced march (+20% speed)' }, { value: 'camouflage', label: 'Camouflage' }],
+  heavy_mg: [{ value: 'steadyAim', label: 'Steady aim (+12% accuracy)' }, { value: 'suppressor', label: 'Suppressor (+50% suppression)' }, { value: 'fastReload', label: 'Fast reload (-15%)' }],
+  assault_infantry: [{ value: 'steadyAim', label: 'Steady aim (+12% accuracy)' }, { value: 'fastReload', label: 'Fast reload (-15%)' }, { value: 'forcedMarch', label: 'Forced march (+20% speed)' }, { value: 'camouflage', label: 'Camouflage' }],
+  at_gun: [{ value: 'tankHunter', label: 'Tank hunter (+25% armor damage)' }, { value: 'fastReload', label: 'Fast reload (-15%)' }, { value: 'steadyAim', label: 'Steady aim (+12% accuracy)' }],
 
   rifleman: [{ value: 'steadyAim', label: 'Steady aim (+12% accuracy)' }, { value: 'fastReload', label: 'Fast reload (−15%)' }, { value: 'forcedMarch', label: 'Forced march (+20% movement speed)' }, { value: 'camouflage', label: 'Camouflage (−25% enemy detection range)' }],
 
@@ -512,6 +519,7 @@ export class Hud {
   private selectionKey = '';
 
   private specializationRole = '';
+  private readonly roleAbilityButton: HTMLButtonElement;
 
 
 
@@ -793,6 +801,11 @@ export class Hud {
 
     this.el.btnLightFire.addEventListener('click', () => this.cb.onLightFire());
 
+    this.roleAbilityButton = document.createElement('button');
+    this.roleAbilityButton.id = 'btn-role-ability'; this.roleAbilityButton.type = 'button';
+    this.roleAbilityButton.className = 'action-button'; this.roleAbilityButton.hidden = true;
+    this.roleAbilityButton.addEventListener('click', () => this.cb.onRoleAbility());
+    this.el.btnAmbush.parentElement!.append(this.roleAbilityButton);
     this.el.btnAmbush.addEventListener('click', () => this.cb.onAmbush(Number(this.el.ambushArc.value)));
     this.el.ambushArc.addEventListener('change', () => this.cb.onAmbushArcChange(Number(this.el.ambushArc.value)));
     this.el.btnFireOrder.addEventListener('click', () => this.cb.onFireOrder());
@@ -867,7 +880,7 @@ export class Hud {
 
     this.el.recruitButtons.replaceChildren();
 
-    const roles: FriendlyRole[] = ['rifleman', 'mg', 'medic', 'supply_officer', 'at', 'sniper', 'engineer', 'radio_engineer', 'officer', 'mortarman', 'gun_truck'];
+    const roles: FriendlyRole[] = ['rifleman', 'mg', 'medic', 'supply_officer', 'at', 'sniper', 'engineer', 'radio_engineer', 'officer', 'mortarman', 'gun_truck', 'scout', 'heavy_mg', 'assault_infantry', 'at_gun'];
 
     for (const role of roles) {
 
@@ -1082,6 +1095,7 @@ export class Hud {
 
 
   show(): void {
+    const log = document.getElementById('battle-log'); if (log) log.hidden = false;
 
     this.el.top.hidden = false;
 
@@ -1092,6 +1106,8 @@ export class Hud {
 
 
   hide(): void {
+    for (const id of ['battle-log', 'combat-alert', 'placement-feedback']) { const element = document.getElementById(id); if (element) element.hidden = true; }
+    window.clearTimeout(this.alertTimer);
 
     this.closeSoldierMenu();
 
@@ -1175,7 +1191,46 @@ export class Hud {
 
 
 
+  private alertTimer = 0;
+  private pinnedIds = new Set<number>();
+  private pinnedSeed = -1;
+  private readonly originalTitles = new WeakMap<HTMLButtonElement, string>();
+
+  private availability(button: HTMLButtonElement, reason: string): void {
+    if (!this.originalTitles.has(button)) this.originalTitles.set(button, button.title);
+    const base = this.originalTitles.get(button)!;
+    const title = button.disabled ? `${base} · Unavailable: ${reason}` : base;
+    if (button.title !== title) { button.title = title; button.setAttribute('aria-description', button.disabled ? reason : base); }
+  }
+
+  private addHistory(text: string, kind: string): void {
+    const history = document.getElementById('battle-history');
+    if (!history) return;
+    const row = document.createElement('li'); row.className = kind; row.textContent = text;
+    history.prepend(row);
+    while (history.children.length > 60) history.lastChild?.remove();
+  }
+
+  setPlacementFeedback(preview: PreviewInfo | null): void {
+    const element = document.getElementById('placement-feedback');
+    if (!element) return;
+    element.hidden = preview === null;
+    if (!preview) return;
+    const costs = CONFIG.costs as unknown as Record<string, number>;
+    const cost = preview.kind === 'recruit' ? CONFIG.costs.recruit[preview.role as FriendlyRole]
+      : preview.kind === 'satchel' ? CONFIG.satchel.cost : costs[preview.kind];
+    const label = preview.kind.replace(/([A-Z])/g, ' $1');
+    const text = `${label[0]!.toUpperCase()}${label.slice(1)}${cost !== undefined ? ` · ${cost} points` : ''} · ${preview.valid ? 'Click to confirm · Esc to cancel' : preview.reason ?? 'Invalid position or soldier unavailable'}`;
+    if (element.textContent !== text) element.textContent = text;
+    element.classList.toggle('invalid', !preview.valid);
+  }
+
   notice(text: string, kind: 'info' | 'warn' | 'error' | 'good' = 'info'): void {
+    this.addHistory(text, kind);
+    if (kind === 'error' || text.includes('pinned')) {
+      const alert = document.getElementById('combat-alert');
+      if (alert) { alert.textContent = text; alert.hidden = false; window.clearTimeout(this.alertTimer); this.alertTimer = window.setTimeout(() => { alert.hidden = true; }, 6500); }
+    }
 
     const div = document.createElement('div');
 
@@ -1183,15 +1238,15 @@ export class Hud {
 
     div.textContent = text;
 
-    this.el.notices.append(div);
+    this.el.notices.prepend(div);
 
     while (this.el.notices.children.length > MAX_NOTICES) {
 
-      this.el.notices.firstChild?.remove();
+      this.el.notices.lastChild?.remove();
 
     }
 
-    window.setTimeout(() => div.remove(), NOTICE_TTL_MS);
+    window.setTimeout(() => div.remove(), kind === 'error' ? NOTICE_TTL_MS * 2 : NOTICE_TTL_MS);
 
     if (this.noticeTimer === undefined) {
 
@@ -1213,7 +1268,10 @@ export class Hud {
 
 
 
-  chatter(team: 'friendly' | 'enemy', text: string): void {
+  clearChatter(): void { window.clearTimeout(this.chatterTimer); this.el.chatter.hidden = true; }
+
+  chatter(team: 'friendly' | 'enemy', text: string, channel: 'field' | 'radio' = 'radio'): void {
+    this.addHistory(`${team === 'friendly' ? 'Allied' : 'Axis'} ${channel}: ${text}`, 'info');
 
     this.el.chatter.className = team === 'enemy' ? 'axis' : 'allied';
 
@@ -1223,7 +1281,7 @@ export class Hud {
 
     label.className = 'radio-label';
 
-    label.textContent = team === 'enemy' ? 'AXIS RADIO' : 'ALLIED RADIO';
+    label.textContent = `${team === 'enemy' ? 'AXIS' : 'ALLIED'} ${channel === 'field' ? 'FIELD' : 'RADIO'}`;
 
     const line = document.createElement('span');
 
@@ -1297,6 +1355,7 @@ export class Hud {
     this.el.btnCancelMode.hidden = !showCancel;
 
     const hints: Record<string, string> = {
+      suppress: 'Click visible ground within the selected machine gun’s range to suppress it for 10 seconds. Esc or right-click cancels.',
       ambush: `Click to set facing and trigger range. The selected arc width applies to each soldier. Prepare for ${CONFIG.ambush.prepareSeconds}s, then hold guns and grenades until a visible enemy enters. Moving cancels the order. Esc or right-click cancels targeting.`,
 
       recruit: 'Left-click the southern zone to deploy. Esc or right-click cancels.',
@@ -1364,6 +1423,10 @@ export class Hud {
    */
 
   update(state: SimState, selection: readonly Unit[], mode: UIMode): void {
+    if (this.pinnedSeed !== state.baseTerrainSeed) { this.pinnedIds.clear(); this.pinnedSeed = state.baseTerrainSeed; }
+    const pinned = state.units.filter((unit) => unit.team === 'friendly' && unit.pinned && !unit.dead && unit.health > 0);
+    for (const soldier of pinned) if (!this.pinnedIds.has(soldier.id)) this.notice(`${nameOf(state, soldier.id)} pinned! Move support into position.`, 'warn');
+    this.pinnedIds = new Set(pinned.map((unit) => unit.id));
 
     const selectionKey = selection.map((unit) => unit.id).sort((a, b) => a - b).join(',');
 
@@ -1566,6 +1629,20 @@ export class Hud {
     }
 
     this.el.btnFoodSupplies.disabled = !hasRadioEngineer || state.foodSupplyCooldown > 0 || this.foodSuppliesPending;
+    for (const [button, cost] of [
+      [this.el.btnBarbedWire, CONFIG.costs.barbedWire], [this.el.btnSandbag, CONFIG.costs.sandbag],
+      [this.el.btnTrench, CONFIG.costs.trench], [this.el.btnBunker, CONFIG.costs.bunker],
+      [this.el.btnMortarPit, CONFIG.costs.mortarPit], [this.el.btnBridge, CONFIG.costs.bridge],
+      [this.el.btnMineAp, CONFIG.mineKinds.ap.cost], [this.el.btnMineAt, CONFIG.mineKinds.at.cost],
+    ] as const) this.availability(button, !hasEngineer ? 'Recruit an unpinned Combat Support Engineer.' : `Requires ${cost} tactical points.`);
+    for (const [button, cooldown, cost, pending] of [
+      [this.el.btnArtillery, state.artilleryCooldown, CONFIG.costs.artillery, this.artilleryRequestPending],
+      [this.el.btnAirSupport, state.airSupportCooldown, CONFIG.costs.airSupport, this.airSupportRequestPending],
+      [this.el.btnFlare, state.flareCooldown, CONFIG.costs.flare, this.flareRequestPending],
+      [this.el.btnFoodSupplies, state.foodSupplyCooldown, 0, this.foodSuppliesPending],
+    ] as const) this.availability(button, pending ? 'Waiting for radio confirmation.' : !hasRadioEngineer ? 'Recruit an unpinned Radio Engineer.'
+      : button === this.el.btnFlare && !night ? 'Flares are available at night after three waves.'
+      : cooldown > 0 ? `Ready in ${Math.ceil(cooldown / CONFIG.tickRate)} seconds.` : `Requires ${cost} tactical points.`);
 
     if (state.foodSupplyCooldown > 0) {
 
@@ -1661,6 +1738,15 @@ export class Hud {
 
     this.el.btnLightFire.title = fireError ?? `Light a free fire at this soldier's position for ${CONFIG.campfire.durationSeconds}s. Illuminates ${CONFIG.campfire.radius}px for both sides. One fire per soldier at a time; extinguished at dawn.`;
 
+    const ability = primary ? ROLE_ABILITIES[primary.role] : undefined;
+    this.roleAbilityButton.hidden = !ability || selection.length !== 1;
+    this.roleAbilityButton.disabled = !primary || primary.pinned || primary.crossed === true || (!primary.roleDuty && (primary.roleCooldown ?? 0) > 0);
+    const duty = primary?.roleDuty;
+    const remaining = duty?.ticksRemaining ? ` · ${Math.ceil(duty.ticksRemaining / CONFIG.tickRate)}s` : duty?.kind === 'supply' ? ` · ${duty.stock} items` : '';
+    this.roleAbilityButton.textContent = duty ? `${duty.kind === 'observe' ? 'Stop observing' : duty.kind === 'supply' ? 'Close supply point' : duty.kind === 'repair' ? 'Stop repair detail' : duty.kind === 'suppress' ? 'Cease area fire' : 'End rally'}${remaining}` : `${ability?.label ?? ''}${(primary?.roleCooldown ?? 0) > 0 ? ` · ${Math.ceil(primary!.roleCooldown! / CONFIG.tickRate)}s` : ''}`;
+    this.roleAbilityButton.title = ability?.description ?? '';
+    this.roleAbilityButton.classList.toggle('active', !!duty || mode.kind === 'suppress');
+    this.roleAbilityButton.setAttribute('aria-pressed', String(!!duty || mode.kind === 'suppress'));
     const ambushUnits = selection.filter(supportsAmbush);
     const ambushing = ambushUnits.some((unit) => unit.ambush);
     this.el.btnAmbush.hidden = ambushUnits.length === 0;
@@ -1722,13 +1808,13 @@ export class Hud {
 
     this.el.btnPatrol.setAttribute('aria-pressed', String(mode.kind === 'patrol' || patrolling));
 
-    this.el.btnPatrol.title = 'Riflemen, snipers, and medics patrol the marked area. Fighters stop to engage enemies; medics stop to treat nearby wounded soldiers, then resume. A move or building order replaces the patrol.';
+    this.el.btnPatrol.title = 'Riflemen, scouts, snipers, and medics patrol the marked area. Fighters stop to engage enemies; medics stop to treat nearby wounded soldiers, then resume. A move or building order replaces the patrol.';
 
     this.el.btnStance.hidden = selectedInfantry.length === 0;
 
     this.el.btnCrawl.hidden = selectedInfantry.length === 0;
 
-    this.el.btnRun.hidden = selectedInfantry.length === 0;
+    this.el.btnRun.hidden = selectedInfantry.length === 0 || selectedInfantry.every((unit) => unit.role === 'at_gun' || unit.role === 'heavy_mg');
 
     if (selectedInfantry.length > 0) {
 
@@ -1982,6 +2068,13 @@ export class Hud {
 
       else if (selected.targetId !== null) action = 'Engaging';
 
+      if (!selected.pinned && selected.clearBuilding) action = selected.path.length ? 'Approaching hostile building' : 'Clearing hostile occupants';
+      if (!selected.pinned && selected.deployment) action = selected.deployment.packingTicks > 0
+        ? `Packing weapon · ${Math.ceil(selected.deployment.packingTicks / CONFIG.tickRate)}s`
+        : selected.path.length ? 'Moving weapon crew'
+          : selected.deployment.ticks > 0 ? `Deploying / traversing · ${Math.ceil(selected.deployment.ticks / CONFIG.tickRate)}s`
+            : selected.targetId !== null ? 'Deployed · engaging' : 'Deployed · covering firing arc';
+      if (selected.role === 'scout' && !selected.path.length && selected.targetId === null && !selected.pinned) action = 'Observing · spotting for mortars';
       if (selected.patrol && !selected.pinned && (selected.upgradeTimer ?? 0) === 0) action = selected.role === 'medic' && !selected.path.length && selected.healTimer > 0
 
         ? 'Patrol · tending wounded' : selected.targetId !== null ? 'Patrol · engaging' : selected.path.length ? 'Patrolling' : 'Patrol · waiting for route';
@@ -1992,6 +2085,8 @@ export class Hud {
 
           ? `${selected.running ? 'Running' : selected.terrainCrawling || selected.crawling ? 'Crawling' : 'Walking'} to gunfire` : 'Listening for gunfire';
 
+      if (selected.roleDuty) action = `${ROLE_ABILITIES[selected.role]?.label ?? 'Support duty'}${selected.pinned ? ' · paused under fire' : ''}${selected.roleDuty.kind === 'supply' ? ` · ${selected.roleDuty.stock} items` : ''}`;
+      if (selected.scoutReports?.length) action += ` · ${selected.scoutReports.length} reports (amber markers fade over 12s)`;
       if (selected.bridgePosition) action += selected.bridgePosition.level === 'under' ? ' · Under bridge' : ' · Bridge deck';
 
       if (usesBackupRifle(selected, getContent())) action += ` · Using rifle · Out of ${selected.role === 'at' ? 'rockets' : 'mortar bombs'}`;
@@ -2496,7 +2591,7 @@ export class Hud {
 
     this.contextNote.textContent = reason || 'Call for treatment. Medics attend requests in the order received.';
 
-    const canRequestSupplies = patient.role === 'rifleman' || patient.role === 'engineer' || patient.role === 'at' || patient.role === 'mortarman';
+    const canRequestSupplies = patient.role === 'rifleman' || patient.role === 'assault_infantry' || patient.role === 'engineer' || patient.role === 'at' || patient.role === 'mortarman';
 
     this.callSupplyButton.hidden = !canRequestSupplies; this.supplyNote.hidden = !canRequestSupplies;
 

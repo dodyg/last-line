@@ -1995,6 +1995,15 @@ test.describe('Last Line smoke', () => {
       await page.locator('#btn-campaign-start').click();
       await expect(page.locator('#overlay-campaign')).toBeHidden();
       await expect(page.locator('#hud-setting')).toContainText(CAMPAIGNS[country].name);
+      await expect(page.locator('#overlay-pause')).toBeVisible();
+      await expect(page.locator('#overlay-pause .campaign-briefing')).toContainText('Chapter 1/4');
+      await expect(page.locator('#btn-resume')).toHaveText('Deploy squad');
+      if (country === 'italy') await page.screenshot({ path: testInfo.outputPath('italy-field-briefing.png') });
+      const deploymentTicks = (await getState(page))!.ticks;
+      await page.waitForTimeout(150);
+      expect((await getState(page))!.ticks).toBe(deploymentTicks);
+      await page.locator('#btn-resume').click();
+      await expect(page.locator('#overlay-pause')).toBeHidden();
       if (country === 'italy') await page.screenshot({ path: testInfo.outputPath('italy-battlefield.png') });
       await call<void>(page, 'pause');
       await call<void>(page, 'save');
@@ -2012,6 +2021,56 @@ test.describe('Last Line smoke', () => {
       expect(restarted.buildings.map((building) => building.name)).toEqual(before.buildings.map((building) => building.name));
     });
   }
+  test('campaign dispatch follows secured milestones, supply resumes, and fallback orders', async ({ page }, testInfo) => {
+    await startRun(page, 2026);
+    await call<void>(page, 'pause');
+    const staged = (await getState(page))!;
+    staged.campaignCountry = 'italy';
+    staged.mapsCleared = 24;
+    staged.mapNumber = 25;
+    staged.sectorCaptured = true;
+    staged.sectorSupplyPending = false;
+    await page.evaluate((snapshot) => localStorage.setItem('lastline/save/v1', JSON.stringify(snapshot)), staged);
+    await page.reload();
+    await page.locator('#btn-continue').click();
+    await expect(page.locator('#overlay-pause .campaign-briefing')).toContainText('Chapter 1/4');
+    await page.locator('#btn-resume').click();
+    await call<void>(page, 'rallyAtNorthEdge');
+    await call<void>(page, 'step', 200);
+    await expect(page.locator('#overlay-sector-supply')).toBeVisible();
+    await expect(page.locator('#overlay-sector-supply .campaign-briefing')).toContainText('Chapter 2/4');
+    await expect(page.locator('#overlay-sector-supply .campaign-briefing')).toContainText('previous sector is secure');
+    await page.screenshot({ path: testInfo.outputPath('campaign-arrival-dispatch.png') });
+    await page.reload();
+    await page.locator('#btn-continue').click();
+    await expect(page.locator('#overlay-sector-supply .campaign-briefing')).toContainText('Chapter 2/4');
+    await page.locator('#btn-sector-points').click();
+    await call<void>(page, 'pause');
+    const fallback = (await getState(page))!;
+    fallback.sectorCaptured = false;
+    fallback.sectorSupplyPending = false;
+    await page.evaluate((snapshot) => localStorage.setItem('lastline/save/v1', JSON.stringify(snapshot)), fallback);
+    await page.reload();
+    await page.locator('#btn-continue').click();
+    await page.locator('#btn-resume').click();
+    await call<void>(page, 'rallyAtNorthEdge');
+    await call<void>(page, 'step', 200);
+    await expect(page.locator('#overlay-pause .campaign-briefing')).toContainText('No campaign progress was earned');
+    await expect(page.locator('#overlay-pause .campaign-briefing')).toContainText('Chapter 2/4');
+    expect((await getState(page))!.mapsCleared).toBe(25);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: testInfo.outputPath('campaign-fallback-mobile.png') });
+    const panel = page.locator('#overlay-pause .panel');
+    expect(await panel.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    // Fixed command tabs must stay behind the modal at mobile breakpoints.
+    expect(await panel.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      return Boolean(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)?.closest('#overlay-pause'));
+    })).toBe(true);
+    await page.locator('#btn-resume').click();
+    await expect(page.locator('#overlay-pause')).toBeHidden();
+  });
+
   test('country chooser works on a narrow screen and closes with Escape', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 740 });
     await page.goto(URL);
@@ -2695,12 +2754,39 @@ test.describe('Last Line smoke', () => {
     const afterPan = await probePoint();
     expect(afterPan.x).toBeGreaterThan(beforePan.x);
 
+    // Ctrl can also be pressed after beginning a selection drag.
+    const selectionBeforePan = await call<number[]>(page, 'selectionIds');
+    await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+    await page.mouse.down();
+    await page.keyboard.down('Control');
+    await page.mouse.move(bounds!.x + bounds!.width / 2 - 40, bounds!.y + bounds!.height / 2, { steps: 4 });
+    await expect(canvas).toHaveClass(/pan-active/);
+    await page.mouse.up();
+    await page.keyboard.up('Control');
+    await expect.poll(async () => (await probePoint()).x).toBeLessThan(afterPan.x - 10);
+    expect(await call<number[]>(page, 'selectionIds')).toEqual(selectionBeforePan);
+    await expect(canvas).not.toHaveClass(/pan-active/);
+
     await canvas.focus();
     await page.keyboard.press('-');
     const zoomedOutDistance = await pointDistance();
     expect(zoomedOutDistance).toBeLessThan(zoomedDistance);
     await page.keyboard.press('0');
     expect(await pointDistance()).toBeCloseTo(defaultDistance, 1);
+    const fullFieldPoint = await probePoint();
+    await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+    await page.keyboard.down('Control');
+    await page.mouse.down();
+    await page.mouse.move(bounds!.x + bounds!.width / 2 + 40, bounds!.y + bounds!.height / 2, { steps: 4 });
+    await page.mouse.up();
+    await page.keyboard.up('Control');
+    await expect.poll(async () => (await probePoint()).x).toBeGreaterThan(fullFieldPoint.x + 10);
+    // Maximum zoom-out must restore the full-map framing after panning.
+    await page.mouse.wheel(0, 10000);
+    await expect.poll(async () => (await probePoint()).x).toBeCloseTo(fullFieldPoint.x, 1);
+    await canvas.focus();
+    await page.keyboard.press('0');
+    await expect.poll(async () => (await probePoint()).x).toBeCloseTo(fullFieldPoint.x, 1);
     await page.mouse.wheel(0, 10000);
     expect(await pointDistance()).toBeCloseTo(defaultDistance, 1);
     await page.keyboard.press('-');

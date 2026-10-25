@@ -1,5 +1,6 @@
+import { LULL_BANTER } from '../content/lull-banter';
 import { CONFIG } from '../content/config';
-import type { CampaignCountry, SimEvent, Team, Unit, UnitRole, WeatherKind } from '../simulation/types';
+import type { CampaignCountry, SimEvent, Team, Unit, UnitRole, WavePhase, WeatherKind } from '../simulation/types';
 import { CAMPAIGNS } from '../content/campaigns';
 
 export type RadioCue = 'contact' | 'kill' | 'wounded' | 'medic' | 'wave' | 'clear' | 'ambient' | 'breakthrough' | 'artillery' | 'construction' | 'supplies' | 'airSupport' | 'flare';
@@ -225,30 +226,60 @@ export interface ChatterResult {
   delivery: 'shout' | 'tense' | 'panic';
   cue: RadioCue;
   speakerId: number;
+  channel: 'field' | 'radio';
+  reply?: { text: string; speakerId: number };
 }
 
 /** Chooses restrained, non-repeating radio barks from actual combat events. */
 export class RadioDirector {
   private lastSpokenAt = -Infinity;
   private recentLines: string[] = [];
-  private nextAmbientAt = 20;
+  private nextAmbientAt = 0;
+  private quietSinceTick: number | null = null;
+  private lastWasBanter = false;
+  private interruptedBanter = false;
+  private lastPriority = -1;
 
-  consider(events: readonly SimEvent[], units: readonly Unit[], tick: number, weather?: WeatherKind, country?: CampaignCountry): ChatterResult | null {
-    const candidates: Array<{ team: Team; role?: UnitRole; cue: RadioCue; priority: number; speakerId?: number; pos?: { x: number; y: number }; confirmation?: string; ambientLines?: readonly string[] }> = [];
+  reset(): void { this.lastSpokenAt = -Infinity; this.lastPriority = -1; this.recentLines = []; this.nextAmbientAt = 0; this.quietSinceTick = null; this.lastWasBanter = false; this.interruptedBanter = false; }
+
+  takeBanterInterruption(): boolean {
+    const interrupted = this.interruptedBanter; this.interruptedBanter = false; return interrupted;
+  }
+
+  consider(events: readonly SimEvent[], units: readonly Unit[], tick: number, weather?: WeatherKind, country?: CampaignCountry, wavePhase?: WavePhase): ChatterResult | null {
+    const combat = events.some((event) => ['shot', 'explosion', 'artilleryImpact', 'enemyBarrageIncoming', 'grenadeThrown', 'scoutContact', 'breakthrough', 'unitDied', 'buildingDestroyed'].includes(event.type)
+      || (event.type === 'wavePhase' && event.phase === 'spawning'));
+    const quiet = !combat && (wavePhase === undefined || wavePhase === 'prep' || wavePhase === 'advance')
+      && !units.some((unit) => unit.health > 0 && !unit.dead && !unit.crossed && (unit.team === 'enemy' || unit.pinned || unit.targetId !== null || unit.suppression > CONFIG.suppression.recoverThreshold));
+    if (quiet) this.quietSinceTick ??= tick;
+    else {
+      this.quietSinceTick = null;
+      if (this.lastWasBanter) { this.interruptedBanter = true; this.lastWasBanter = false; this.lastSpokenAt = -Infinity; }
+    }
+    const candidates: Array<{ team: Team; role?: UnitRole; cue: RadioCue; priority: number; speakerId?: number; pos?: { x: number; y: number }; confirmation?: string; ambientLines?: readonly string[]; text?: string; reply?: ChatterResult['reply']; banter?: boolean }> = [];
     for (const event of events) {
-      if (event.type === 'wavePhase' && event.phase === 'spawning') {
-        candidates.push({ team: 'enemy', cue: 'wave', priority: 2 });
+      if (event.type === 'roleAbilityStarted') {
+        const messages = { rally: 'Stay together! Hold this position!', observe: 'Observation post ready. Watching the approaches.', supply: 'Forward ammunition point ready. Bring the men here.', repair: 'Repair detail standing by. Cover us while we work.', suppress: 'Covering the marked ground! Keep their heads down!' };
+        candidates.push({ team: 'friendly', cue: 'contact', priority: 2, speakerId: event.unitId, text: messages[event.kind] });
+      } else if (event.type === 'scoutContact') {
+        const label = event.role === 'vehicle' ? 'Tank' : event.role === 'mg_team' ? 'Machine-gun team' : event.role === 'sapper' ? 'Sappers' : event.role === 'troop_transport' ? 'Troop transport' : 'Enemy infantry';
+        candidates.push({ team: 'friendly', cue: 'contact', priority: event.role === 'vehicle' ? 4 : 2, speakerId: event.unitId, pos: event.pos, text: `${label} observed. ${directionCallout(event.pos, 'friendly')}` });
+      } else if (event.type === 'grenadesResupplied' || event.type === 'rocketsResupplied' || event.type === 'mortarBombsResupplied') {
+        candidates.push({ team: 'friendly', cue: 'supplies', priority: 1, speakerId: event.officerId, text: `${event.type === 'rocketsResupplied' ? 'Rockets' : event.type === 'mortarBombsResupplied' ? 'Mortar bombs' : 'Grenades'} delivered.` });
+      } else if (event.type === 'wavePhase'  && event.phase === 'spawning') {
+        candidates.push({ team: 'enemy', cue: 'wave', priority: 2, text: 'Zum Angriff bereit! Abstand halten!' });
       } else if (event.type === 'waveCleared') {
-        candidates.push({ team: 'friendly', cue: 'clear', priority: 2 });
+        candidates.push({ team: 'friendly', cue: 'clear', priority: 2, text: 'That attack is over. Reload and check the wounded.' });
       } else if (event.type === 'breakthrough') {
-        candidates.push({ team: 'enemy', role: event.role, cue: 'breakthrough', priority: 4, speakerId: event.unitId, pos: event.pos });
+        candidates.push({ team: 'friendly', cue: 'breakthrough', priority: 5, pos: event.pos, text: `Enemy through the line! Cover the gap! ${directionCallout(event.pos, 'friendly')}` });
+        candidates.push({ team: 'enemy', role: event.role, cue: 'breakthrough', priority: 4, speakerId: event.unitId, pos: event.pos, text: `Durchbruch! ${directionCallout(event.pos, 'enemy')}` });
       } else if (event.type === 'unitDied') {
         const speakerTeam: Team = event.team === 'friendly' ? 'enemy' : 'friendly';
         const speakers = units.filter((unit) => unit.team === speakerTeam && unit.health > 0);
         const speaker = speakers.length > 0 ? speakers[Math.floor(Math.random() * speakers.length)] : undefined;
-        candidates.push({ team: speakerTeam, role: speaker?.role, cue: 'kill', priority: 3, speakerId: speaker?.id, pos: event.pos });
+        candidates.push({ team: speakerTeam, role: speaker?.role, cue: 'kill', priority: 1, speakerId: speaker?.id, pos: event.pos, text: speakerTeam === 'friendly' ? 'Target down. Keep watch.' : 'Ziel ausgeschaltet. Weiter beobachten.' });
       } else if (event.type === 'healed') {
-        candidates.push({ team: 'friendly', role: 'medic', cue: 'medic', priority: 2, speakerId: event.medicId, pos: event.pos });
+        candidates.push({ team: 'friendly', role: 'medic', cue: 'medic', priority: 2, speakerId: event.medicId, pos: event.pos, text: 'Dressing applied. Keep behind cover.' });
       } else if (event.type === 'airSupportOrdered') {
         if (units.some((unit) => unit.team === 'enemy' && unit.health > 0)) {
           candidates.push({ team: 'enemy', cue: 'airSupport', priority: 2, pos: event.pos });
@@ -259,19 +290,19 @@ export class RadioDirector {
           candidates.push({ team: 'enemy', cue: 'flare', priority: 2, pos: event.pos });
         }
       } else if (event.type === 'mortarFired') {
-        candidates.push({ team: 'friendly', role: 'mortarman', cue: 'artillery', priority: 2, speakerId: event.unitId, pos: event.pos });
+        candidates.push({ team: 'friendly', role: 'mortarman', cue: 'artillery', priority: 1, speakerId: event.unitId, pos: event.pos, text: 'Mortar round away!' });
       } else if (event.type === 'enemyBarrageIncoming') {
         // Enemy guns ranging the line: the Axis call it to their own troops, and
         // the Allied line shouts the warning back.
-        candidates.push({ team: 'enemy', cue: 'artillery', priority: 4, pos: event.pos });
-        candidates.push({ team: 'friendly', cue: 'contact', priority: 3, pos: event.pos });
+        candidates.push({ team: 'enemy', cue: 'artillery', priority: 4, pos: event.pos, text: `Feuerschlag angefordert! ${directionCallout(event.pos, 'enemy')}` });
+        candidates.push({ team: 'friendly', cue: 'artillery', priority: 5, pos: event.pos, text: `Incoming artillery! Take cover! ${directionCallout(event.pos, 'friendly')}` });
       } else if (event.type === 'artilleryImpact') {
-        candidates.push({ team: 'enemy', cue: 'artillery', priority: 3, pos: event.pos });
+        candidates.push({ team: 'enemy', cue: 'artillery', priority: 3, pos: event.pos, text: `Granateneinschlag! Deckung! ${directionCallout(event.pos, 'enemy')}` });
       } else if (event.type === 'constructionCompleted') {
-        candidates.push({ team: 'friendly', role: 'engineer', cue: 'construction', priority: 2, pos: event.pos });
+        candidates.push({ team: 'friendly', role: 'engineer', cue: 'construction', priority: 2, pos: event.pos, text: `${event.kind === 'barbedWire' ? 'Barbed wire' : event.kind === 'sandbag' ? 'Sandbags' : event.kind === 'mine' ? 'Mine' : event.kind === 'mortarPit' ? 'Mortar pit' : event.kind === 'bridge' ? 'Bridge' : event.kind === 'bunker' ? 'Bunker' : 'Trench'} ready.` });
       } else if (event.type === 'weaponUpgraded') {
         // The soldier is head-down on his own weapon, so he is the one who says so.
-        candidates.push({ team: 'friendly', cue: 'construction', priority: 1, speakerId: event.unitId });
+        candidates.push({ team: 'friendly', cue: 'construction', priority: 1, speakerId: event.unitId, text: 'Working on my weapon. Cover me.' });
       } else if (event.type === 'weatherChanged') {
         for (const team of ['friendly', 'enemy'] as const) {
           if (units.some((unit) => unit.team === team && unit.health > 0)) {
@@ -282,60 +313,72 @@ export class RadioDirector {
         // The explicit request/acknowledgment exchange is handled by the controller.
       } else if (event.type === 'shot' && event.hit && event.targetId !== null && Math.random() < 0.09) {
         const target = units.find((unit) => unit.id === event.targetId && unit.health > 0);
-        if (target !== undefined) candidates.push({ team: target.team, role: target.role, cue: 'wounded', priority: 2, speakerId: target.id, pos: event.to });
+        if (target !== undefined) candidates.push({ team: target.team, role: target.role, cue: 'wounded', priority: 3, speakerId: target.id, pos: event.to, text: target.team === 'friendly' ? 'I’m hit! Need cover!' : 'Getroffen! Ich brauche Deckung!' });
       } else if (event.type === 'shot' && Math.random() < 0.012) {
         const shooter = units.find((unit) => unit.id === event.shooterId);
-        if (shooter) candidates.push({ team: event.shooterTeam, role: shooter.role, cue: 'contact', priority: 1, speakerId: shooter.id, pos: event.to });
+        if (shooter) candidates.push({ team: event.shooterTeam, role: shooter.role, cue: 'contact', priority: 1, speakerId: shooter.id, pos: event.to, text: event.shooterTeam === 'friendly' ? `Contact! ${directionCallout(event.to, 'friendly')}` : `Feindkontakt! ${directionCallout(event.to, 'enemy')}` });
       }
     }
 
-    if (candidates.length === 0 && tick >= this.nextAmbientAt) {
-      this.nextAmbientAt = tick + 45 + Math.floor(Math.random() * 36);
-      const alive = units.filter((unit) => unit.health > 0);
+    if (candidates.length === 0 && quiet && this.quietSinceTick !== null && tick - this.quietSinceTick >= 6 * CONFIG.tickRate && tick >= this.nextAmbientAt) {
+      this.nextAmbientAt = tick + (20 + Math.floor(Math.random() * 16)) * CONFIG.tickRate;
+      const alive = units.filter((unit) => unit.team === 'friendly' && unit.health > 0 && !unit.dead && !unit.crossed && !unit.pinned && unit.targetId === null && unit.health > 25 && !unit.running && unit.medicalTargetId === undefined && !(unit.role === 'medic' && unit.healTimer > 0));
       if (alive.length > 0) {
         const speaker = alive[Math.floor(Math.random() * alive.length)];
         if (speaker !== undefined) {
-          const roll = Math.random();
-          const ambientLines = roll < 0.5 && weather !== undefined ? WEATHER_CHATTER[weather][speaker.team]
-            : roll < 0.8 && country !== undefined ? CAMPAIGNS[country].chatter[speaker.team] : undefined;
-          candidates.push({
-            team: speaker.team,
-            role: speaker.role,
-            cue: 'ambient',
-            priority: 0,
-            ...(ambientLines === undefined ? {} : { ambientLines }),
-          });
+          const partners = alive.filter((unit) => unit.id !== speaker.id && Math.hypot(unit.pos.x - speaker.pos.x, unit.pos.y - speaker.pos.y) <= 160
+            && (!unit.buildingPosition && !speaker.buildingPosition || unit.buildingPosition && speaker.buildingPosition && unit.buildingPosition.buildingId === speaker.buildingPosition.buildingId && unit.buildingPosition.level === speaker.buildingPosition.level));
+          const partner = partners[Math.floor(Math.random() * partners.length)];
+          const jokes = LULL_BANTER.filter((joke) => !this.recentLines.includes(joke.line));
+          const joke = jokes[Math.floor(Math.random() * jokes.length)];
+          if (partner && joke) candidates.push({ team: 'friendly', cue: 'ambient', priority: 0, speakerId: speaker.id, text: joke.line, reply: { text: joke.reply, speakerId: partner.id }, banter: true });
+          else {
+            const roll = Math.random();
+            const ambientLines = roll < 0.5 && weather !== undefined ? WEATHER_CHATTER[weather][speaker.team]
+              : roll < 0.8 && country !== undefined ? CAMPAIGNS[country].chatter[speaker.team] : undefined;
+            candidates.push({
+              team: speaker.team, role: speaker.role, cue: 'ambient', priority: 0, speakerId: speaker.id,
+              text: roll > .85 && speaker.kills >= 5 ? 'We’ve held through worse. Watch your sector.' : roll > .85 && speaker.service.healthRestored > 0 ? 'Keep the wounded close to cover. I’ll check on them.' : undefined,
+              ...(ambientLines === undefined ? {} : { ambientLines }),
+            });
+          }
         }
       }
     }
     if (candidates.length === 0) return null;
     const requests = candidates.filter((candidate) => candidate.confirmation !== undefined);
-    if (requests.length === 0 && tick - this.lastSpokenAt < 7.5 * CONFIG.tickRate) return null;
+    const priority = Math.max(...candidates.map((candidate) => candidate.priority));
+    if (requests.length === 0 && tick - this.lastSpokenAt < (priority >= 4 && priority > this.lastPriority ? 1 : 7.5) * CONFIG.tickRate) return null;
     const selectable = requests.length > 0 ? requests : candidates;
     selectable.sort((a, b) => b.priority - a.priority);
-    const chosen = selectable[Math.floor(Math.random() * Math.min(3, selectable.length))];
+    const highest = selectable.filter((candidate) => candidate.priority === selectable[0]?.priority);
+    const chosen = highest[Math.floor(Math.random() * highest.length)];
     if (chosen === undefined) return null;
     const common = chosen.team === 'friendly' ? ALLIED : AXIS;
-    const speakers = units.filter((unit) => unit.team === chosen.team && unit.health > 0);
+    const speakers = units.filter((unit) => unit.team === chosen.team && unit.health > 0 && !unit.dead && !unit.crossed);
     const roleSpeakers = chosen.role === undefined ? [] : speakers.filter((unit) => unit.role === chosen.role);
     const speaker = (chosen.speakerId === undefined ? undefined : units.find((unit) => unit.id === chosen.speakerId && unit.health > 0))
       ?? (roleSpeakers.length > 0 ? roleSpeakers[Math.floor(Math.random() * roleSpeakers.length)] : undefined)
       ?? speakers[Math.floor(Math.random() * speakers.length)];
+    if (!speaker) return null;
     const speakerId = speaker?.id ?? (chosen.team === 'friendly' ? -1 : -2);
     const roleSpecific = speaker === undefined ? [] : ROLE_LINES[chosen.team][speaker.role]?.[chosen.cue] ?? [];
-    const lines = chosen.ambientLines ?? [...roleSpecific, ...common[chosen.cue]];
+    const lines = chosen.ambientLines ?? (chosen.cue === 'ambient' ? ['Keep your eyes open.', 'Check your gear while it’s quiet.', 'Stay close. Watch your sector.'] : [...roleSpecific, ...common[chosen.cue]]);
     const options = lines.filter((line) => !this.recentLines.includes(line));
     const line = options[Math.floor(Math.random() * options.length)] ?? lines[0] ?? 'Stay alert. Keep your position.';
-    let text = line;
-    if (chosen.pos !== undefined && ['contact', 'artillery', 'breakthrough', 'airSupport', 'flare'].includes(chosen.cue) && Math.random() < 0.72) {
+    let text = chosen.text ?? line;
+    if (!chosen.text && chosen.pos !== undefined && ['contact', 'artillery', 'breakthrough', 'airSupport', 'flare'].includes(chosen.cue) && Math.random() < 0.72) {
       text = `${text} ${directionCallout(chosen.pos, chosen.team)}`;
     }
-    this.recentLines.push(line);
+    this.recentLines.push(chosen.text ?? line);
     if (this.recentLines.length > 8) this.recentLines.shift();
-    this.lastSpokenAt = tick;
+    this.lastSpokenAt = tick; this.lastPriority = chosen.priority; this.lastWasBanter = chosen.banter === true;
     const panic = chosen.cue === 'wounded' || speaker?.pinned || (speaker?.morale ?? 100) < CONFIG.morale.rattledThreshold;
     const delivery = panic ? 'panic' : chosen.cue === 'ambient' || (speaker?.morale ?? 100) < CONFIG.morale.shakenThreshold ? 'tense' : Math.random() < 0.42 ? 'tense' : 'shout';
-    return { team: chosen.team, text, confirmation: chosen.confirmation, delivery, cue: chosen.cue, speakerId };
+    const partner = chosen.team === 'friendly' && (chosen.text === 'Stay together! Hold this position!' || chosen.text === 'Covering the marked ground! Keep their heads down!' || chosen.cue === 'medic')
+      ? units.find((unit) => unit.id !== speakerId && unit.team === 'friendly' && unit.health > 0 && !unit.dead && !unit.crossed && !unit.pinned && Math.hypot(unit.pos.x - speaker.pos.x, unit.pos.y - speaker.pos.y) <= 160) : undefined;
+    const reply = chosen.reply ?? (partner ? { text: chosen.cue === 'medic' ? 'Thanks, doc.' : 'Understood! Keeping low!', speakerId: partner.id } : undefined);
+    return { team: chosen.team, text, reply, confirmation: chosen.confirmation, delivery, cue: chosen.cue, speakerId, channel: ['wave', 'airSupport', 'flare'].includes(chosen.cue) ? 'radio' : 'field' };
   }
 }
 

@@ -1,7 +1,10 @@
+import { battlePressure } from './soundscape';
+import { landmarkHint, localShelter } from '../simulation/environment';
 import { ambushShape, supportsAmbush } from '../simulation/ambush';
 import { wireContains } from '../simulation/barbed-wire';
 import { CONFIG } from '../content/config';
 import { CAMPAIGNS } from '../content/campaigns';
+import { campaignChapter, type FieldDispatch } from '../content/campaign-story';
 import type { CampaignCountry } from '../simulation/types';
 import { getContent, unitDef } from '../content/validate';
 import { Simulation, waveTelegraph, wonByCampaign } from '../simulation/simulation';
@@ -36,6 +39,7 @@ import type { BuildingFacing, BuildingLevel } from '../simulation/types';
 
 export type UIMode =
   | { kind: 'none' }
+  | { kind: 'suppress'; unitId: number }
   | { kind: 'ambush'; unitIds: number[]; arcDegrees: number }
   | { kind: 'patrol'; unitIds: number[]; origin?: { x: number; y: number } }
   | { kind: 'recruit'; role: FriendlyRole }
@@ -155,6 +159,7 @@ export class GameController {
 
   attachRenderer(renderer: RendererPort): void {
     this.renderer = renderer;
+    renderer.setPreferences?.(this.prefs);
     // Idle battlefield behind the title screen.
     this.terrainData = generateTerrain((Math.random() * 0xffffffff) >>> 0);
     const idleState = this.idleState();
@@ -262,7 +267,7 @@ export class GameController {
   generateMapReview(country: CampaignCountry): string {
     if (!this.mapReviewActive) this.openMapReview();
     const seed = (Math.random() * 0xffffffff) >>> 0;
-    const data = generateTerrain(seed, true, 3, country);
+    const data = generateTerrain(seed, true, 4, country, seasonForSeed(seed));
     const previewState = this.idleState(data);
     this.mapReviewState = previewState;
     this.renderer?.rebuildStatic(previewState, data);
@@ -317,7 +322,16 @@ export class GameController {
         target instanceof HTMLSelectElement ||
         target instanceof HTMLTextAreaElement ||
         (target !== null && target.isContentEditable);
-      if (e.code === 'Space' && !formControl) {
+      if (this.overlayOpen || document.querySelector('.overlay:not([hidden])') !== null) {
+        if (e.key === 'Escape' && !formControl) this.escape();
+        return;
+      }
+      if (!formControl && !(target instanceof HTMLButtonElement) && e.code === this.prefs.keys.panel) {
+        e.preventDefault();
+        document.getElementById('btn-toggle-commands')?.click();
+        return;
+      }
+      if (e.code === this.prefs.keys.pause && !formControl) {
         // Buttons are excluded via formControl-like check below: Space on a
         // focused button should activate the button, not toggle pause.
         if (!(target instanceof HTMLButtonElement)) {
@@ -357,13 +371,18 @@ export class GameController {
     const runSeed = seed ?? (Math.random() * 0xffffffff) >>> 0;
     // Generate the battlefield once and hand it to the simulation, which would
     // otherwise generate an identical copy for itself.
-    const terrainData = generateTerrain(runSeed, true, 3, country);
+    const terrainData = generateTerrain(runSeed, true, 4, country);
     this.sim = new Simulation(runSeed, undefined, terrainData);
     this.terrainData = terrainData;
     this.afterRunSetup();
     this.hud.notice(`${country === undefined ? '' : CAMPAIGNS[country].name + ' campaign · '}Map 1 - wave 1 approaching. Deploy your defenses.`, 'info');
     const telegraph = waveTelegraph(0);
     if (telegraph) this.hud.notice(telegraph, 'warn');
+    if (country !== undefined) {
+      this.pauseRun(false);
+      this.updateCampaignDispatch('deployment');
+      this.menus.showDeploymentBriefing();
+    }
   }
 
   continueRun(): void {
@@ -426,6 +445,7 @@ export class GameController {
   }
 
   private afterRunSetup(): void {
+    this.radio.reset();
     this.clearSelection();
     this.cancelDrag();
     this.terrainInspectMode = false;
@@ -490,13 +510,26 @@ export class GameController {
    * renderer, the terrain inspector and the HUD setting label cannot drift out
    * of step with it.
    */
-  private reloadBattlefield(): void {
+  private reloadBattlefield(arrival: FieldDispatch['arrival'] = 'review'): void {
     const sim = this.sim;
     if (sim === null) return;
     this.terrainData = sim.terrainData();
     this.mapHasRiver = this.terrainData.zones.river !== null;
     this.updateBattlefieldLabel(sim.state.weather);
+    this.updateCampaignDispatch(sim.state.sectorSupplyPending ? 'secured' : arrival);
     this.renderer?.rebuildStatic(sim.state, this.terrainData);
+  }
+
+  private updateCampaignDispatch(arrival: FieldDispatch['arrival']): void {
+    const s = this.sim?.state;
+    this.menus.setCampaignDispatch(s?.campaignCountry ? {
+      country: s.campaignCountry,
+      mapsCleared: s.mapsCleared,
+      mapNumber: s.mapNumber,
+      sector: this.terrainData?.layout?.label ?? 'Forward position',
+      squad: s.units.filter((unit) => unit.team === 'friendly' && !unit.dead && unit.health > 0 && !unit.crossed).length,
+      arrival,
+    } : null);
   }
 
   private updateBattlefieldLabel(weatherKind: WeatherKind): void {
@@ -512,7 +545,8 @@ export class GameController {
       : '';
     const country = data.campaignCountry === undefined ? '' : `${CAMPAIGNS[data.campaignCountry].name} · `;
     const season = SEASON_NAMES[this.sim?.state.season ?? data.season ?? seasonForSeed(data.seed)];
-    this.hud.setBattlefield(`${country}${setting} · ${season} · ${weather.name} · ${this.mapHasRiver ? 'river' : 'Dry'} · ${timeOfDay}`, `${data.campaignCountry === undefined ? '' : CAMPAIGNS[data.campaignCountry].description + ' '}${season}. ${weather.description}${nightHint}`);
+    const chapter = data.campaignCountry && this.sim ? campaignChapter(data.campaignCountry, this.sim.state.mapsCleared).chapter : null;
+    this.hud.setBattlefield(`${country}${setting} · ${season} · ${weather.name} · ${this.mapHasRiver ? 'river' : 'Dry'} · ${timeOfDay}`, `${chapter ? `${chapter.period} · ${chapter.title}. Pause to review campaign orders. ` : ''}${data.campaignCountry === undefined ? '' : CAMPAIGNS[data.campaignCountry].description + ' '}${season}. ${weather.description}${nightHint}`);
   }
 
   pauseRun(auto: boolean): void {
@@ -522,6 +556,7 @@ export class GameController {
     this.accumulator = 0;
     this.saveRun();
     this.hud.setPausedBadge(true);
+    this.updateCampaignDispatch('review');
     this.menus.showPause(auto);
     this.overlayOpen = true;
   }
@@ -590,6 +625,10 @@ export class GameController {
   frame(deltaMs: number): void {
     const sim = this.sim;
     const renderer = this.renderer;
+    this.audio.setAtmosphere(sim?.state.weather ?? 'clear', sim !== null && !sim.paused && sim.state.phase === 'running' && !this.overlayOpen && !document.hidden, {
+      pressure: sim ? battlePressure(sim.state) : 0, night: sim ? dayNightAtTick(sim.state.ticks, sim.state.dayNightStartTick).night : false,
+      sheltered: localShelter(sim?.state.units.find((unit) => this.selectionIds.includes(unit.id))), secured: sim?.state.sectorCaptured ?? false,
+    });
     if (this.mapReviewActive) {
       const preview = this.mapReviewState;
       if (preview !== null) renderer?.frame(preview, 0, null, [], Math.min(deltaMs, 100) / 1000);
@@ -621,7 +660,7 @@ export class GameController {
       if (collected.length > 0) {
         renderer.handleEvents(state, collected);
         this.processEvents(collected);
-      }
+      } else this.updateChatter([]);
       if (state.ticks - this.lastSaveTick >= secSafe(CONFIG.autosaveSeconds)) {
         this.saveRun();
       }
@@ -633,7 +672,9 @@ export class GameController {
     if (this.terrainData === null || this.terrainData.seed !== state.seed) this.reloadBattlefield();
 
     this.pruneSelection();
-    renderer.frame(state, this.alpha, this.currentPreview(), this.selectionIds, Math.min(deltaMs, 100) / 1000, this.dragRect());
+    const preview = this.currentPreview();
+    this.hud.setPlacementFeedback(preview);
+    renderer.frame(state, this.alpha, preview, this.selectionIds, Math.min(deltaMs, 100) / 1000, this.dragRect());
     this.hud.update(state, this.selectedUnits(), this.mode);
   }
 
@@ -649,7 +690,7 @@ export class GameController {
     if (events.length > 0) {
       this.renderer.handleEvents(sim.state, events);
       this.processEvents(events);
-    }
+    } else this.updateChatter([]);
     if (this.terrainData === null || this.terrainData.seed !== sim.state.seed) this.reloadBattlefield();
     this.pruneSelection();
     this.renderer.frame(sim.state, 0, this.currentPreview(), this.selectionIds, 0, this.dragRect());
@@ -837,7 +878,7 @@ export class GameController {
           this.audio.play('ui');
           break;
         case 'mapCleared':
-          this.reloadBattlefield();
+          this.reloadBattlefield(ev.credited ? 'secured' : 'withdrawal');
           {
             const setting = this.terrainData?.layout?.label ?? BATTLEFIELD_SETTINGS[this.terrainData?.settingId ?? 0] ?? BATTLEFIELD_SETTINGS[0];
           if (ev.credited) {
@@ -852,6 +893,10 @@ export class GameController {
           this.hud.notice('Forward positions are lost: sandbags, trenches, bunkers, mortar pits, barbed wire and mines do not march.', 'warn');
           this.audio.play('horn');
           if (this.sim?.state.sectorSupplyPending) this.openSectorSupplyChoice();
+          else if (this.sim?.state.campaignCountry && this.sim.state.phase === 'running') {
+            this.pauseRun(false);
+            this.updateCampaignDispatch(ev.credited ? 'secured' : 'withdrawal');
+          }
           break;
         case 'breakthrough':
           const unitLabel = ev.role === 'vehicle' ? 'vehicle' : ev.role === 'gun_truck' ? 'machine-gun truck' : ev.role === 'troop_transport' ? 'troop transport' : 'infantry';
@@ -873,14 +918,14 @@ export class GameController {
         case 'satchelDetonated':
           this.hud.notice(`Satchel charge detonated · ${ev.victims} caught in the blast.`, 'info');
           this.audio.play('explosion');
-          if (this.prefs.screenShake) this.renderer?.shake(6, 0.5);
+          if (this.prefs.screenShake && !this.prefs.reducedMotion) this.renderer?.shake(6, 0.5);
           break;
         case 'mineTriggered':
           this.hud.notice(ev.victims > 0 ? `Mine struck - ${ev.victims} caught in the blast.` : 'Mine detonated.', 'good');
           this.audio.play('explosion');
           // A charge going off under armour should register harder than one under
           // a man, so the shake scales with what the blast caught.
-          if (this.prefs.screenShake) this.renderer?.shake(4 + Math.min(2, ev.victims) * 2, 0.3 + Math.min(2, ev.victims) * 0.1);
+          if (this.prefs.screenShake && !this.prefs.reducedMotion) this.renderer?.shake(4 + Math.min(2, ev.victims) * 2, 0.3 + Math.min(2, ev.victims) * 0.1);
           break;
         case 'grenadeThrown':
           this.audio.play('ui');
@@ -964,17 +1009,19 @@ export class GameController {
           break;
         case 'artilleryImpact':
           this.audio.play(ev.delivery === 'airSupport' ? 'airBomb' : 'artillery', (ev.pos.x / CONFIG.field.width) * 2 - 1);
-          if (this.prefs.screenShake) this.renderer?.shake(6, 0.5);
+          if (this.prefs.screenShake && !this.prefs.reducedMotion) this.renderer?.shake(6, 0.5);
           break;
         case 'explosion':
           this.audio.play('explosion');
-          if (this.prefs.screenShake && ev.radius > 40) this.renderer?.shake(3, 0.25);
+          if (this.prefs.screenShake && !this.prefs.reducedMotion && ev.radius > 40) this.renderer?.shake(3, 0.25);
           break;
         case 'shot': {
-          if (ev.shooterTeam === 'enemy' || ev.weapon === 'M1918A2 BAR' || ev.weapon === 'STEN Submachine Gun') {
+          if (ev.weapon === 'Panzerschreck' || ev.weapon === '57 mm M1 Anti-Tank Gun') {
+            this.audio.play('rocket', (ev.from.x / CONFIG.field.width) * 2 - 1);
+          } else if (ev.shooterTeam === 'enemy' || ev.weapon === 'M1918A2 BAR' || ev.weapon === 'STEN Submachine Gun' || ev.weapon === 'M1A1 Thompson' || ev.weapon.includes('Tripod')) {
             // Only some shots audible to keep the mix restrained.
             if (ev.weapon !== 'M1918A2 BAR' || Math.random() < 0.35) {
-              this.audio.play(ev.weapon === 'MP 40' || ev.weapon === 'STEN Submachine Gun' ? 'smg' : ev.weapon === 'M1918A2 BAR' ? 'mg' : 'rifle', (ev.from.x / CONFIG.field.width) * 2 - 1);
+              this.audio.play(ev.weapon === 'MP 40' || ev.weapon === 'STEN Submachine Gun' || ev.weapon === 'M1A1 Thompson' ? 'smg' : ev.weapon.includes('M1919') || ev.weapon.includes('MG 42') || ev.weapon === 'M1918A2 BAR' ? 'mg' : 'rifle', (ev.from.x / CONFIG.field.width) * 2 - 1);
             }
           } else if (ev.weapon === 'M1A1 Bazooka') {
             this.audio.play('rocket', (ev.from.x / CONFIG.field.width) * 2 - 1);
@@ -1000,7 +1047,7 @@ export class GameController {
         case 'enemyChargeDetonated':
           this.hud.notice('Enemy demolition charge detonated!', 'error');
           this.audio.play('explosion');
-          if (this.prefs.screenShake) this.renderer?.shake(9, .6);
+          if (this.prefs.screenShake && !this.prefs.reducedMotion) this.renderer?.shake(9, .6);
           this.saveRun();
           break;
         case 'structureDemolished':
@@ -1029,12 +1076,12 @@ export class GameController {
         }
         case 'buildingHit':
           // A single round striking masonry is not news; the destruction notice is.
-          if (this.prefs.screenShake) this.renderer?.shake(2, 0.15);
+          if (this.prefs.screenShake && !this.prefs.reducedMotion) this.renderer?.shake(2, 0.15);
           break;
         case 'buildingDestroyed':
           this.hud.notice(`${ev.name} has been destroyed - the ground it stood on is open.`, 'warn');
           this.audio.play('explosion');
-          if (this.prefs.screenShake) this.renderer?.shake(9, 0.6);
+          if (this.prefs.screenShake && !this.prefs.reducedMotion) this.renderer?.shake(9, 0.6);
           break;
         case 'victory':
           this.endRun(true);
@@ -1046,12 +1093,17 @@ export class GameController {
           break;
       }
     }
+    this.updateChatter(events);
+  }
+
+  private updateChatter(events: readonly SimEvent[]): void {
     const sim = this.sim;
     if (sim !== null && !sim.paused && sim.state.phase === 'running' && !this.radioTransmissionPending) {
-      const chatter = this.radio.consider(events, sim.state.units, sim.state.ticks, sim.state.weather, sim.state.campaignCountry);
+      const chatter = this.radio.consider(events, sim.state.units, sim.state.ticks, sim.state.weather, sim.state.campaignCountry, sim.state.scheduler.phase);
+      if (this.radio.takeBanterInterruption()) { this.audio.cancelChatter(false); this.hud.clearChatter(); }
       if (chatter !== null) {
-        this.hud.chatter(chatter.team, chatter.text);
-        this.audio.speakChatter(chatter.text, chatter.team, chatter.delivery, chatter.speakerId, chatter.cue, chatter.confirmation);
+        this.hud.chatter(chatter.team, chatter.reply ? `${chatter.text} — ${this.soldierLabel(chatter.reply.speakerId)}: ${chatter.reply.text}` : chatter.text, chatter.channel);
+        this.audio.speakChatter(chatter.text, chatter.team, chatter.delivery, chatter.speakerId, chatter.cue, chatter.confirmation, chatter.channel, chatter.reply);
       }
     }
   }
@@ -1268,6 +1320,18 @@ export class GameController {
     this.saveRun();
   }
 
+  useRoleAbility(): void {
+    if (this.mode.kind === 'suppress') { this.cancelMode(); return; }
+    const sim = this.requireSim();
+    if (!sim) return;
+    const unit = sim.state.units.find((u) => this.selectionIds.includes(u.id) && u.team === 'friendly');
+    if (!unit) return;
+    if (!unit.roleDuty && (unit.role === 'mg' || unit.role === 'heavy_mg')) { this.setMode({ kind: 'suppress', unitId: unit.id }); return; }
+    const result = sim.command({ type: 'roleAbility', unitId: unit.id });
+    if (!result.ok) this.hud.notice(result.reason ?? 'Ability unavailable.', 'warn');
+    else { this.saveRun(); this.cancelMode(); }
+  }
+
   toggleAmbush(arcDegrees: number): void {
     if (this.mode.kind === 'ambush') { this.cancelMode(); return; }
     const sim = this.requireSim();
@@ -1439,6 +1503,12 @@ export class GameController {
 
   /** Execute a placement or targeting mode's click. */
   private applyModeClick(sim: Simulation, pos: { x: number; y: number }): void {
+    if (this.mode.kind === 'suppress') {
+      const result = sim.command({ type: 'roleAbility', unitId: this.mode.unitId, pos });
+      if (result.ok) { this.saveRun(); this.cancelMode(); }
+      else this.hud.notice(result.reason ?? 'Cannot suppress this ground.', 'warn');
+      return;
+    }
     if (this.mode.kind === 'ambush') {
       const result = sim.command({ type: 'ambush', unitIds: this.mode.unitIds, aim: pos, arcDegrees: this.mode.arcDegrees });
       if (result.ok) {
@@ -1716,13 +1786,13 @@ export class GameController {
       if (building.destroyed) {
         this.hud.showTerrainTooltip({
           title: `${building.name} (ruin)`,
-          detail: `${kindLabel}, destroyed. The ground is walkable now and blocks nothing - no cover, and no cover for the enemy either.`,
+          detail: `${kindLabel}, destroyed. ${landmarkHint(building)}`,
         }, worldX, worldY);
       } else {
         const pct = Math.round((building.health / building.maxHealth) * 100);
         this.hud.showTerrainTooltip({
           title: `${building.name}`,
-          detail: `${kindLabel}, ${pct}% intact. ${buildingArchitecture(building).floors} floors, ${buildingArchitecture(building).roofStyle} roof${buildingArchitecture(building).rooftopAccess ? " with rooftop access" : ""}${buildingArchitecture(building).balcony ? ", balcony" : ""}. Right-click with infantry selected to enter; choose a firing position in the Squad panel. Explosives can collapse it.`,
+          detail: `${kindLabel}, ${pct}% intact. ${buildingArchitecture(building).floors} floors, ${buildingArchitecture(building).roofStyle} roof${buildingArchitecture(building).rooftopAccess ? " with rooftop access" : ""}${buildingArchitecture(building).balcony ? ", balcony" : ""}. Right-click with infantry selected to enter; choose a firing position in the Squad panel. Explosives can collapse it. ${landmarkHint(building)}`,
         }, worldX, worldY);
       }
       return;
@@ -1768,7 +1838,7 @@ export class GameController {
     } else if (isRapidsAt(terrainData.zones, terrainData.seed, worldX, worldY)) {
       info = {
         title: 'River rapids',
-        detail: `Dangerous fast water: ${describeGroundPenalty(CONFIG.terrain.effects.rapids)}. Use a bridge or cross at a calmer reach.`,
+        detail: `Dangerous fast water: ${describeGroundPenalty(CONFIG.terrain.effects.rapids)}. Rain further slows crossings, especially vehicles. Use a bridge or cross at a calmer reach.`,
       };
     } else if (isRiverAt(terrainData.zones, terrainData.seed, worldX, worldY)) {
       info = {
@@ -1778,7 +1848,7 @@ export class GameController {
     } else if (isMudAt(terrainData.zones, worldX, worldY) && !isRoadAt(terrainData.zones, worldX, worldY)) {
       info = {
         title: 'Mud',
-        detail: `Churned ground that bogs a unit down: ${describeGroundPenalty(CONFIG.terrain.effects.mud)}.`,
+        detail: `Churned ground that bogs a unit down (rain adds up to 35% vehicle and 15% infantry slowdown): ${describeGroundPenalty(CONFIG.terrain.effects.mud)}.`,
       };
     } else if (groundKind === TERRAIN_KIND.road) {
       info = { title: 'Road', detail: 'Connected firm ground for moving through the sector. Buildings and vegetation leave the route clear; bridges carry it across the river.' };
@@ -1834,6 +1904,10 @@ export class GameController {
     const sim = this.sim;
     if (sim === null || sim.paused || this.mode.kind === 'none') return null;
     const pos = this.pointerPos;
+    if (this.mode.kind === 'suppress') {
+      const check = sim.validateSuppression(this.mode.unitId, pos);
+      return { kind: 'suppress', pos, valid: check.ok, reason: check.reason };
+    }
     if (this.mode.kind === 'ambush') {
       const units = this.mode.unitIds.map((id) => sim.state.units.find((unit) => unit.id === id)).filter((unit): unit is Unit => unit !== undefined && unit.health > 0 && !unit.dead && !unit.crossed);
       const arc = this.mode.arcDegrees;
@@ -1848,47 +1922,47 @@ export class GameController {
     }
     if (this.mode.kind === 'recruit') {
       const check = sim.validatePlacement('recruit', pos, this.mode.role);
-      return { kind: 'recruit', role: this.mode.role, pos, valid: check.ok };
+      return { kind: 'recruit', role: this.mode.role, pos, valid: check.ok, reason: check.reason };
     }
     if (this.mode.kind === 'barbedWire') {
       const check = sim.validatePlacement('barbedWire', pos);
       const engineer = sim.nearestAvailableEngineer(pos);
-      return { kind: 'barbedWire', pos, valid: check.ok, engineerPos: engineer?.pos, engineerRange: CONFIG.construction.engineerRange };
+      return { kind: 'barbedWire', pos, valid: check.ok, reason: check.reason, engineerPos: engineer?.pos, engineerRange: CONFIG.construction.engineerRange };
     }
     if (this.mode.kind === 'sandbag') {
       const check = sim.validatePlacement('sandbag', pos);
       const engineer = sim.nearestAvailableEngineer(pos);
-      return { kind: 'sandbag', pos, valid: check.ok, engineerPos: engineer?.pos, engineerRange: CONFIG.construction.engineerRange };
+      return { kind: 'sandbag', pos, valid: check.ok, reason: check.reason, engineerPos: engineer?.pos, engineerRange: CONFIG.construction.engineerRange };
     }
     if (this.mode.kind === 'trench') {
       const check = sim.validatePlacement('trench', pos);
       const engineer = sim.nearestAvailableEngineer(pos);
-      return { kind: 'trench', pos, valid: check.ok, engineerPos: engineer?.pos, engineerRange: CONFIG.construction.engineerRange };
+      return { kind: 'trench', pos, valid: check.ok, reason: check.reason, engineerPos: engineer?.pos, engineerRange: CONFIG.construction.engineerRange };
     }
     if (this.mode.kind === 'bunker') {
       const check = sim.validatePlacement('bunker', pos);
       const engineer = sim.nearestAvailableEngineer(pos);
-      return { kind: 'bunker', pos, valid: check.ok, engineerPos: engineer?.pos, engineerRange: CONFIG.construction.engineerRange };
+      return { kind: 'bunker', pos, valid: check.ok, reason: check.reason, engineerPos: engineer?.pos, engineerRange: CONFIG.construction.engineerRange };
     }
     if (this.mode.kind === 'bridge') {
       const check = sim.validatePlacement('bridge', pos);
       const engineer = sim.nearestAvailableEngineer(pos);
       const shape = sim.bridgeShapeAt(pos);
-      return { kind: 'bridge', pos, valid: check.ok, engineerPos: engineer?.pos, engineerRange: CONFIG.construction.engineerRange, bridgeAxis: shape?.axis, bridgeHalfWidth: shape?.halfWidth, bridgeHalfLength: shape?.halfLength };
+      return { kind: 'bridge', pos, valid: check.ok, reason: check.reason, engineerPos: engineer?.pos, engineerRange: CONFIG.construction.engineerRange, bridgeAxis: shape?.axis, bridgeHalfWidth: shape?.halfWidth, bridgeHalfLength: shape?.halfLength };
     }
     if (this.mode.kind === 'mortarPit') {
       const check = sim.validatePlacement('mortarPit', pos);
       const engineer = sim.nearestAvailableEngineer(pos);
-      return { kind: 'mortarPit', pos, valid: check.ok, engineerPos: engineer?.pos, engineerRange: CONFIG.construction.engineerRange };
+      return { kind: 'mortarPit', pos, valid: check.ok, reason: check.reason, engineerPos: engineer?.pos, engineerRange: CONFIG.construction.engineerRange };
     }
     if (this.mode.kind === 'mine') {
       const check = sim.validatePlacement('mine', pos, undefined, this.mode.mineKind);
       const engineer = sim.nearestAvailableEngineer(pos);
-      return { kind: 'mine', mineKind: this.mode.mineKind, pos, valid: check.ok, engineerPos: engineer?.pos, engineerRange: CONFIG.construction.engineerRange };
+      return { kind: 'mine', mineKind: this.mode.mineKind, pos, valid: check.ok, reason: check.reason, engineerPos: engineer?.pos, engineerRange: CONFIG.construction.engineerRange };
     }
     if (this.mode.kind === 'artillery') {
       const check = sim.validatePlacement('artillery', pos);
-      return { kind: 'artillery', pos, valid: check.ok };
+      return { kind: 'artillery', pos, valid: check.ok, reason: check.reason };
     }
     if (this.mode.kind === 'airSupport') {
       const halfRun = (CONFIG.airSupport.bombCount - 1) * CONFIG.airSupport.bombSpacing / 2;
@@ -1897,7 +1971,7 @@ export class GameController {
         y: Math.min(CONFIG.field.height - 10, Math.max(CONFIG.spawnMargin * 3, pos.y)),
       };
       const check = sim.validatePlacement('airSupport', target);
-      return { kind: 'airSupport', pos: target, valid: check.ok };
+      return { kind: 'airSupport', pos: target, valid: check.ok, reason: check.reason };
     }
     if (this.mode.kind === 'flare') {
       const target = {
@@ -1905,13 +1979,14 @@ export class GameController {
         y: Math.min(CONFIG.field.height - 4, Math.max(4, pos.y)),
       };
       const check = sim.validatePlacement('flare', target);
-      return { kind: 'flare', pos: target, valid: check.ok };
+      return { kind: 'flare', pos: target, valid: check.ok, reason: check.reason };
     }
     if (this.mode.kind === 'satchel') {
       const selected = this.selectedUnits();
       const engineer = selected.length === 1 ? selected[0] : undefined;
       if (!engineer) return null;
-      return { kind: 'satchel', pos, valid: satchelError(sim.state, engineer, pos) === null,
+      const reason = satchelError(sim.state, engineer, pos);
+      return { kind: 'satchel', pos, valid: reason === null, reason: reason ?? undefined,
         engineerPos: engineer.pos, engineerRange: CONFIG.satchel.placementRange };
     }
     if (this.mode.kind === 'smoke') {
@@ -1924,7 +1999,8 @@ export class GameController {
         && (thrower.smokeGrenades ?? 0) > 0
         && Math.hypot(thrower.pos.x - pos.x, thrower.pos.y - pos.y) <= CONFIG.smoke.throwRange
         && inBounds;
-      return { kind: 'smoke', pos, valid, throwerPos: thrower.pos, throwRange: CONFIG.smoke.throwRange };
+      return { kind: 'smoke', pos, valid, reason: valid ? undefined : !inBounds ? 'Choose a target inside the battlefield.'
+        : thrower.pinned ? 'Pinned soldiers cannot throw smoke.' : (thrower.smokeGrenades ?? 0) <= 0 ? 'No smoke grenades remaining.' : `Target must be within ${CONFIG.smoke.throwRange}px.`, throwerPos: thrower.pos, throwRange: CONFIG.smoke.throwRange };
     }
     return null;
   }
@@ -1944,7 +2020,23 @@ export class GameController {
   applyPrefs(prefs: Preferences): void {
     this.prefs = prefs;
     this.audio.setPrefs(prefs);
+    this.renderer?.setPreferences?.(prefs);
+    document.documentElement.style.fontSize = `${16 * prefs.uiScale}px`;
+    document.documentElement.style.setProperty('--friendly', prefs.friendlyColor);
+    document.documentElement.style.setProperty('--enemy', prefs.enemyColor);
+    document.body.classList.toggle('large-captions', prefs.largeCaptions);
+    document.body.classList.toggle('reduced-motion', prefs.reducedMotion);
+    const keyLabel = (code: string) => code.replace('Key', '').replace('Digit', '').replace('Equal', '+').replace('Minus', '−');
+    document.getElementById('btn-toggle-commands')?.setAttribute('title', `Toggle command panel (${keyLabel(prefs.keys.panel)})`);
+    document.getElementById('btn-pause')?.setAttribute('title', `Pause / resume (${keyLabel(prefs.keys.pause)})`);
     savePrefs(this.storage, prefs);
+  }
+
+  resetCamera(): void { this.renderer?.resetCamera?.(); }
+
+  openSettings(): void {
+    if (this.sim !== null && !this.sim.paused && this.sim.state.phase === 'running') this.pauseRun(false);
+    this.menus.showSettings();
   }
 
   unlockAudio(): void {
@@ -1959,7 +2051,7 @@ function secSafe(seconds: number): number {
 /** Role metadata for the recruitment UI. */
 export function roleCatalog(): Array<{ role: FriendlyRole; label: string; cost: number; blurb: string }> {
   const content = getContent();
-  const roles: FriendlyRole[] = ['rifleman', 'mg', 'medic', 'supply_officer', 'at', 'sniper', 'engineer', 'radio_engineer', 'officer', 'mortarman', 'gun_truck'];
+  const roles: FriendlyRole[] = ['rifleman', 'mg', 'medic', 'supply_officer', 'at', 'sniper', 'engineer', 'radio_engineer', 'officer', 'mortarman', 'gun_truck', 'scout', 'heavy_mg', 'assault_infantry', 'at_gun'];
   return roles.map((role) => ({
     role,
     label: content.friendly[role].label,

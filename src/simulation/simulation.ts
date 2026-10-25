@@ -1,5 +1,10 @@
+import { inRubble, weatherGroundEffects } from './environment';
+import { roleAbility, updateRoleAbilities } from './role-abilities';
+import { crewTuning, crewArcContains, updateCrew } from './specialists';
+import { recordVehicleTracks } from './battle-wear';
 import { AMBUSH_ARCS, ambushShape, insideAmbushArc, supportsAmbush } from './ambush';
 import { CONFIG } from '../content/config';
+import { campaignSeason } from '../content/campaign-story';
 import { demolitionSites, demolitionTargetExists, sameDemolitionTarget } from './sappers';
 import type { EnemySapperTeam } from './types';
 import { wireContains, wireDistance } from './barbed-wire';
@@ -34,7 +39,7 @@ import type { BuildingFacing, BuildingLevel, BuildingPosition } from './types';
 import { ELEVATION, elevationAt, elevationTraversal, slopeAt } from './elevation';
 import { canRun, updateStamina } from './movement';
 import { damageTankComponent, tankImmobilized, TANK_COMPONENTS } from './tank-damage';
-import { nextSeasonalWeather, seasonForSeed } from './seasons';
+import { nextSeasonalWeather, seasonForSeed, SEASON_WEATHER } from './seasons';
 import { strikeIsImminent } from './incoming-fire';
 import { insidePatrolArea, isPatrolRole, patrolArea, patrolPoints, patrolTerrain, validPatrolArea } from './patrol';
 import { BRIDGE, bridgeContains, bridgeDeckHeight, bridgeFootHeight, bridgeKey, bridgeTraversal, unitBridge } from './bridges';
@@ -144,7 +149,7 @@ export class Simulation {
    * restored from a save made before buildings existed.
    */
   private terrainHasBuildings: boolean;
-  private terrainLayoutVersion: 1 | 2 | 3;
+  private terrainLayoutVersion: 1 | 2 | 3 | 4;
   /**
    * The map's buildings in generation order, kept alongside the state because
    * generation is the only thing that knows their names and footprints. The state
@@ -187,6 +192,7 @@ export class Simulation {
       enemySmokeAssaults: [],
       strikes: [],
       groundImpacts: [],
+      vehicleTracks: [],
       treeDamage: [],
       sandbags: [],
       trenches: [],
@@ -295,7 +301,9 @@ export class Simulation {
     // A save from before buildings existed has no record of them, so its map is
     // generated without any rather than with structures the save cannot describe.
     const withBuildings = snap.terrainHasBuildings !== false;
-    const season = snap.season ?? (snap.weather?.toLowerCase().includes('snow') ? 'winter' : seasonForSeed(snap.seed));
+    const season = snap.campaignCountry === undefined
+      ? snap.season ?? (snap.weather?.toLowerCase().includes('snow') ? 'winter' : seasonForSeed(snap.seed))
+      : campaignSeason(snap.campaignCountry, snap.mapsCleared ?? Math.max(0, mapNumber - 1));
     const sim = new Simulation(base, content, generateTerrain(mapTerrainSeed(base, mapNumber), withBuildings, snap.terrainLayoutVersion ?? 1, snap.campaignCountry, season), withBuildings);
     const s = sim.state;
     // The constructor uses the run seed for identity; terrain lookups need this map's seed.
@@ -321,6 +329,7 @@ export class Simulation {
     s.enemySmokeAssaults = structuredClone(snap.enemySmokeAssaults ?? []);
     s.strikes = snap.strikes.map((k) => ({ ...k, pos: { ...k.pos } }));
     s.groundImpacts = structuredClone(snap.groundImpacts ?? []);
+    s.vehicleTracks = structuredClone(snap.vehicleTracks ?? []);
     s.treeDamage = structuredClone(snap.treeDamage ?? []);
     for (const tree of s.treeDamage) if (tree.health === 0) sim.terrainKinds[tree.cell] = TERRAIN_KIND.open;
     s.sandbags = snap.sandbags.map((b) => ({ ...b, pos: { ...b.pos } }));
@@ -373,7 +382,8 @@ export class Simulation {
     s.flares = (snap.flares ?? []).map((flare) => ({ ...flare, pos: { ...flare.pos } }));
     s.campfires = (snap.campfires ?? []).map((fire) => ({ ...fire, pos: { ...fire.pos } }));
     s.satchelCharges = (snap.satchelCharges ?? []).map((charge) => ({ ...charge, pos: { ...charge.pos } }));
-    s.weather = snap.weather ?? weatherForSeed(snap.seed, snap.campaignCountry, season);
+    s.weather = snap.weather !== undefined && (snap.campaignCountry === undefined || SEASON_WEATHER[season].includes(snap.weather))
+      ? snap.weather : weatherForSeed(snap.seed, snap.campaignCountry, season);
     s.weatherChangeTick = snap.weatherChangeTick ?? snap.ticks + sec(CONFIG.weatherChangeSeconds);
     s.wavesCompleted = snap.wavesCompleted ?? Math.max(snap.scheduler.waveIndex, snap.scheduler.endlessWavesCleared ?? 0);
     s.dayNightStartTick = snap.dayNightStartTick !== undefined
@@ -434,6 +444,7 @@ export class Simulation {
       enemySmokeAssaults: structuredClone(s.enemySmokeAssaults ?? []),
       strikes: s.strikes.map((k) => ({ ...k, pos: { ...k.pos } })),
       groundImpacts: structuredClone(s.groundImpacts ?? []),
+      vehicleTracks: structuredClone(s.vehicleTracks ?? []),
       treeDamage: structuredClone(s.treeDamage ?? []),
       sandbags: s.sandbags.map((b) => ({ ...b, pos: { ...b.pos } })),
       trenches: s.trenches.map((t) => ({ ...t, pos: { ...t.pos } })),
@@ -527,7 +538,13 @@ export class Simulation {
     this.updateMedicalQueue();
     this.updateGrenadeSupplyQueue();
     this.updateEnemySmokeAssaults();
+    updateRoleAbilities(s, (event) => this.emit(event), (observer, target) => observer.role === 'scout'
+      ? this.scoutCanObserve(observer, target) : this.supportInRange(observer, target, 90) && hasLineOfSight(s.terrain, observer.pos, target.pos, unitEyeHeight(s.terrain, observer), unitEyeHeight(s.terrain, target), [observer.buildingPosition?.buildingId, target.buildingPosition?.buildingId].filter((id): id is number => id !== undefined)), (recipient) => {
+        s.grenadeSupplyQueue = s.grenadeSupplyQueue?.filter((id) => id !== recipient.id);
+        for (const officer of s.units) if (officer.supplyTargetId === recipient.id) this.cancelSupportRequest(officer);
+      });
     this.updateUnits();
+    recordVehicleTracks(s, this.zones);
     // After movement, so a mine bites the unit that actually stepped on it.
     this.updateMines();
     this.updateConstruction();
@@ -577,10 +594,28 @@ export class Simulation {
         return CONFIG.weather[this.state.weather].visibilityMult * Math.max(flareBonus, headlightBonus, litByFire ? 1 : 0) * foliageVisibility;
       }
     }
-    const baseline = this.visibilityMultiplier() * foliageVisibility;
+    let concealment = 1;
+    const revealed = (target.revealedUntil ?? 0) > this.state.ticks || this.isIlluminated(target.pos);
+    if (!revealed && (target.role === 'infiltrator' || target.role === 'sharpshooter')) concealment = target.role === 'infiltrator' ? .48 : .65;
+    const observed = shooter.team === 'friendly' && this.scoutObserves(target);
+    const baseline = this.visibilityMultiplier() * (observed || shooter.role === 'scout' ? Math.max(.85, foliageVisibility) : foliageVisibility)
+      * (observed || shooter.role === 'scout' ? 1 : concealment);
     const contact = nightContactFor(this.state, shooter, target);
     const cueRange = contact?.kind === 'sound' ? CONFIG.dayNight.gunfire.heardRangeMult : 1;
     return contact ? Math.max(baseline, contact.kind === 'sound' ? cueRange : CONFIG.weather[this.state.weather].visibilityMult * cueRange) : baseline;
+  }
+
+  scoutCanObserve(scout: Unit, target: Unit): boolean {
+    const watching = scout.roleDuty?.kind === 'observe';
+    const range = watching ? scout.buildingPosition ? 620 : 540 : 420;
+    return scout.team === 'friendly' && scout.role === 'scout' && !scout.dead && scout.health > 0 && !scout.pinned && !scout.crossed
+      && targetIsValid(this.content, this.state.terrain, this.state.sandbags, scout, target,
+        { ...this.content.weapons.scout_carbine!, range }, CONFIG, this.state.trenches, this.state.smokes,
+        this.visibilityMultiplier() * (this.isIlluminated(target.pos) ? 2 : 1));
+  }
+
+  scoutObserves(target: Unit): boolean {
+    return this.state.units.some((scout) => this.scoutCanObserve(scout, target));
   }
 
   private vehicleHeadlightsOn(unit: Unit): boolean {
@@ -617,6 +652,11 @@ export class Simulation {
   }
 
   private findEnemyPath(start: Vec2, goal: Vec2, unit?: Unit) {
+    if (unit?.role === 'infiltrator') {
+      return this.findUnitPath(unit, start, goal, (pos) =>
+        (this.isInFoliage(pos) ? .6 : 2) * (this.isIlluminated(pos) ? 12 : 1)
+        * (this.livingFriendlies().some((u) => dist(u.pos, pos) < 160) ? 5 : 1));
+    }
     const cost = this.nightFlareSignature() === '' ? undefined : (pos: Vec2) => this.isIlluminated(pos) ? 12 : 1;
     return unit ? this.findUnitPath(unit, start, goal, cost) : findPath(this.state.terrain, start, goal, cost);
   }
@@ -704,6 +744,7 @@ export class Simulation {
     if (unit.role === 'troop_transport' && effects === CONFIG.terrain.effects.road) {
       effects = { ...effects, speedMult: CONFIG.troopTransport.roadSpeedMult };
     }
+    effects = weatherGroundEffects(effects, this.state.weather, isVehicle(this.content, unit), inRubble(this.state.buildings, unit.pos, this.state.terrain.cell));
     if (!isVehicle(this.content, unit) && !bridge && this.state.barbedWire.some((wire) => wireContains(wire, unit.pos))) {
       effects = { ...effects, speedMult: effects.speedMult * CONFIG.barbedWire.speedMult };
     }
@@ -744,6 +785,7 @@ export class Simulation {
     for (const unit of reachedExit) {
       delete unit.buildingOrder;
       delete unit.buildingPosition;
+      delete unit.roleDuty; delete unit.scoutReports;
       unit.crossed = true;
       unit.path = [];
       unit.moveGoal = null;
@@ -842,6 +884,7 @@ export class Simulation {
     s.enemySmokeAssaults = [];
     s.strikes = [];
     s.groundImpacts = [];
+    s.vehicleTracks = [];
     s.treeDamage = [];
     s.sandbags = [];
     s.trenches = [];
@@ -872,14 +915,14 @@ export class Simulation {
     s.sectorSupplyPending = credited && s.mapsCleared < CONFIG.crossing.campaignMaps;
     s.mapNumber += 1;
     s.seed = mapTerrainSeed(s.baseTerrainSeed, s.mapNumber);
-    s.season = seasonForSeed(s.seed);
+    s.season = s.campaignCountry === undefined ? seasonForSeed(s.seed) : campaignSeason(s.campaignCountry, s.mapsCleared);
     s.weather = weatherForSeed(s.seed, s.campaignCountry, s.season);
     s.weatherChangeTick = s.ticks + sec(CONFIG.weatherChangeSeconds);
     // The battery's stream is a property of the map, like the terrain: a fresh
     // battlefield gets a fresh fire plan rather than continuing the old one.
     s.enemyArtilleryRng = { s: deriveRng(s.seed, BATTERY_RNG_SALT).s };
-    const terrainData = generateTerrain(s.seed, true, 3, s.campaignCountry, s.season);
-    this.terrainLayoutVersion = 3;
+    const terrainData = generateTerrain(s.seed, true, 4, s.campaignCountry, s.season);
+    this.terrainLayoutVersion = 4;
     this.terrainHasBuildings = true;
     s.terrainHasBuildings = true;
     s.terrain = terrainData.terrain;
@@ -1154,7 +1197,7 @@ export class Simulation {
     if (this.state.phase !== 'running') return { ok: false, reason: 'The battle is over.' };
     switch (cmd.type) {
       case 'callGrenadeSupplies':
-        return this.commandCallSupplies(cmd.unitId, this.findUnit(cmd.unitId)?.role === 'engineer' ? 'engineer' : 'rifleman');
+        return this.commandCallSupplies(cmd.unitId, this.findUnit(cmd.unitId)?.role === 'assault_infantry' ? 'assault_infantry' : this.findUnit(cmd.unitId)?.role === 'engineer' ? 'engineer' : 'rifleman');
       case 'callRocketSupplies':
         return this.commandCallSupplies(cmd.unitId, 'at');
       case 'callMortarSupplies':
@@ -1182,7 +1225,7 @@ export class Simulation {
           unit.path = []; unit.moveGoal = null; unit.running = false; unit.movementPace = 'walk';
           stopped = true;
         }
-        return stopped ? { ok: true } : { ok: false, reason: 'Select a patrolling rifleman, sniper, or medic.' };
+        return stopped ? { ok: true } : { ok: false, reason: 'Select a patrolling rifleman, scout, sniper, or medic.' };
       }
       case 'moveGroup':
         return this.commandMoveGroup(cmd.unitIds, cmd.pos);
@@ -1214,6 +1257,16 @@ export class Simulation {
         return this.commandSmoke(cmd.unitId, cmd.pos);
       case 'satchel':
         return this.commandSatchel(cmd.unitId, cmd.pos);
+      case 'roleAbility': {
+        const unit = this.findUnit(cmd.unitId);
+        if (unit && !unit.roleDuty && (unit.role === 'mg' || unit.role === 'heavy_mg')) {
+          const check = this.validateSuppression(unit.id, cmd.pos);
+          if (!check.ok) return check;
+        }
+        const result = roleAbility(this.state, unit, cmd.pos);
+        if (result.ok && unit?.roleDuty) this.emit({ type: 'roleAbilityStarted', unitId: unit.id, kind: unit.roleDuty.kind, pos: { ...unit.pos } });
+        return result;
+      }
       case 'lightFire':
         return this.commandLightFire(cmd.unitId);
       case 'ambush':
@@ -1305,9 +1358,9 @@ export class Simulation {
       }
       const empty = unit.role === 'at' ? (unit.rockets ?? this.content.friendly.at.rockets ?? 0) <= 0
         : unit.role === 'mortarman' ? (unit.mortarBombs ?? this.content.friendly.mortarman.mortarBombs ?? 0) <= 0
-        : (unit.role === 'rifleman' || unit.role === 'engineer') && unit.grenades <= 0;
+        : (unit.role === 'rifleman' || unit.role === 'engineer' || unit.role === 'assault_infantry') && unit.grenades <= 0;
       if (empty && s.ticks >= (unit.autoSupplyCallAfter ?? 0)
-        && (unit.role === 'rifleman' || unit.role === 'engineer' || unit.role === 'at' || unit.role === 'mortarman')
+        && (unit.role === 'rifleman' || unit.role === 'engineer' || unit.role === 'assault_infantry' || unit.role === 'at' || unit.role === 'mortarman')
         && this.commandCallSupplies(unit.id, unit.role).ok) {
         unit.autoSupplyCallAfter = s.ticks + sec(tuning.retrySeconds);
         this.emit({ type: 'automaticSupportRequested', unitId: unit.id,
@@ -1334,16 +1387,16 @@ export class Simulation {
 
   private needsSupplies(unit: Unit | undefined): unit is Unit {
     return !!unit && unit.team === 'friendly' && !unit.dead && !unit.crossed && unit.health > 0
-      && (((unit.role === 'rifleman' || unit.role === 'engineer') && unit.grenades < (this.content.friendly[unit.role].grenades ?? 0))
+      && (((unit.role === 'rifleman' || unit.role === 'engineer' || unit.role === 'assault_infantry') && unit.grenades < (this.content.friendly[unit.role].grenades ?? 0))
         || (unit.role === 'at' && (unit.rockets ?? this.content.friendly.at.rockets ?? 0) < (this.content.friendly.at.rockets ?? 0))
         || (unit.role === 'mortarman' && (unit.mortarBombs ?? this.content.friendly.mortarman.mortarBombs ?? 0) < (this.content.friendly.mortarman.mortarBombs ?? 0)));
   }
 
-  private commandCallSupplies(unitId: number, role: 'rifleman' | 'engineer' | 'at' | 'mortarman'): CommandResult {
+  private commandCallSupplies(unitId: number, role: 'rifleman' | 'engineer' | 'assault_infantry' | 'at' | 'mortarman'): CommandResult {
     const recipient = this.findUnit(unitId);
     if (recipient?.role !== role || !this.needsSupplies(recipient)) return { ok: false, reason: role === 'mortarman' ? 'Select a mortarman who needs bombs.' : role === 'at' ? 'Select an anti-tank soldier who needs rockets.' : 'Select a rifleman or engineer who needs grenades.' };
     if (this.state.grenadeSupplyQueue?.includes(unitId)) return { ok: false, reason: 'Ammunition supplies have already been requested.' };
-    if (!this.state.units.some((u) => u.team === 'friendly' && u.role === 'supply_officer' && !u.dead && !u.crossed && u.health > 0)) {
+    if (!this.state.units.some((u) => u.team === 'friendly' && u.role === 'supply_officer' && u.roleDuty?.kind !== 'supply' && !u.dead && !u.crossed && u.health > 0)) {
       return { ok: false, reason: 'No Supply Officer available. Recruit one first.' };
     }
     (this.state.grenadeSupplyQueue ??= []).push(unitId);
@@ -1353,7 +1406,7 @@ export class Simulation {
 
   private updateGrenadeSupplyQueue(): void {
     this.state.grenadeSupplyQueue = (this.state.grenadeSupplyQueue ?? []).filter((id) => this.needsSupplies(this.findUnit(id)));
-    const officers = this.state.units.filter((u) => u.team === 'friendly' && u.role === 'supply_officer' && !u.dead && !u.crossed && u.health > 0);
+    const officers = this.state.units.filter((u) => u.team === 'friendly' && u.role === 'supply_officer' && u.roleDuty?.kind !== 'supply' && !u.dead && !u.crossed && u.health > 0);
     for (const officer of officers) {
       if (officer.supplyTargetId !== undefined && !this.needsSupplies(this.findUnit(officer.supplyTargetId))) {
         delete officer.supplyTargetId; delete officer.buildingOrder;
@@ -1372,7 +1425,7 @@ export class Simulation {
   }
 
   private supplyBehavior(officer: Unit): void {
-    if (officer.supplyTargetId === undefined || officer.pinned) return;
+    if (officer.supplyTargetId === undefined || officer.pinned || officer.roleDuty?.kind === 'supply') return;
     const recipient = this.findUnit(officer.supplyTargetId);
     if (!this.needsSupplies(recipient)) return;
     if (!this.supportInRange(officer, recipient, CONFIG.grenadeSupplies.range)) {
@@ -1461,13 +1514,23 @@ export class Simulation {
     for (const id of new Set(unitIds)) {
       const unit = this.findUnit(id);
       if (!unit || unit.team !== 'friendly') continue;
+      if (unit.role === 'assault_infantry' && !unit.pinned && !unit.dead && !unit.crossed && unit.health > 0
+        && this.state.units.some((u) => u.team === 'enemy' && u.health > 0 && u.buildingPosition?.buildingId === building.id)) {
+        const entrance = this.buildingEntrances(building).sort((a,b) => dist(a,unit.pos)-dist(b,unit.pos))
+          .find((p) => this.findUnitPath(unit, this.buildingExit(unit) ?? unit.pos, p).reachable);
+        if (!entrance || ((unit.buildingPosition || unit.buildingOrder) && !this.leaveBuilding(unit))) continue;
+        delete unit.patrol; this.cancelGunfireOrder(unit); this.cancelSupportRequest(unit);
+        unit.clearBuilding = { buildingId, level, facing, ticks: sec(2) };
+        unit.path = this.findUnitPath(unit, unit.pos, entrance).waypoints; unit.moveGoal = entrance;
+        accepted = true; continue;
+      }
       accepted = this.assignBuildingPosition(unit, building, level, facing, preserveSupportRequest) || accepted;
     }
     return accepted ? { ok: true } : { ok: false, reason: 'No free reachable position. Select unpinned infantry; vehicles stay outside and enemies must be cleared first.' };
   }
 
   private assignBuildingPosition(unit: Unit, building: Building, level: BuildingLevel, facing?: BuildingFacing, preserveSupportRequest = false): boolean {
-    if (unit.dead || unit.health <= 0 || unit.crossed || unit.pinned || isVehicle(this.content, unit)) return false;
+    if (unit.dead || unit.health <= 0 || unit.crossed || unit.pinned || isVehicle(this.content, unit) || unit.role === 'at_gun') return false;
     if (this.state.constructionSites.some((site) => site.builderId === unit.id)) return false;
     if (this.state.units.some((u) => u.team !== unit.team && u.health > 0 && !u.dead
       && (u.buildingPosition?.buildingId === building.id || u.buildingOrder?.buildingId === building.id))) return false;
@@ -1499,6 +1562,7 @@ export class Simulation {
     const oldLevel = typeof currentLevel === 'number' ? currentLevel : currentLevel === 'roof' ? buildingArchitecture(building).floors : 1;
     const targetLevel = typeof level === 'number' ? level : level === 'roof' ? buildingArchitecture(building).floors : 1;
     delete unit.patrol;
+    delete unit.clearBuilding;
     delete unit.dodgingStrike;
     this.cancelGunfireOrder(unit);
     unit.buildingOrder = { ...position, climbTicks: sec(1 + Math.abs(targetLevel - oldLevel) * .8) };
@@ -1510,6 +1574,43 @@ export class Simulation {
   }
 
   /** Building orders own movement until arrival; climbing temporarily holds fire. */
+  private updateBuildingClearing(unit: Unit): boolean {
+    const order = unit.clearBuilding;
+    if (!order) return false;
+    const building = this.state.buildings.find((b) => b.id === order.buildingId && !b.destroyed);
+    if (!building) { delete unit.clearBuilding; unit.path = []; unit.moveGoal = null; return false; }
+    if (unit.pinned || (unit.upgradeTimer ?? 0) > 0) return true;
+    if (unit.moveGoal && dist(unit.pos, unit.moveGoal) > 3) {
+      if (!unit.path.length) {
+        const route = this.findUnitPath(unit, unit.pos, unit.moveGoal);
+        if (!route.reachable) { delete unit.clearBuilding; return false; }
+        unit.path = route.waypoints;
+      }
+      this.advanceAlongPath(unit); return true;
+    }
+    const occupants = this.state.units.filter((u) => u.team === 'enemy' && u.health > 0 && !u.dead && u.buildingPosition?.buildingId === building.id);
+    if (!occupants.length) {
+      delete unit.clearBuilding;
+      this.assignBuildingPosition(unit, building, order.level, order.facing); return true;
+    }
+    if (--order.ticks > 0) return true;
+    order.ticks = sec(2);
+    const defender = occupants.sort((a,b) => a.id-b.id)[0]!;
+    // Close combat at the entrance reaches occupants, regardless of window LOS.
+    const result = this.damageUnit(defender, this.weaponDamage(unit, 42), 1);
+    applySuppression(defender, 24, CONFIG);
+    recordNightGunfire(this.state, unit, this.terrainKinds, this.content.weapons.thompson!);
+    unit.revealedUntil = this.state.ticks + sec(4);
+    this.emit({ type: 'shot', shooterId: unit.id, shooterTeam: unit.team, targetId: defender.id,
+      from: { ...unit.pos }, to: { ...defender.pos }, weapon: this.content.weapons.thompson!.name, hit: true });
+    if (result.killed) this.killUnit(defender, unit.id);
+    if (unit.health > 0 && !defender.pinned) {
+      const counter = this.damageUnit(unit, 12, 1);
+      if (counter.killed) this.killUnit(unit, defender.id);
+    }
+    return true;
+  }
+
   private updateBuildingOrder(unit: Unit): boolean {
     const order = unit.buildingOrder;
     if (!order) return false;
@@ -1537,7 +1638,7 @@ export class Simulation {
   }
 
   private seekEnemyBuilding(unit: Unit): boolean {
-    if (isVehicle(this.content, unit) || (unit.buildingCooldown ?? 0) > 0 || unit.id % 3 !== 0 || (this.state.ticks + unit.id) % 30 !== 0) return false;
+    if (crewTuning(unit) || ['infiltrator', 'at_infantry'].includes(unit.role) || isVehicle(this.content, unit) || (unit.buildingCooldown ?? 0) > 0 || unit.id % 3 !== 0 || (this.state.ticks + unit.id) % 30 !== 0) return false;
     const threats = this.livingFriendlies();
     for (const building of [...this.state.buildings].filter((b) => !b.destroyed).sort((a, b) => dist(a.pos, unit.pos) - dist(b.pos, unit.pos))) {
       if (dist(building.pos, unit.pos) > 145) continue;
@@ -1555,7 +1656,7 @@ export class Simulation {
     if (!validPatrolArea(area)) return { ok: false, reason: 'Mark an area at least 48 × 48 inside the battlefield.' };
     const selected = this.state.units.filter((unit) => unitIds.includes(unit.id) && unit.team === 'friendly' && isPatrolRole(unit.role)
       && !unit.dead && unit.health > 0 && !unit.crossed && !unit.pinned);
-    if (!selected.length) return { ok: false, reason: 'Select an unpinned rifleman, sniper, or medic to patrol.' };
+    if (!selected.length) return { ok: false, reason: 'Select an unpinned rifleman, scout, sniper, or medic to patrol.' };
     const points = patrolPoints(this.state.terrain, area);
     if (!points) return { ok: false, reason: 'No connected patrol route inside that area. Mark more open ground.' };
     let accepted = false;
@@ -1616,6 +1717,7 @@ export class Simulation {
     if (!result.reachable) return { ok: false, reason: 'No route to that position.' };
     this.leaveBuilding(unit, preserveSupportRequest);
     delete unit.patrol;
+    delete unit.clearBuilding;
     delete unit.dodgingStrike;
     this.cancelGunfireOrder(unit);
     unit.path = result.waypoints;
@@ -1684,6 +1786,7 @@ export class Simulation {
         if (!route.reachable) continue;
         this.leaveBuilding(unit);
         delete unit.patrol;
+        delete unit.clearBuilding;
         delete unit.dodgingStrike;
         this.cancelGunfireOrder(unit);
         taken.add(i);
@@ -2573,6 +2676,7 @@ export class Simulation {
         delete unit.gunfirePursuit; delete unit.dodgingStrike;
       }
       if (order === 'seekGunfire') {
+        delete unit.clearBuilding;
         this.cancelSupportRequest(unit);
         delete unit.patrol;
         unit.stance = 'standing'; unit.crawling = false;
@@ -2586,6 +2690,7 @@ export class Simulation {
 
   /** A direct move, patrol, or building order replaces autonomous pursuit. */
   private cancelGunfireOrder(unit: Unit): void {
+    delete unit.clearBuilding;
     delete unit.ambush;
     if (unit.fireOrder === 'seekGunfire') unit.fireOrder = 'auto';
     delete unit.gunfirePursuit;
@@ -2622,8 +2727,8 @@ export class Simulation {
     if (pace !== 'walk' && pace !== 'run') return { ok: false, reason: 'Choose walking or running.' };
     const selected = [...new Set(unitIds)].map((id) => this.findUnit(id)).filter((unit): unit is Unit =>
       unit !== undefined && unit.team === 'friendly' && unit.health > 0 && !unit.dead && !unit.crossed
-      && unit.role !== 'vehicle' && unit.role !== 'gun_truck');
-    if (!selected.length) return { ok: false, reason: 'Select living infantry to change pace.' };
+      && unit.role !== 'vehicle' && unit.role !== 'gun_truck' && !crewTuning(unit));
+    if (!selected.length) return { ok: false, reason: 'Select living infantry to change pace. Weapon crews move at walking pace.' };
     const eligible = selected.filter((unit) => pace === 'walk' || (!unit.pinned && !unit.terrainCrawling
       && !unit.buildingPosition && (unit.stamina ?? 1) >= CONFIG.infantryMovement.minimumRunStamina));
     if (!eligible.length) return { ok: false, reason: 'Running needs at least 25% stamina, open footing, and unpinned infantry.' };
@@ -2648,6 +2753,10 @@ export class Simulation {
   specializationsFor(role: FriendlyRole): Specialization[] {
     const choices: Record<FriendlyRole, Specialization[]> = {
       rifleman: ['steadyAim', 'fastReload', 'forcedMarch', 'camouflage'],
+      scout: ['steadyAim', 'forcedMarch', 'camouflage'],
+      heavy_mg: ['steadyAim', 'suppressor', 'fastReload'],
+      assault_infantry: ['steadyAim', 'fastReload', 'forcedMarch', 'camouflage'],
+      at_gun: ['tankHunter', 'fastReload', 'steadyAim'],
       mg: ['steadyAim', 'suppressor', 'forcedMarch', 'camouflage'],
       mortarman: ['forcedMarch', 'camouflage'],
       at: ['tankHunter', 'fastReload', 'forcedMarch', 'camouflage'],
@@ -3172,15 +3281,25 @@ export class Simulation {
     }
     building.destroyed = true;
     for (const unit of this.state.units) {
-      if (unit.buildingPosition?.buildingId !== building.id && unit.buildingOrder?.buildingId !== building.id) continue;
-      const occupied = unit.buildingPosition !== undefined;
-      delete unit.buildingPosition;
-      delete unit.buildingOrder;
+      const occupied = unit.buildingPosition?.buildingId === building.id;
+      const entering = unit.buildingOrder?.buildingId === building.id;
+      if (!occupied && !entering) continue;
+      if (occupied) delete unit.buildingPosition;
+      if (entering) delete unit.buildingOrder;
+      unit.path = []; unit.moveGoal = null;
+      // Soldiers still approaching lose their entry order but are outside the collapse.
+      if (!occupied || unit.dead || unit.health <= 0) continue;
       const safe = nearestOpenCell({ ...this.state.terrain, blocked: this.state.terrain.baseBlocked ?? this.state.terrain.blocked }, centre, 4) ?? centre;
-      unit.pos = { ...safe }; unit.prevPos = { ...safe }; unit.path = []; unit.moveGoal = null;
-      if (occupied) {
-        const damage = applyDamageToUnit(this.content, unit, 40, 1);
-        if (damage.killed) this.killUnit(unit, null);
+      unit.pos = { ...safe }; unit.prevPos = { ...safe };
+      delete unit.roleDuty; delete unit.ambush;
+      unit.burstRemaining = 0; unit.running = false; unit.targetId = null;
+      const collapseDamage = this.maxHealthOf(unit) * rngRange(this.state.rng,
+        CONFIG.buildings.collapseDamageMinMult, CONFIG.buildings.collapseDamageMaxMult);
+      const damage = applyDamageToUnit(this.content, unit, collapseDamage, 1);
+      if (damage.killed) this.killUnit(unit, null);
+      else {
+        unit.suppression = CONFIG.suppression.max; unit.pinned = true;
+        unit.morale = Math.max(0, unit.morale - 30);
       }
     }
     // Reopening the ground is the whole point: the floor plan plus the buildings
@@ -3268,6 +3387,13 @@ export class Simulation {
 
   private updateUnits(): void {
     const s = this.state;
+    for (const target of s.units) {
+      if (!['infiltrator', 'sharpshooter'].includes(target.role) || target.health <= 0) continue;
+      if ((target.revealedUntil ?? 0) > s.ticks || this.scoutObserves(target) || this.livingFriendlies().some((observer) =>
+        targetIsValid(this.content, s.terrain, s.sandbags, observer, target,
+          this.weaponOf(observer) ?? this.content.weapons.rifle!, CONFIG, s.trenches, s.smokes,
+          (candidate) => this.visibilityMultiplierFor(observer, candidate)))) target.detectedUntil = s.ticks + sec(1);
+    }
     const snapshot = [...s.units];
     for (const unit of snapshot) {
       if (unit.health <= 0 || s.phase !== 'running') continue;
@@ -3286,7 +3412,7 @@ export class Simulation {
       unit.advanceFlip = Math.floor((Math.imul(unit.id, 2654435761) >>> 0) % 2) === 0;
 
       // Suppression decay and pin hysteresis.
-      const officerNearby = unit.team === 'friendly' && this.nearbyOfficer(unit);
+      const officerNearby = this.nearbyOfficer(unit);
       const suppressionRecoveryMult = officerNearby ? CONFIG.morale.officerSuppressionRecoveryMult : 1;
       unit.suppression = Math.max(0, unit.suppression - CONFIG.suppression.decayPerTick * suppressionRecoveryMult);
       if (unit.pinned) {
@@ -3335,7 +3461,7 @@ export class Simulation {
         unit.path = []; unit.moveGoal = null; unit.running = false;
       }
       if (unit.fireOrder === 'seekGunfire' && !unit.pinned) this.leaveBuilding(unit);
-      if (this.updateBuildingOrder(unit)) continue;
+      if (this.updateBuildingClearing(unit) || this.updateBuildingOrder(unit)) continue;
 
       const weapon = this.weaponOf(unit);
       const enemies = s.units.filter((u) => u.team !== unit.team && u.health > 0
@@ -3349,11 +3475,11 @@ export class Simulation {
       if (weapon && target !== null && !targetIsValid(this.content, s.terrain, s.sandbags, unit, target, weapon, CONFIG, s.trenches, s.smokes, visibility)) {
         target = null;
       }
-      if (weapon && target === null && !unit.pinned) {
+      if (weapon && (target === null || unit.role === 'at_gun' || unit.role === 'sharpshooter') && !unit.pinned) {
         target = acquireTarget(this.content, s.terrain, s.sandbags, unit, enemies, weapon, CONFIG, s.trenches, unit.team === 'friendly' ? (unit.fireOrder ?? 'auto') : 'auto', s.smokes, visibility, (candidate) => nightContactFor(s, unit, candidate) !== undefined);
       }
       let supportingPinnedComrade = false;
-      if (unit.team === 'enemy' && weapon?.kind === 'hitscan' && !unit.pinned) {
+      if (unit.team === 'enemy' && unit.role !== 'sharpshooter' && unit.role !== 'infiltrator' && weapon?.kind === 'hitscan' && !unit.pinned) {
         const supportTarget = this.pinnedComradeSuppressor(unit, enemies, weapon, visibility);
         if (supportTarget !== null) {
           target = supportTarget;
@@ -3389,7 +3515,17 @@ export class Simulation {
 
       // Movement along path (moving units hold fire; pinned units hold still).
       const moved = this.advanceAlongPath(unit);
+      if (moved) delete unit.roleDuty;
       if (moved) delete unit.ambush;
+      const crewReady = updateCrew(unit, unit.roleDuty?.kind === 'suppress' && unit.roleDuty.target ? { ...unit, pos: unit.roleDuty.target } : target, moved);
+      if (unit.role === 'infiltrator' && unit.advance) target = null;
+      if (unit.role === 'at_infantry') {
+        if (!target || moved || unit.pinned) delete unit.aim;
+        else {
+          if (unit.aim?.targetId !== target.id) unit.aim = { targetId: target.id, ticks: sec(2) };
+          unit.aim.ticks = Math.max(0, unit.aim.ticks - 1);
+        }
+      }
 
       // Firing. A grenade is the answer to a position rifles cannot reach, so it
       // is considered first, and a throw spends the turn instead of a shot. A
@@ -3401,11 +3537,12 @@ export class Simulation {
       // cover - and the upgrade itself is already banked, so the only thing at
       // risk is the next few seconds of fire.
       const upgrading = (unit.upgradeTimer ?? 0) > 0;
+      if (unit.roleDuty?.kind === 'suppress' && weapon && crewReady && !moved && !upgrading && !unit.pinned) this.fireSuppressionArea(unit, weapon);
       if (unit.team === 'friendly' && unit.role === 'mortarman' && !unit.pinned && !moved && !upgrading) {
         this.tryMortarFire(unit, enemies);
       }
       const canFireWhileMoving = unit.role === 'gun_truck' || unit.role === 'vehicle';
-      if (!unit.pinned && unit.tankCrew?.behavior !== 'retreat' && (!moved || canFireWhileMoving) && !upgrading && ((weapon && target) || unit.grenades > 0)) {
+      if (crewReady && (unit.role !== 'at_infantry' || unit.aim?.ticks === 0) && !unit.pinned && unit.tankCrew?.behavior !== 'retreat' && (!moved || canFireWhileMoving) && !upgrading && unit.roleDuty?.kind !== 'suppress' && unit.roleDuty?.kind !== 'observe' && unit.roleDuty?.kind !== 'repair' && ((weapon && target) || unit.grenades > 0)) {
         const threw = !unit.ambush && !moved && (unit.fireOrder ?? 'auto') !== 'holdGrenades' && this.tryThrowGrenade(unit, enemies);
         if (!threw && weapon && target) this.tryFire(unit, target, weapon, moved);
       }
@@ -3466,7 +3603,7 @@ export class Simulation {
 
   private updateMorale(unit: Unit): void {
     const tuning = CONFIG.morale;
-    const officerNearby = unit.team === 'friendly' && this.nearbyOfficer(unit);
+    const officerNearby = this.nearbyOfficer(unit);
     if (unit.pinned || unit.suppression > CONFIG.suppression.recoverThreshold) {
       const pressure = Math.max(0.25, unit.suppression / CONFIG.suppression.pinThreshold);
       const moraleSupportMult = officerNearby ? 0.65 : 1;
@@ -3483,7 +3620,7 @@ export class Simulation {
   }
 
   private nearbyOfficer(unit: Unit): boolean {
-    return this.state.units.some((ally) => ally.id !== unit.id && ally.team === 'friendly' && ally.role === 'officer'
+    return this.state.units.some((ally) => ally.id !== unit.id && ally.team === unit.team && ally.role === (unit.team === 'friendly' ? 'officer' : 'field_officer')
       && ally.health > 0 && !ally.dead && !ally.pinned && ally.crossed !== true
       && dist(ally.pos, unit.pos) <= CONFIG.morale.officerAuraRange);
   }
@@ -3498,6 +3635,14 @@ export class Simulation {
 
   /** Returns true when the unit moved this tick. */
   private advanceAlongPath(unit: Unit): boolean {
+    const crew = crewTuning(unit);
+    if (crew && unit.path.length > 0 && unit.deployment && unit.deployment.ticks < sec(crew.setupSeconds)) {
+      unit.deployment.ticks = sec(crew.setupSeconds);
+      unit.deployment.packingTicks = sec(crew.packSeconds);
+    }
+    if (crew && (unit.deployment?.packingTicks ?? 0) > 0) {
+      unit.deployment!.packingTicks--; return false;
+    }
     if (tankImmobilized(unit)) { unit.path = []; unit.moveGoal = null; unit.advance = false; return false; }
     const terrain = this.state.terrain;
     const vehicle = isVehicle(this.content, unit);
@@ -3733,6 +3878,14 @@ export class Simulation {
     }
     if (this.dodgeIncomingArtillery(unit)) return;
     if (this.advanceUnderSmoke(unit)) return;
+    if (unit.role === 'infiltrator' && (target === null || dist(unit.pos, target.pos) > 85)) {
+      unit.targetId = null; unit.advance = true;
+      if (!unit.path.length) this.repathToward(unit);
+      return;
+    }
+    if (target && ['mg_team', 'sharpshooter', 'at_infantry', 'field_officer'].includes(unit.role)) {
+      unit.advance = false; unit.path = []; unit.moveGoal = null; return;
+    }
 
     if (unit.team === 'enemy') {
       const flareSignature = this.nightFlareSignature();
@@ -4072,6 +4225,7 @@ export class Simulation {
   }
 
   private friendlyBehavior(unit: Unit, target: Unit | null, _weapon: WeaponStats | null): void {
+    if (unit.roleDuty) return;
     if (unit.role === 'supply_officer' && unit.supplyTargetId !== undefined) { this.supplyBehavior(unit); return; }
     if (unit.fireOrder === 'seekGunfire') { this.seekGunfire(unit, target); return; }
     if (unit.patrol) {
@@ -4281,7 +4435,7 @@ export class Simulation {
 
     const target = rngPick(s.rng, targets);
     const angle = rngNext(s.rng) * Math.PI * 2;
-    const scatter = rngRange(s.rng, 0, mortar.scatterRadius);
+    const scatter = rngRange(s.rng, 0, mortar.scatterRadius * (this.scoutObserves(target) ? .5 : 1));
     let x = target.pos.x + Math.cos(angle) * scatter;
     let y = target.pos.y + Math.sin(angle) * scatter;
     const dx = x - unit.pos.x;
@@ -4321,6 +4475,8 @@ export class Simulation {
    * so the firing path (including positional bonuses) can be exercised directly.
    */
   fireShot(unit: Unit, target: Unit, weapon: WeaponStats, moving = false): boolean {
+    if (crewTuning(unit) && (!unit.deployment || unit.deployment.ticks > 0 || unit.deployment.packingTicks > 0 || !crewArcContains(unit, target.pos) || moving)) return false;
+    if (unit.role === 'at_infantry' && (unit.aim?.targetId !== target.id || unit.aim.ticks > 0)) return false;
     if (unit.team === 'enemy' && unit.role === 'vehicle'
       && ((unit.tankDamage?.turret && weapon.name === this.content.weapons.shell!.name)
         || (unit.tankDamage?.machineGun && weapon.name === this.content.weapons.tank_mg!.name))) return false;
@@ -4340,13 +4496,14 @@ export class Simulation {
       unit.rockets = remaining - 1;
     }
     const s = this.state;
+    unit.revealedUntil = s.ticks + sec(4);
     recordNightGunfire(s, unit, this.terrainKinds, weapon);
     const distance = dist(unit.pos, target.pos);
     const inTrench = hasTrenchCover(s.trenches, target.pos, unit.pos, CONFIG);
     const inBunker = hasBunkerCover(s.bunkers, target, CONFIG);
     const inMortarPit = target.team === 'friendly' && target.role === 'mortarman'
       && s.mortarPits.some((pit) => dist(pit.pos, target.pos) <= CONFIG.mortarPit.occupyRadius);
-    const covered = target.buildingPosition !== undefined || inTrench || hasDirectionalCover(s.sandbags, target.pos, unit.pos, CONFIG, s.trenches, s.terrain);
+    const covered = target.buildingPosition !== undefined || (!isVehicle(this.content, target) && inRubble(s.buildings, target.pos, s.terrain.cell)) || inTrench || hasDirectionalCover(s.sandbags, target.pos, unit.pos, CONFIG, s.trenches, s.terrain);
     // A building in the way eats the round. This matters most for cannon and
     // rockets, which arc over obstacles and so never asked line of sight whether
     // the target was even visible: a wall on the flight path stops the shell, and
@@ -4580,6 +4737,7 @@ export class Simulation {
     const def = this.content.friendly[role];
     const unit: Unit = this.baseUnit('friendly', role, pos);
     unit.health = def.health;
+    if (role === 'at_gun') unit.fireOrder = 'antiArmor';
     this.state.units.push(unit);
     this.emit({ type: 'unitSpawned', unitId: unit.id, team: 'friendly', role, pos: { ...pos } });
     return unit;
@@ -4593,7 +4751,7 @@ export class Simulation {
     const laneX = at !== undefined ? at.x : this.chooseEnemyApproachLane(spawnX);
     const pos: Vec2 = at !== undefined ? { x: at.x, y: at.y } : { x: spawnX, y: -14 };
     const unit = this.baseUnit('enemy', archetype, pos);
-    unit.laneX = laneX;
+    unit.laneX = archetype === 'infiltrator' && at === undefined ? (spawnX < CONFIG.field.width / 2 ? 36 : CONFIG.field.width - 36) : laneX;
     unit.health = this.content.enemy[archetype].health;
     if (archetype === 'troop_transport') {
       const tuning = CONFIG.troopTransport;
@@ -4725,6 +4883,36 @@ export class Simulation {
   private secondaryWeaponOf(unit: Unit): WeaponStats | null {
     if (unit.team !== 'enemy' || unit.role !== 'vehicle' || unit.tankDamage?.machineGun) return null;
     return this.content.weapons.tank_mg ?? null;
+  }
+
+  validateSuppression(unitId: number, point?: Vec2): CommandResult {
+    const unit = this.findUnit(unitId);
+    const weapon = unit ? this.weaponOf(unit) : null;
+    if (!unit || unit.team !== 'friendly' || unit.dead || unit.crossed || unit.health <= 0 || !['mg', 'heavy_mg'].includes(unit.role)
+      || unit.pinned || (unit.roleCooldown ?? 0) > 0 || !weapon || !point || !Number.isFinite(point.x) || !Number.isFinite(point.y)
+      || point.x < 0 || point.y < 0 || point.x > CONFIG.field.width || point.y > CONFIG.field.height) return { ok: false, reason: 'Select a ready machine gun and mark visible ground within range.' };
+    const probe = { ...unit, id: -1, team: 'enemy' as const, pos: point, buildingPosition: undefined, bridgePosition: undefined };
+    return targetIsValid(this.content, this.state.terrain, this.state.sandbags, unit, probe, weapon, CONFIG, this.state.trenches, this.state.smokes, this.visibilityMultiplier())
+      ? { ok: true } : { ok: false, reason: 'Mark visible ground within machine-gun range, clear of smoke.' };
+  }
+
+  private fireSuppressionArea(unit: Unit, weapon: WeaponStats): void {
+    const point = unit.roleDuty?.target;
+    if (!point || unit.reloadTimer > 0 || unit.shotTimer > 0 || !crewArcContains(unit, point)
+      || dist(unit.pos, point) > weapon.range) return;
+    // A smoke screen blocks directed area fire just as it blocks ordinary rifle fire.
+    const probe = { ...unit, id: -1, team: 'enemy' as const, pos: point, buildingPosition: undefined, bridgePosition: undefined };
+    if (!targetIsValid(this.content, this.state.terrain, this.state.sandbags, unit, probe, weapon, CONFIG, this.state.trenches, this.state.smokes, this.visibilityMultiplier())) return;
+    unit.shotTimer = Math.max(1, weapon.shotIntervalTicks);
+    unit.burstRemaining = Math.max(0, (unit.burstRemaining || weapon.burstShots) - 1);
+    if (!unit.burstRemaining) unit.reloadTimer = this.reloadTicksFor(unit, weapon);
+    unit.revealedUntil = this.state.ticks + sec(4);
+    recordNightGunfire(this.state, unit, this.terrainKinds, weapon);
+    for (const target of this.state.units) if (target.team !== unit.team && !target.dead && target.health > 0 && !isVehicle(this.content, target)
+      && dist(target.pos, point) <= 55 && targetIsValid(this.content, this.state.terrain, this.state.sandbags, unit, target, weapon, CONFIG, this.state.trenches, this.state.smokes, (candidate) => this.visibilityMultiplierFor(unit, candidate))) {
+      applySuppression(target, weapon.suppressionAmount * .75, CONFIG);
+    }
+    this.emit({ type: 'shot', shooterId: unit.id, shooterTeam: unit.team, from: { ...unit.pos }, to: { ...point }, hit: false, weapon: weapon.name, targetId: null });
   }
 
   maxHealthOf(unit: Unit): number {

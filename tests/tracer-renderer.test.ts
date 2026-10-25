@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { BattleRenderer3D } from '../src/render/BattleRenderer3D';
 import { CONFIG } from '../src/content/config';
 import { simulationToWorld } from '../src/render/app/coordinates';
+import { drapedRingGeometry } from '../src/render/app/heightfield';
 import { Simulation } from '../src/simulation/simulation';
 import { elevationAt } from '../src/simulation/elevation';
 import { buildingSlot } from '../src/simulation/buildings';
@@ -48,6 +49,109 @@ function transientLines(renderer: BattleRenderer3D): THREE.Line[] {
 }
 
 describe('tracer frame animation', () => {
+  it('keeps the right-click move ring on a slope as it expands', () => {
+    const sim = new Simulation(2026);
+    const cols = 81, rows = 61, cell = 12;
+    sim.state.terrain.elevation = { cols, rows, cell, heights: Float32Array.from({ length: cols * rows }, (_, i) =>
+      Math.max(0, Math.min(36, (i % cols * cell - 456) * 1.5))) };
+    const renderer = new BattleRenderer3D(document.createElement('canvas'), 960, 720);
+    try {
+      renderer.rebuildStatic(sim.state, sim.terrainData());
+      renderer.handleEvents(sim.state, [{ type: 'moveOrdered', unitId: sim.state.units[0]!.id, pos: { x: 468, y: 360 } }]);
+      const ring = renderer.scene.getObjectByName('terrain-pulse') as THREE.Mesh;
+      const disposed = vi.spyOn(ring.geometry, 'dispose');
+      for (const dt of [0, .1, .15, .15]) {
+        renderer.frame(sim.state, 1, null, [], dt);
+        ring.updateWorldMatrix(true, false);
+        const positions = ring.geometry.getAttribute('position');
+        for (let i = 0; i < positions.count; i++) {
+          const point = new THREE.Vector3().fromBufferAttribute(positions, i).applyMatrix4(ring.matrixWorld);
+          const x = point.x / WORLD_UNITS_PER_PIXEL + CONFIG.field.width / 2;
+          const y = point.z / WORLD_UNITS_PER_PIXEL + CONFIG.field.height / 2;
+          expect(point.y).toBeCloseTo(elevationAt(sim.state.terrain, x, y) * WORLD_UNITS_PER_PIXEL + .055, 5);
+        }
+      }
+      expect(ring.scale.x).toBeGreaterThan(2);
+      renderer.frame(sim.state, 1, null, [], .2);
+      renderer.frame(sim.state, 1, null, [], 0);
+      expect(renderer.scene.getObjectByName('terrain-pulse')).toBeUndefined();
+      expect(disposed).toHaveBeenCalledOnce();
+    } finally { renderer.destroy(); }
+  });
+
+  it('keeps range outlines above ridges between their endpoints', () => {
+    const sim = new Simulation(2026);
+    const cols = 81, rows = 61, cell = 12;
+    sim.state.terrain.elevation = { cols, rows, cell, heights: Float32Array.from({ length: cols * rows }, (_, i) =>
+      Math.max(0, 36 - Math.abs(i % cols * cell - 480) * 1.5)) };
+    const renderer = new BattleRenderer3D(document.createElement('canvas'), 960, 720);
+    let circle: THREE.BufferGeometry | undefined;
+    try {
+      renderer.rebuildStatic(sim.state, sim.terrainData());
+      renderer.frame(sim.state, 1, { kind: 'ambush', pos: { x: 360, y: 360 }, valid: true,
+        ambushArcs: [{ origin: { x: 360, y: 360 }, facing: 0, range: 240, arcDegrees: 90 }] }, [], 0);
+      const arc = renderer.scene.getObjectByName('ambush-arc-preview') as THREE.Line;
+      const checkSegment = (a: THREE.Vector3, b: THREE.Vector3) => {
+        expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeLessThan(.1);
+        for (const t of [0, .25, .5, .75, 1]) {
+          const point = a.clone().lerp(b, t);
+          const x = point.x / WORLD_UNITS_PER_PIXEL + CONFIG.field.width / 2;
+          const y = point.z / WORLD_UNITS_PER_PIXEL + CONFIG.field.height / 2;
+          expect(point.y).toBeGreaterThan(elevationAt(sim.state.terrain, x, y) * WORLD_UNITS_PER_PIXEL);
+        }
+      };
+      const positions = arc.geometry.getAttribute('position');
+      for (let i = 1; i < positions.count; i++) checkSegment(
+        new THREE.Vector3().fromBufferAttribute(positions, i - 1), new THREE.Vector3().fromBufferAttribute(positions, i));
+      circle = drapedRingGeometry(sim.state.terrain, { x: 360, y: 360 }, 4.77, 4.8);
+      const vertices = circle.getAttribute('position'), indices = circle.getIndex()!;
+      for (let i = 0; i < indices.count; i += 3) {
+        for (let j = 0; j < 3; j++) checkSegment(
+          new THREE.Vector3().fromBufferAttribute(vertices, indices.getX(i + j)),
+          new THREE.Vector3().fromBufferAttribute(vertices, indices.getX(i + (j + 1) % 3)));
+      }
+    } finally { circle?.dispose(); renderer.destroy(); }
+  });
+
+  it('drapes blasts over higher and lower ground throughout expansion and disposes them', () => {
+    const sim = new Simulation(2026);
+    const cols = 81, rows = 61, cell = 12;
+    sim.state.terrain.elevation = { cols, rows, cell, heights: Float32Array.from({ length: cols * rows }, (_, i) => {
+      const x = i % cols * cell;
+      return Math.max(0, Math.min(36, (x - 468) * 1.5, (552 - x) * 1.5));
+    }) };
+    const renderer = new BattleRenderer3D(document.createElement('canvas'), 960, 720);
+    try {
+      renderer.rebuildStatic(sim.state, sim.terrainData());
+      renderer.handleEvents(sim.state, [{ type: 'explosion', pos: { x: 456, y: 360 }, radius: 42 }]);
+      const ring = renderer.scene.getObjectByName('terrain-blast') as THREE.Mesh;
+      const disposed = vi.spyOn(ring.geometry, 'dispose');
+      const checkSurface = () => {
+        ring.updateWorldMatrix(true, false);
+        const positions = ring.geometry.getAttribute('position');
+        let highest = 0, lowest = Infinity;
+        for (let i = 0; i < positions.count; i++) {
+          const world = new THREE.Vector3().fromBufferAttribute(positions, i).applyMatrix4(ring.matrixWorld);
+          const x = world.x / WORLD_UNITS_PER_PIXEL + CONFIG.field.width / 2;
+          const y = world.z / WORLD_UNITS_PER_PIXEL + CONFIG.field.height / 2;
+          expect(world.y).toBeCloseTo(elevationAt(sim.state.terrain, x, y) * WORLD_UNITS_PER_PIXEL + .04, 5);
+          highest = Math.max(highest, world.y); lowest = Math.min(lowest, world.y);
+        }
+        expect(highest - lowest).toBeGreaterThan(.5);
+      };
+      checkSurface();
+      for (const dt of [.1, .2, .3]) {
+        renderer.frame(sim.state, 1, null, [], dt);
+        checkSurface();
+      }
+      expect(ring.scale.x).toBeGreaterThan(2);
+      renderer.frame(sim.state, 1, null, [], .2);
+      renderer.frame(sim.state, 1, null, [], 0);
+      expect(renderer.scene.getObjectByName('terrain-blast')).toBeUndefined();
+      expect(disposed).toHaveBeenCalledOnce();
+    } finally { renderer.destroy(); }
+  });
+
   it('retains unchanged smoke, lighting and command geometry between frames', () => {
     const sim = new Simulation(2026), unit = sim.state.units[0]!;
     sim.state.weather = 'fog';

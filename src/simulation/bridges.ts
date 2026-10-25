@@ -38,6 +38,12 @@ export function bridgeTraversal(terrain: Terrain, from: Vec2, to: Vec2, current?
     const hit = crossing(bridge, from, to);
     if (!hit) continue;
     const key = bridgeKey(bridge), startsInside = bridgeContains(bridge, from), endsInside = bridgeContains(bridge, to);
+    // Joined low platforms have no side rails or lower passage. Their shallow
+    // edge is accessible from every connecting road, including a dry junction.
+    if (bridge.junction && bridge.type === 'pontoon') {
+      if (endsInside) position = { key, level: 'deck' };
+      continue;
+    }
     const level = startsInside ? current?.key === key ? current.level : 'deck' : hit.entryEnd ? 'deck' : 'under';
     if (level === 'deck' && !endsInside && !hit.exitEnd) return { allowed: false };
     if (level === 'under') {

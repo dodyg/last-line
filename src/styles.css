@@ -477,7 +477,7 @@ html, body {
 
 /* ---------- Overlays ---------- */
 
-#overlay-root { position: fixed; inset: 0; pointer-events: none; }
+#overlay-root { position: fixed; inset: 0; pointer-events: none; z-index: 30; }
 
 .overlay {
   position: absolute;
@@ -547,6 +547,16 @@ html, body {
 .campaign-choice[aria-pressed="true"] { border-color: var(--accent); background: #37402a; box-shadow: inset 0 0 0 1px var(--accent); }
 .campaign-choice:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .campaign-actions { display: flex; justify-content: space-between; gap: 12px; }
+.campaign-story-preview { border-left: 2px solid var(--accent); padding-left: 14px; margin: 16px 0; line-height: 1.5; }
+.campaign-briefing { border-top: 1px solid var(--panel-edge); border-bottom: 1px solid var(--panel-edge); margin: 12px 0; padding: 8px 0 14px; line-height: 1.55; font-size: .9rem; }
+.campaign-briefing .dispatch-kicker { color: var(--accent); font-size: .78rem; letter-spacing: .03em; }
+.campaign-briefing h3 { font-size: 1.2rem; margin-top: 0; }
+.campaign-briefing h4 { margin: 14px 0 4px; color: var(--accent); }
+.campaign-briefing p { margin: 8px 0; }
+.dispatch-location, .dispatch-progress { color: var(--accent); }
+.campaign-briefing details { font-size: .78rem; color: var(--ink-dim); }
+.campaign-briefing summary { cursor: pointer; padding: 6px 0; }
+.campaign-briefing a { color: var(--accent); overflow-wrap: anywhere; }
 @media (max-width: 520px) { .campaign-choices { grid-template-columns: 1fr; } }
 .help-columns { display: flex; gap: 1.4rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
 .help-columns section { flex: 1 1 260px; }
@@ -656,3 +666,70 @@ button:focus-visible, input:focus-visible {
   }
   .recruit-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+/* Battlefield-first layout. Camera projection, rather than CSS stretching, owns aspect. */
+#hud-top { max-width: none; width: calc(100% - 1rem); gap: .65rem; border-radius: 3px; }
+#hud-integrity, #hud-points, #hud-phase { font-size: 1.2rem; }
+#hud-top .hud-stat:has(#hud-score), #hud-top .hud-stat:has(#hud-setting) { opacity: .75; }
+#stage { max-width: none; align-items: stretch; }
+#game-frame { flex: 1 1 0; }
+#game { width: 100%; height: max(360px, calc(100dvh - 160px)); aspect-ratio: auto; }
+#hud-side { flex: 0 0 clamp(230px, 20vw, 320px); max-height: max(360px, calc(100dvh - 160px)); overflow-y: auto; scrollbar-width: thin; }
+.commands-collapsed #hud-side { display: none; }
+#notices { max-width: none; min-height: 0; max-height: 3.5rem; overflow: hidden; }
+#notices .notice.info, #notices .notice.good { color: var(--ink-dim); font-size: .78rem; }
+#notices .notice.error { order: -1; background: #48251d; color: #ffe0c7; font-weight: 600; }
+#radio-chatter { max-width: none; margin: .2rem .5rem 0; width: calc(100% - 1rem); }
+#combat-alert { position: absolute; z-index: 15; top: .75rem; left: .75rem; max-width: min(460px, calc(100% - 1.5rem)); padding: .6rem .85rem; color: #ffe4d4; background: #48251df2; border-left: 4px solid var(--danger); box-shadow: 0 3px 12px #0005; font-size: .86rem; pointer-events: none; }
+#placement-feedback { position: absolute; z-index: 14; left: .6rem; bottom: .6rem; max-width: calc(100% - 1.2rem); padding: .5rem .75rem; background: #17251bf2; border: 1px solid var(--ok); color: #e1ecd3; font-size: .82rem; pointer-events: none; }
+#placement-feedback.invalid { border-color: var(--danger); background: #36231cf2; color: #ffd6bf; }
+#battle-log { align-self: stretch; margin: .2rem .75rem; font-size: .78rem; color: var(--ink-dim); }
+#battle-log summary { cursor: pointer; width: fit-content; padding: .2rem 0; }
+#battle-history { max-height: 180px; overflow-y: auto; padding-left: 1.5rem; }
+#battle-history li { padding: .18rem; }
+#battle-history .error { color: #f2aa8e; }
+#battle-history .warn { color: var(--accent); }
+.settings-panel { box-sizing: border-box; width: min(720px, 96vw); max-width: 720px; height: min(560px, 92dvh); display: flex; flex-direction: column; overflow: hidden; }
+.settings-panel > h2 { flex: none; margin: 0 0 1rem; }
+.settings-tabs { flex: none; display: flex; flex-wrap: wrap; gap: .25rem; border-bottom: 1px solid var(--panel-edge); padding-bottom: .5rem; }
+.settings-tab { border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--ink-dim); font: inherit; font-size: .85rem; padding: .55rem .65rem; cursor: pointer; }
+.settings-tab:hover { color: var(--ink); background: var(--bg); }
+.settings-tab[aria-selected="true"] { color: var(--accent); border-color: var(--panel-edge); background: var(--bg); box-shadow: inset 0 -2px var(--accent); }
+.settings-content { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: .4rem .25rem; }
+.settings-footer { flex: none; display: flex; align-items: center; justify-content: space-between; gap: .75rem; border-top: 1px solid var(--panel-edge); padding-top: .75rem; }
+.settings-footer .menu-button { margin: 0; min-width: 0; width: auto; font-size: .85rem; }
+.settings-panel .settings-tools { border: 0; margin: .8rem 0; padding: 0; }
+.settings-panel fieldset { margin: .8rem 0; border: 1px solid var(--panel-edge); border-radius: 4px; padding: .6rem .8rem; }
+.settings-panel legend { color: var(--accent); padding: 0 .4rem; font-size: .88rem; }
+.settings-panel .settings-row { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(80px, 150px) 3.5rem; align-items: center; gap: .7rem; margin: .55rem 0; font-size: .88rem; }
+.settings-row input[type=range] { width: 100%; min-width: 0; accent-color: var(--accent); }
+.settings-row input[type=checkbox], .settings-row input[type=color] { justify-self: end; accent-color: var(--accent); }
+.settings-row select { background: var(--bg); color: var(--ink); padding: .4rem; border: 1px solid var(--panel-edge); }
+.settings-row output { font-variant-numeric: tabular-nums; font-size: .78rem; color: var(--ink-dim); }
+.large-captions #radio-chatter { font-size: 1.2rem; }
+.large-captions #radio-chatter .radio-label { font-size: .9rem; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.reduced-motion *, .reduced-motion *::before, .reduced-motion *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+/* A column layout needs an explicit battlefield flex basis to retain its height. */
+@media (max-width: 1080px) {
+  #game-frame { flex: none; width: 100%; }
+  #game { height: clamp(260px, 52dvh, 480px); }
+  #hud-side { flex: none; width: 100%; max-height: 32dvh; }
+}
+@media (max-width: 1000px) {
+  #hud-top .hud-stat:has(#hud-score), #hud-top .hud-stat:has(#hud-setting) { display: none; }
+  #hud-top { gap: .4rem; }
+  .hud-button { padding: .35rem .5rem; }
+}
+@media (max-width: 760px) {
+  #stage { flex-direction: column; }
+  #game-frame { flex: none; width: 100%; }
+  #game { height: auto; width: 100%; aspect-ratio: 4 / 3; }
+  #hud-side { width: 100%; flex: auto; max-height: 36dvh; }
+  #hud-top .hud-stat { min-width: 3rem; }
+  .settings-panel .settings-row { grid-template-columns: minmax(110px, 1fr) minmax(60px, 110px) 2.8rem; gap: .35rem; }
+}
+
+#panel-squad:has(#sel-details[hidden]) #personal-upgrades { display: none; }
+
+/* Field abilities use a full text row below the compact command icons. */
+.unit-command-buttons #btn-role-ability { grid-column: 1 / -1; width: 100%; min-width: 0; white-space: normal; }

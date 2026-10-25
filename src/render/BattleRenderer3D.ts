@@ -1,4 +1,11 @@
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { scorchGeometry, vehicleTrackGeometry } from './app/battle-wear';
+import { hippedRoofGeometry, riverDressing } from './app/environment-dressing';
 import * as THREE from 'three';
+import { crewTuning } from '../simulation/specialists';
+import { DEFAULT_PREFS, type Preferences } from '../persistence';
+import { REGIONAL_STYLE } from './app/regional-style';
+import { tacticalFoliageMaterial } from './app/tactical-foliage';
 import { UnitBatches } from './app/unit-batches';
 import { AdaptiveResolution } from './app/adaptive-resolution';
 import { CONFIG } from '../content/config';
@@ -44,6 +51,14 @@ type RenderShot = Extract<SimEvent, { type: 'shot' }> & { lastTargetHeight?: num
 
 /** Three.js view adapter. Simulation data is read-only; all motion here is cosmetic. */
 export class BattleRenderer3D implements RendererPort {
+  private prefs: Preferences = { ...DEFAULT_PREFS };
+  private region = REGIONAL_STYLE.france;
+  private country: keyof typeof REGIONAL_STYLE = 'france';
+  private wetRoads: THREE.InstancedMesh | null = null;
+  private readonly tacticalPoints = Array.from({ length: 14 }, () => new THREE.Vector3());
+  private readonly tacticalCount = { value: 0 };
+  private readonly fadedMaterials = new Map<THREE.Material, THREE.Material>();
+  private fenceImpactKey = '';
   readonly scene = new THREE.Scene();
   camera: THREE.OrthographicCamera;
   private readonly renderer: THREE.WebGLRenderer;
@@ -58,7 +73,10 @@ export class BattleRenderer3D implements RendererPort {
   private readonly damagedTreeGroup = new THREE.Group();
   private readonly treeInstances = new Map<number, Array<{ mesh: THREE.InstancedMesh; index: number }>>();
   private readonly damagedTreeViews = new Map<number, { stage: number; mesh: THREE.Mesh }>();
-  private readonly groundImpactViews = new Map<number, THREE.Mesh>();
+  private readonly groundImpactViews = new Map<number, THREE.Group>();
+  private vehicleTracksView: THREE.Mesh | null = null;
+  private vehicleTracksKey = '';
+  private terrainZones: TerrainData['zones'] | null = null;
   private readonly unitGroup = new THREE.Group();
   private readonly unitBatches = new UnitBatches();
   private readonly weatherGroup = new THREE.Group();
@@ -136,6 +154,25 @@ export class BattleRenderer3D implements RendererPort {
     return material;
   }
 
+  setPreferences(prefs: Preferences): void {
+    const recolor = prefs.friendlyColor !== this.prefs.friendlyColor || prefs.enemyColor !== this.prefs.enemyColor;
+    this.prefs = prefs;
+    this.renderer.shadowMap.enabled = prefs.shadows;
+    this.applyResolution();
+    if (recolor) { this.unitBatches.clear(); this.clearGroup(this.unitGroup, true, false); this.unitViews.clear(); this.unitHitTargets.length = 0; }
+    for (const root of this.unitViews.values()) root.userData.selected = undefined;
+    if (prefs.reducedMotion) this.shakeTime = this.shakeMag = 0;
+  }
+
+  private applyResolution(): void {
+    const scale = this.prefs.renderScale * (this.prefs.graphics === 'auto' ? this.resolution.scale : 1);
+    this.pixelRatio = Math.min(window.devicePixelRatio || 1, 2) * scale;
+    this.renderer.setPixelRatio(this.pixelRatio);
+    this.lighting.setResolutionScale(scale);
+  }
+
+  resetCamera(): void { this.setZoom(1); }
+
   private geometry<T extends THREE.BufferGeometry>(geometry: T): T {
     this.sharedGeometries.push(geometry);
     return geometry;
@@ -208,8 +245,7 @@ export class BattleRenderer3D implements RendererPort {
   resize(width: number, height: number): void {
     if (width <= 0 || height <= 0) return;
     const zoom = this.camera.zoom;
-    this.pixelRatio = Math.min(window.devicePixelRatio || 1, 2) * this.resolution.scale;
-    this.renderer.setPixelRatio(this.pixelRatio);
+    this.applyResolution();
     this.renderer.setSize(width, height, false);
     this.camera = createBattleCamera(width, height);
     this.camera.zoom = zoom;
@@ -217,17 +253,20 @@ export class BattleRenderer3D implements RendererPort {
   }
 
   updateFrameTime(deltaMs: number): void {
-    if (this.resolution.sample(deltaMs) === null) return;
-    this.lighting.setResolutionScale(this.resolution.scale);
-    this.pixelRatio = Math.min(window.devicePixelRatio || 1, 2) * this.resolution.scale;
-    this.renderer.setPixelRatio(this.pixelRatio);
+    if (this.prefs.graphics !== 'auto' || this.resolution.sample(deltaMs) === null) return;
+    this.applyResolution();
   }
 
   /** Set a bounded orthographic zoom; 1 is the default full-field view. */
   setZoom(zoom: number): number {
+    const previousPanX = this.cameraPanX, previousPanZ = this.cameraPanZ;
     this.camera.zoom = THREE.MathUtils.clamp(zoom, 1, 3.5);
+    if (this.camera.zoom === 1) this.cameraPanX = this.cameraPanZ = 0;
     this.clampCameraPan();
+    this.camera.position.x += this.cameraPanX - previousPanX;
+    this.camera.position.z += this.cameraPanZ - previousPanZ;
     this.camera.updateProjectionMatrix();
+    this.camera.updateMatrixWorld();
     return this.camera.zoom;
   }
 
@@ -235,7 +274,7 @@ export class BattleRenderer3D implements RendererPort {
 
   /** Pan the view by a screen-space drag, clamped so it stays over the field. */
   panByScreenPixels(deltaX: number, deltaY: number, viewportWidth: number, viewportHeight: number): void {
-    if (this.camera.zoom <= 1 || viewportWidth <= 0 || viewportHeight <= 0) return;
+    if (viewportWidth <= 0 || viewportHeight <= 0) return;
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion);
     const moveRight = -deltaX * (this.camera.right - this.camera.left) / (this.camera.zoom * viewportWidth);
@@ -247,8 +286,11 @@ export class BattleRenderer3D implements RendererPort {
 
   private clampCameraPan(): void {
     const zoom = Math.max(1, this.camera.zoom);
-    const maxX = CONFIG.field.width * WORLD_UNITS_PER_PIXEL * (1 - 1 / zoom) / 2;
-    const maxZ = CONFIG.field.height * WORLD_UNITS_PER_PIXEL * (1 - 1 / zoom) / 2;
+    // Leave a small pan allowance at full-field zoom, too; Ctrl-drag should
+    // never silently turn into selection just because the camera is zoomed out.
+    const allowance = Math.max(.25, 1 - 1 / zoom);
+    const maxX = CONFIG.field.width * WORLD_UNITS_PER_PIXEL * allowance / 2;
+    const maxZ = CONFIG.field.height * WORLD_UNITS_PER_PIXEL * allowance / 2;
     this.cameraPanX = THREE.MathUtils.clamp(this.cameraPanX, -maxX, maxX);
     this.cameraPanZ = THREE.MathUtils.clamp(this.cameraPanZ, -maxZ, maxZ);
   }
@@ -310,6 +352,10 @@ export class BattleRenderer3D implements RendererPort {
   rebuildStatic(state: SimState, data: TerrainData): void {
     this.unitBatches.clear();
     this.overlayKey = '';
+    this.region = REGIONAL_STYLE[data.campaignCountry ?? 'france'];
+    this.country = data.campaignCountry ?? 'france';
+    this.wetRoads = null;
+    this.fadedMaterials.clear(); this.fenceImpactKey = '';
     this.season = state.season ?? data.season ?? 'summer';
     this.firingAims.clear();
     this.pendingTracers.length = 0;
@@ -320,6 +366,8 @@ export class BattleRenderer3D implements RendererPort {
     this.clearGroup(this.propsGroup, true);
     this.clearGroup(this.structureGroup, true);
     this.clearGroup(this.groundImpactGroup, true); this.groundImpactViews.clear();
+    this.vehicleTracksView = null; this.vehicleTracksKey = '';
+    this.terrainZones = data.zones;
     this.clearGroup(this.damagedTreeGroup, true); this.damagedTreeViews.clear(); this.treeInstances.clear();
     this.clearGroup(this.unitGroup, true);
     this.clearGroup(this.effectGroup, true);
@@ -348,10 +396,13 @@ export class BattleRenderer3D implements RendererPort {
     this.sharedMaterials.push(this.fortificationMaterial);
     this.buildGround(data);
     this.drawTerrain(data);
+    this.propsGroup.add(riverDressing(data, (x, y) => this.groundWorld(x, y)));
+    this.buildWetRoads(data);
     this.buildWeather(data.weather, data.seed);
     for (const building of state.buildings) this.building(building, state.seed);
     this.structures(state);
     this.updateGroundImpacts(state);
+    this.updateVehicleTracks(state);
     this.updateDamagedTrees(state);
     this.zoneKey = '';
     this.drawZones(state);
@@ -396,7 +447,9 @@ export class BattleRenderer3D implements RendererPort {
       if (isFoliageKind(kind)) {
         const helper = new THREE.Object3D();
         for (const part of vegetationParts(kind, this.season)) {
-          const mesh = new THREE.InstancedMesh(this.geometry(part.geometry), this.material(part.color), positions.length);
+          const foliageMaterial = !part.woody ? tacticalFoliageMaterial(part.color, this.tacticalPoints, this.tacticalCount) : this.material(part.color);
+          if (!part.woody) this.sharedMaterials.push(foliageMaterial);
+          const mesh = new THREE.InstancedMesh(this.geometry(part.geometry), foliageMaterial, positions.length);
           positions.forEach((p, i) => {
             const [x, , z] = this.groundWorld((p.x + .5) * cell, (p.y + .5) * cell);
             // Stable visual variation never consumes gameplay randomness.
@@ -496,6 +549,31 @@ export class BattleRenderer3D implements RendererPort {
     }
   }
 
+  private buildWetRoads(data: TerrainData): void {
+    const points: Vec2[] = [];
+    for (const road of data.layout?.roads ?? data.zones.roads ?? []) {
+      for (let index = 1; index < road.points.length; index++) {
+        const from = road.points[index - 1]!, to = road.points[index]!;
+        const length = Math.hypot(to.x - from.x, to.y - from.y);
+        for (let distance = 8; distance < length; distance += 22) {
+          const t = distance / length, point = { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
+          if (!isRiverAt(data.zones, data.seed, point.x, point.y)) points.push(point);
+        }
+      }
+    }
+    if (!points.length) return;
+    const material = new THREE.MeshStandardMaterial({ color: 0x859c9b, roughness: .18, metalness: .15, transparent: true, opacity: .2, depthWrite: false });
+    this.sharedMaterials.push(material);
+    const mesh = new THREE.InstancedMesh(this.geometry(new THREE.CircleGeometry(1, 12).rotateX(-Math.PI / 2)), material, points.length);
+    const transform = new THREE.Object3D(), rng = deriveRng(data.seed, 0x574554);
+    points.forEach((point, index) => {
+      const [x, , z] = this.groundWorld(point.x, point.y);
+      this.placeOnGround(transform, x, .018, z); transform.rotation.y = rngRange(rng, 0, Math.PI); transform.scale.set(rngRange(rng, .12, .3), 1, rngRange(rng, .04, .1)); transform.updateMatrix(); mesh.setMatrixAt(index, transform.matrix);
+    });
+    mesh.name = 'rain-road-puddles'; mesh.instanceMatrix.needsUpdate = true; mesh.visible = false;
+    this.terrainGroup.add(mesh); this.wetRoads = mesh;
+  }
+
   private building(building: Building, seed: number): void {
     const width = building.cols * CONFIG.terrain.cell * WORLD_UNITS_PER_PIXEL;
     const depth = building.rows * CONFIG.terrain.cell * WORLD_UNITS_PER_PIXEL;
@@ -520,16 +598,19 @@ export class BattleRenderer3D implements RendererPort {
       rubble.name = 'building-rubble'; rubble.castShadow = true; rubble.receiveShadow = true; root.add(rubble); return;
     }
     root.userData.buildingCenter = center;
-    const masonry = damagedBuildingColor(building.kind === 'hospital' ? 0xb5ac91 : building.kind === 'barn' ? 0x947b5e : 0xa49b7d, damageStage);
-    box(width * .94, height, depth * .94, 0, height / 2, 0, masonry);
+    const style = deriveRng(seed ^ Math.floor(building.pos.x * 13 + building.pos.y * 37), 0x484f5553);
+    const variant = Math.floor(rngRange(style, 0, 4));
+    const tint = (color: number, amount: number) => new THREE.Color(color).multiplyScalar(amount).getHex();
+    const masonry = damagedBuildingColor(building.kind === 'hospital' ? 0xb5ac91 : building.kind === 'barn' ? 0x947b5e : this.region.wall, damageStage);
+    box(width * .94, height, depth * .94, 0, height / 2, 0, tint(masonry, rngRange(style, .9, 1.1)));
     for (let floor = 0; floor < architecture.floors; floor++) {
       const base = floor * floorHeight;
       if (floor > 0) box(width * .98, .055, depth * .98, 0, base, 0, 0x827b66);
       // Windows on every facade align with the simulation's firing slots.
       for (const fraction of [-.22, .22]) for (const side of [-1, 1]) {
-        box(.31, .38, .035, width * fraction, base + .35, side * depth * .476, damageStage >= 2 ? 0x222722 : 0x35413e);
+        box(.31, .38, .035, width * fraction, base + .35, side * depth * .476, damageStage >= 2 ? 0x222722 : this.region.shutter);
         box(.38, .05, .065, width * fraction, base + .14, side * depth * .48, 0xbeb49a);
-        box(.035, .38, .31, side * width * .476, base + .35, depth * fraction, damageStage >= 2 ? 0x222722 : 0x35413e);
+        box(.035, .38, .31, side * width * .476, base + .35, depth * fraction, damageStage >= 2 ? 0x222722 : this.region.shutter);
         box(.065, .05, .38, side * width * .48, base + .14, depth * fraction, 0xbeb49a);
       }
     }
@@ -538,14 +619,23 @@ export class BattleRenderer3D implements RendererPort {
       box(.035, .4, .23, side * width * .48, .2, 0, 0x494232);
     }
     const snowRoof = (color: number): number => new THREE.Color(color).lerp(new THREE.Color(seasonPalette(this.season).snow), seasonPalette(this.season).snowCover).getHex();
-    const roofColor = snowRoof(damagedBuildingColor(building.kind === 'church' ? 0x62666c : 0x795b43, damageStage));
+    const roofColor = snowRoof(damagedBuildingColor(building.kind === 'church' ? 0x62666c : tint(this.region.roof, rngRange(style, .82, 1.16)), damageStage));
     if (architecture.roofStyle === 'pitched') {
-      const span = Math.min(width, depth) * 1.04, length = Math.max(width, depth) * 1.04;
-      const profile = new THREE.Shape();
-      profile.moveTo(-span / 2, 0); profile.lineTo(0, Math.min(.75, span * .35)); profile.lineTo(span / 2, 0); profile.closePath();
-      const roof = new THREE.Mesh(this.geometry(new THREE.ExtrudeGeometry(profile, { depth: length, bevelEnabled: false }).translate(0, 0, -length / 2)), this.material(roofColor));
-      roof.rotation.y = width > depth ? Math.PI / 2 : 0;
-      roof.position.y = height; roof.castShadow = true; root.add(roof);
+      const rise = Math.min(this.country === 'germany' ? 1 : .85, Math.min(width, depth) * (this.country === 'italy' ? .22 : .3 + variant * .035));
+      if (variant === 2 && building.kind !== 'church' && building.kind !== 'barn') {
+        const roof = new THREE.Mesh(this.geometry(hippedRoofGeometry(width * 1.04, depth * 1.04, rise)), this.material(roofColor));
+        roof.position.y = height; roof.castShadow = true; root.add(roof);
+      } else {
+        const span = Math.min(width, depth) * 1.04, length = Math.max(width, depth) * 1.04;
+        const profile = new THREE.Shape();
+        profile.moveTo(-span / 2, 0); profile.lineTo(0, rise); profile.lineTo(span / 2, 0); profile.closePath();
+        const roof = new THREE.Mesh(this.geometry(new THREE.ExtrudeGeometry(profile, { depth: length, bevelEnabled: false }).translate(0, 0, -length / 2)), this.material(roofColor));
+        roof.rotation.y = width > depth ? Math.PI / 2 : 0;
+        roof.position.y = height; roof.castShadow = true; root.add(roof);
+        // Ridge caps and a narrow dormer change silhouettes at tactical zoom.
+        box(width > depth ? length : .06, .05, width > depth ? .06 : length, 0, height + rise, 0, tint(roofColor, .85));
+        if (variant === 1 && building.kind === 'house') box(.3, .22, .25, 0, height + rise * .46, depth * .22, masonry);
+      }
     } else {
       box(width, .1, depth, 0, height, 0, snowRoof(damagedBuildingColor(0x8d8878, damageStage)));
       for (const side of [-1, 1]) {
@@ -558,6 +648,33 @@ export class BattleRenderer3D implements RendererPort {
         box(.42, .06, .47, 0, height + .46, 0, 0x696653);
       }
     }
+    // Shallow plaster wear and foundation courses stay within the collision shell.
+    box(width * .95, .1, depth * .95, 0, .05, 0, tint(masonry, .72));
+    for (const side of [-1, 1]) {
+      box(width * .18, .12, .012, width * (variant % 2 ? .3 : -.3), .13, side * depth * .478, tint(masonry, .8));
+      box(.34, .055, .18, 0, .04, side * depth * .49, 0x8c826a);
+    }
+    // Small regional construction details reinforce the generated local names.
+    if (this.country === 'germany') {
+      for (const side of [-1, 1]) {
+        box(width * .95, .055, .035, 0, floorHeight * .9, side * depth * .48, 0x5a4b3e);
+        for (const fraction of [-.4, 0, .4]) box(.045, height, .035, width * fraction, height / 2, side * depth * .48, 0x5a4b3e);
+      }
+    } else if (this.country === 'netherlands' && architecture.roofStyle === 'pitched') {
+      for (let step = 0; step < 3; step++) box(width * (.65 - step * .17), .13, .09, 0, height + .1 + step * .13, depth * .49, masonry);
+    } else if (this.country === 'italy' && architecture.roofStyle === 'pitched') {
+      box(width > depth ? width : .06, .055, width > depth ? .06 : depth, 0, height + Math.min(.75, Math.min(width, depth) * 1.04 * .35), 0, snowRoof(0xc08152));
+    } else if (this.country === 'belgium') {
+      for (const side of [-1, 1]) for (const level of [.3, .65]) box(width * .95, .035, .025, 0, height * level, side * depth * .48, 0xb7a98c);
+    } else {
+      for (const side of [-1, 1]) for (const fraction of [-.22, .22]) {
+        box(.075, .4, .045, width * fraction - .2, .35, side * depth * .49, this.region.shutter);
+        box(.075, .4, .045, width * fraction + .2, .35, side * depth * .49, this.region.shutter);
+      }
+    }
+    if (building.kind !== 'church' && building.kind !== 'castle') {
+      box(.14, .36, .16, width * .22, height + .25, depth * .18, damagedBuildingColor(this.region.wall, damageStage));
+    }
     if (architecture.balcony) {
       const balconyZ = depth / 2 + .22, balconyWidth = width * .76;
       box(balconyWidth, .08, .6, 0, floorHeight, balconyZ, 0x8e8872);
@@ -568,8 +685,36 @@ export class BattleRenderer3D implements RendererPort {
     if (building.kind === 'church' || building.kind === 'castle') {
       const tower = new THREE.Mesh(this.geometry(new THREE.CylinderGeometry(.22, .3, .65, 6)), this.material(0x777467));
       tower.position.set(width * .28, height + .4, depth * .28); tower.castShadow = true; root.add(tower);
+      if (building.kind === 'church') {
+        const spire = new THREE.Mesh(this.geometry(new THREE.ConeGeometry(.34, .8, 4)), this.material(snowRoof(0x555e5c)));
+        spire.position.set(width * .28, height + 1.08, depth * .28); spire.rotation.y = Math.PI / 4; spire.castShadow = true; root.add(spire);
+      }
     }
     if (damageStage > 0) root.add(buildingDamage(building, width, depth, height, architecture.roofStyle === 'pitched', (color) => this.material(color)));
+    this.batchBuilding(root);
+  }
+
+  /** Bake static facade pieces by material; damage and tactical fading remain per building. */
+  private batchBuilding(root: THREE.Group): void {
+    const batches = new Map<THREE.Material, THREE.BufferGeometry[]>();
+    for (const child of [...root.children]) {
+      if (!(child instanceof THREE.Mesh) || Array.isArray(child.material)) continue;
+      child.updateMatrix();
+      const source = child.geometry as THREE.BufferGeometry;
+      const part = source.index ? source.toNonIndexed() : source.clone();
+      part.applyMatrix4(child.matrix);
+      for (const name of Object.keys(part.attributes)) if (name !== 'position' && name !== 'normal') part.deleteAttribute(name);
+      const parts = batches.get(child.material) ?? [];
+      parts.push(part); batches.set(child.material, parts);
+      root.remove(child);
+      const index = this.sharedGeometries.indexOf(source);
+      if (index >= 0) this.sharedGeometries.splice(index, 1);
+      source.dispose();
+    }
+    for (const [material, parts] of batches) {
+      const merged = this.geometry(mergeGeometries(parts)!); parts.forEach((part) => part.dispose());
+      const mesh = new THREE.Mesh(merged, material); mesh.castShadow = true; mesh.receiveShadow = true; root.add(mesh);
+    }
   }
 
   private deck(bridge: BridgeSurface): void {
@@ -650,7 +795,7 @@ export class BattleRenderer3D implements RendererPort {
     root.userData.stance = unit.terrainCrawling ? 'prone' : unit.stance ?? 'standing'; root.userData.pinned = unit.pinned; root.userData.headlightsOn = unit.headlightsOn !== false;
     root.userData.backupRifle = usesBackupRifle(unit, getContent());
     const isVehicle = unit.role === 'vehicle' || unit.role === 'gun_truck' || unit.role === 'troop_transport';
-    const color = unit.tankCrew ? 0x66655a : unit.team === 'friendly' ? COLORS.friendly : COLORS.enemy;
+    const color = unit.tankCrew ? 0x66655a : new THREE.Color(unit.team === 'friendly' ? this.prefs.friendlyColor : this.prefs.enemyColor).getHex();
     const bodyMat = this.material(isVehicle ? 0x626953 : color);
     if (isVehicle) {
       // Models face local -Z, the same axis used by infantry and path headings.
@@ -737,14 +882,16 @@ export class BattleRenderer3D implements RendererPort {
       const arm = new THREE.Mesh(limb, this.material(0x5a5b49)); arm.position.set(side * .125, .42 * crouch, -.13); arm.rotation.x = .65; root.add(arm);
       if (prone) { leg.rotation.x = Math.PI / 2; leg.position.set(side * .065, .07, .29); arm.rotation.x = Math.PI / 2; arm.position.set(side * .125, .12, -.2); }
     }
-    const bazooka = unit.team === 'friendly' && unit.role === 'at' && !root.userData.backupRifle;
+    const bazooka = (unit.team === 'friendly' && unit.role === 'at' && !root.userData.backupRifle) || unit.role === 'at_infantry';
     const sten = unit.team === 'friendly' && unitDef(getContent(), unit.role, unit.team).weapon === 'sten';
-    const weaponLength = bazooka ? .68 : sten ? .23 : unit.tankCrew ? .13 : unit.role === 'mg' ? .35 : .26;
+    const crew = crewTuning(unit);
+    const weaponLength = unit.role === 'at_gun' ? 1.05 : crew ? .6 : bazooka ? .68 : sten ? .23 : unit.tankCrew ? .13 : unit.role === 'mg' ? .35 : .26;
     const weaponPivot = new THREE.Group(); weaponPivot.name = 'weapon-aim';
-    weaponPivot.position.set(bazooka ? .12 : .02, prone ? .14 : (bazooka ? .52 : .4) * crouch, bazooka ? .12 : (prone ? -.4 : -.25) + weaponLength / 2); root.add(weaponPivot);
+    weaponPivot.position.set(bazooka ? .12 : .02, crew ? .28 : prone ? .14 : (bazooka ? .52 : .4) * crouch, bazooka ? .12 : (prone ? -.4 : -.25) + weaponLength / 2); root.add(weaponPivot);
     // Rotate the geometry so the launch tube keeps the same local -Z aiming
     // and muzzle axis as other weapons, including while posed or recoiling.
-    const weaponGeometry = bazooka ? new THREE.CylinderGeometry(.047, .047, weaponLength, 10, 1, true).rotateX(Math.PI / 2)
+    const weaponGeometry = unit.role === 'at_gun' ? new THREE.CylinderGeometry(.045, .065, weaponLength, 8).rotateX(Math.PI / 2)
+      : bazooka ? new THREE.CylinderGeometry(.047, .047, weaponLength, 10, 1, true).rotateX(Math.PI / 2)
       : sten ? new THREE.CylinderGeometry(.022, .022, weaponLength, 8).rotateX(Math.PI / 2)
       : new THREE.BoxGeometry(.045, .045, weaponLength);
     const weapon = new THREE.Mesh(this.modelGeometry(weaponGeometry), this.material(bazooka ? 0x62684b : unit.role === 'medic' ? 0x7c7b68 : 0x252823)); weapon.position.z = -weaponLength / 2; weapon.name = 'infantry-weapon'; weapon.userData.weapon = true; weapon.userData.weaponLength = weaponLength; weaponPivot.add(weapon);
@@ -783,13 +930,43 @@ export class BattleRenderer3D implements RendererPort {
         tool.name = 'wire-cutters'; tool.position.set(.13, .37, .17); tool.rotation.z = side * .32; root.add(tool);
       }
     }
-    if (unit.role === 'officer' || unit.role === 'supply_officer') { const cap = new THREE.Mesh(this.modelGeometry(new THREE.CylinderGeometry(.11, .12, .045, 7)), this.material(0x514a37)); cap.position.y = .72 * crouch; root.add(cap); }
+    if (unit.role === 'officer' || unit.role === 'field_officer' || unit.role === 'supply_officer') { const cap = new THREE.Mesh(this.modelGeometry(new THREE.CylinderGeometry(.11, .12, .045, 7)), this.material(0x514a37)); cap.position.y = .72 * crouch; root.add(cap); }
     if (unit.role === 'supply_officer') {
       const crate = new THREE.Mesh(this.modelGeometry(new THREE.BoxGeometry(.2, .24, .14)), this.material(0x8a794d));
       crate.name = 'grenade-supply-pack'; crate.position.set(0, prone ? .18 : .4 * crouch, prone ? .08 : .15); root.add(crate);
     }
-    if (unit.role === 'sniper') { const optic = new THREE.Mesh(this.modelGeometry(new THREE.CylinderGeometry(.018, .018, .18, 6)), this.material(0x252823)); optic.rotation.x = Math.PI / 2; optic.position.set(0, .04, -weaponLength / 2 + .01); weaponPivot.add(optic); }
+    if (unit.role === 'sniper' || unit.role === 'sharpshooter') { const optic = new THREE.Mesh(this.modelGeometry(new THREE.CylinderGeometry(.018, .018, .18, 6)), this.material(0x252823)); optic.rotation.x = Math.PI / 2; optic.position.set(0, .04, -weaponLength / 2 + .01); weaponPivot.add(optic); }
     if (unit.role === 'radio_engineer' || unit.role === 'observer') { const aerial = new THREE.Mesh(this.modelGeometry(new THREE.CylinderGeometry(.012, .012, .42, 4)), this.material(0x8d8a72)); aerial.position.set(.08, .69, .12); root.add(aerial); }
+    if (unit.role === 'scout') {
+      const binoculars = new THREE.Group(); binoculars.name = 'scout-binoculars';
+      for (const side of [-1,1]) {
+        const lens = new THREE.Mesh(this.modelGeometry(new THREE.CylinderGeometry(.035,.035,.12,6)), this.material(0x282d24));
+        lens.rotation.x = Math.PI/2; lens.position.set(side*.04,.47,-.15); binoculars.add(lens);
+      }
+      root.add(binoculars);
+    }
+    if (unit.role === 'infiltrator') {
+      const hood = new THREE.Mesh(this.modelGeometry(new THREE.SphereGeometry(.12,7,5)), this.material(0x555b36));
+      hood.name = 'infiltrator-camouflage'; hood.scale.set(1,.7,1); hood.position.set(0,.68*crouch,0); root.add(hood);
+    }
+    if (crewTuning(unit)) {
+      const mount = new THREE.Group(); mount.name = 'crew-mount';
+      const cannon = unit.role === 'at_gun';
+
+      for (const side of [-1,1]) {
+        const leg = new THREE.Mesh(this.modelGeometry(new THREE.BoxGeometry(.035,.035,.65)),this.material(0x424a36));
+        leg.position.set(side*.15,.1,-.2); leg.rotation.y=side*.4; mount.add(leg);
+        if (cannon) {
+          const wheel = new THREE.Mesh(this.modelGeometry(new THREE.CylinderGeometry(.2,.2,.09,10).rotateZ(Math.PI/2)),this.material(0x252822));
+          wheel.position.set(side*.32,.2,-.2); mount.add(wheel);
+        }
+      }
+      if (cannon) {
+        const shield = new THREE.Mesh(this.modelGeometry(new THREE.BoxGeometry(.72,.42,.055)),this.material(0x626b49));
+        shield.name = 'at-gun-shield'; shield.position.set(0,.36,-.28); mount.add(shield);
+      }
+      root.add(mount);
+    }
     if (unit.pinned) { const marker = new THREE.Mesh(this.modelGeometry(new THREE.ConeGeometry(.08, .13, 4)), this.material(0xe5c852)); marker.position.set(0, .88 * crouch, 0); root.add(marker); }
     const proxy = new THREE.Mesh(this.modelGeometry(new THREE.SphereGeometry(.33, 6, 5)), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false }));
     proxy.visible = false; // Raycaster still intersects hidden input proxies.
@@ -834,6 +1011,9 @@ export class BattleRenderer3D implements RendererPort {
     this.unitHitTargets.length = 0;
     for (const unit of state.units) {
       if (unit.dead || unit.health <= 0 || unit.crossed) continue;
+      const concealed = unit.team === 'enemy' && ['infiltrator','sharpshooter'].includes(unit.role)
+        && (unit.detectedUntil ?? 0) <= state.ticks && (unit.revealedUntil ?? 0) <= state.ticks;
+      if (concealed) { const hidden = this.unitViews.get(unit.id); if (hidden) hidden.visible = false; live.add(unit.id); continue; }
       live.add(unit.id);
       let root = this.unitViews.get(unit.id);
       if (!root) { root = this.makeUnit(unit); this.unitViews.set(unit.id, root); this.unitMarker(unit, root); this.unitGroup.add(root); }
@@ -868,6 +1048,7 @@ export class BattleRenderer3D implements RendererPort {
       else if (unit.path.length > 0) facing = Math.atan2(unit.path[0]!.y - interpY, unit.path[0]!.x - interpX);
       // Resting soldiers retain their facing. A separation nudge around the old
       // destination must not spin them toward that point every other tick.
+      if (unit.deployment && unit.path.length === 0) facing = unit.deployment.facing;
       root.userData.facing = facing;
       root.rotation.y = -facing - Math.PI / 2;
       const aheadX = visual.x + Math.cos(facing) * 4, aheadY = visual.y + Math.sin(facing) * 4;
@@ -882,10 +1063,13 @@ export class BattleRenderer3D implements RendererPort {
       // Keep garrisons locatable when a roof hides the far-side window.
       let garrisonMarker = root.children.find((child) => child.userData.garrisonMarker);
       if (!garrisonMarker && unit.buildingPosition) {
-        const marker = new THREE.Mesh(this.modelGeometry(new THREE.RingGeometry(.12, .18, 4)), new THREE.MeshBasicMaterial({ color: unit.team === 'friendly' ? COLORS.friendly : COLORS.enemy, depthTest: false, depthWrite: false, transparent: true, opacity: .85 }));
+        const marker = new THREE.Mesh(this.modelGeometry(new THREE.RingGeometry(.12, .18, 4)), new THREE.MeshBasicMaterial({ color: new THREE.Color(unit.team === 'friendly' ? this.prefs.friendlyColor : this.prefs.enemyColor).getHex(), depthTest: false, depthWrite: false, transparent: true, opacity: .85 }));
         marker.rotation.x = -Math.PI / 2; marker.position.y = .85; marker.renderOrder = 8; marker.userData.garrisonMarker = true; root.add(marker); garrisonMarker = marker;
       }
       if (garrisonMarker) garrisonMarker.visible = unit.buildingPosition !== undefined;
+      root.visible = true;
+      const mount = root.getObjectByName('crew-mount');
+      if (mount) mount.visible = unit.path.length === 0 && (unit.deployment?.packingTicks ?? 0) === 0;
       root.userData.team = unit.team;
       // Ground proxy uses the stable root anchor; selection fallback remains simulation-side.
       const proxy = root.children.find((child) => child.userData.unitId === unit.id);
@@ -940,8 +1124,11 @@ export class BattleRenderer3D implements RendererPort {
       if (root.userData.selected === selected.has(id)) continue;
       root.userData.selected = selected.has(id);
       const old = root.children.find((o) => o.userData.selectionRing === true);
-      if (old) { root.remove(old); const mesh = old as THREE.Mesh; mesh.geometry.dispose(); }
-      if (selected.has(id)) { const ring = new THREE.Mesh(new THREE.RingGeometry(.4, .445, 24), this.material(0xffe29a, .8, true)); ring.rotation.x = -Math.PI / 2; ring.position.y = .03; ring.userData.selectionRing = true; root.add(ring); }
+      if (old) { root.remove(old); const mesh = old as THREE.Mesh; mesh.geometry.dispose(); (mesh.material as THREE.Material).dispose(); }
+      if (selected.has(id)) {
+        const ring = new THREE.Mesh(new THREE.RingGeometry(.4, this.prefs.strongOutlines ? .48 : .445, 32), new THREE.MeshBasicMaterial({ color: this.prefs.friendlyColor, transparent: true, opacity: 1, depthTest: !this.prefs.strongOutlines, depthWrite: false, toneMapped: false }));
+        ring.rotation.x = -Math.PI / 2; ring.position.y = .03; ring.renderOrder = 100; ring.userData.selectionRing = true; root.add(ring);
+      }
     }
   }
 
@@ -1073,13 +1260,18 @@ export class BattleRenderer3D implements RendererPort {
     this.fieldMaterial.color.lerp(this.weatherColor.set(this.fieldMaterial.map ? 0xd2ddeb : 0x404b47), darkness);
     const weatherDef = CONFIG.weather[weather];
     this.weatherFog.color.set(0x242932).lerp(this.weatherColor.set(0x899086), time.daylight);
-    this.weatherFog.density = weatherDef.fogIntensity * .024;
-    this.scene.fog = weatherDef.fogIntensity > 0 ? this.weatherFog : null;
+    this.weatherFog.density = .0015 + weatherDef.fogIntensity * .018;
+    this.fieldMaterial.roughness = .98 - weatherDef.rainIntensity * .48;
+    if (this.wetRoads) {
+      this.wetRoads.visible = weatherDef.rainIntensity > .1 && this.prefs.weatherEffects;
+      (this.wetRoads.material as THREE.MeshStandardMaterial).opacity = weatherDef.rainIntensity * .28;
+    }
+    this.scene.fog = this.prefs.weatherEffects ? this.weatherFog : null;
     if (this.rainLines) {
       const attribute = this.rainLines.geometry.getAttribute('position') as THREE.BufferAttribute;
       const positions = attribute.array as Float32Array;
       const visible = Math.ceil(160 * weatherDef.rainIntensity);
-      this.rainLines.visible = visible > 0;
+      this.rainLines.visible = visible > 0 && this.prefs.weatherEffects;
       this.rainLines.geometry.setDrawRange(0, visible * 2);
       for (let i = 0; i < visible; i++) {
         const j = i * 6;
@@ -1095,7 +1287,7 @@ export class BattleRenderer3D implements RendererPort {
       const attribute = this.snowPoints.geometry.getAttribute('position') as THREE.BufferAttribute;
       const positions = attribute.array as Float32Array;
       const visible = Math.ceil(240 * intensity * 2);
-      this.snowPoints.visible = visible > 0;
+      this.snowPoints.visible = visible > 0 && this.prefs.weatherEffects;
       this.snowPoints.geometry.setDrawRange(0, visible);
       for (let i = 0; i < visible; i++) {
         const j = (i % 240) * 4;
@@ -1172,8 +1364,12 @@ export class BattleRenderer3D implements RendererPort {
 
   private pulse(pos: Vec2, color: number, lifetime: number): void {
     const [x, , z] = this.groundWorld(pos.x, pos.y);
-    const ring = new THREE.Mesh(new THREE.RingGeometry(.08, .13, 18), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .9, side: THREE.DoubleSide, depthWrite: false }));
-    ring.rotation.x = -Math.PI / 2; this.placeOnGround(ring, x, .055, z); ring.userData.ttl = lifetime; ring.userData.max = lifetime; this.effectGroup.add(ring);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(.08, .13, 32, 2), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .9, side: THREE.DoubleSide, depthWrite: false }));
+    ring.geometry.rotateX(-Math.PI / 2);
+    ring.name = 'terrain-pulse'; ring.position.set(x, 0, z);
+    ring.userData.groundRingCenter = { ...pos }; ring.userData.groundRingOffset = .055;
+    this.updateGroundRing(ring, 1);
+    ring.userData.ttl = lifetime; ring.userData.max = lifetime; this.effectGroup.add(ring);
   }
 
   private tracer(muzzle: THREE.Vector3, target: THREE.Vector3, team: 'friendly' | 'enemy', shooterId: number): void {
@@ -1235,14 +1431,74 @@ export class BattleRenderer3D implements RendererPort {
 
   private blast(pos: Vec2, radius: number, color: number): void {
     const [x, , z] = this.groundWorld(pos.x, pos.y);
-    const ring = new THREE.Mesh(new THREE.RingGeometry(.15, Math.max(.2, radius * WORLD_UNITS_PER_PIXEL), 28), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .75, side: THREE.DoubleSide, depthWrite: false })); ring.rotation.x = -Math.PI / 2; this.placeOnGround(ring, x, .04, z); ring.userData.ttl = .75; ring.userData.max = .75; this.effectGroup.add(ring);
+    const outer = Math.max(.2, radius * WORLD_UNITS_PER_PIXEL);
+    // Subdivide the filled ring as well as its perimeter so slopes inside the
+    // blast are represented, including ground reached later during expansion.
+    const geometry = new THREE.RingGeometry(.15, outer, 64, Math.max(1, Math.ceil(outer / .12)));
+    geometry.rotateX(-Math.PI / 2);
+    const ring = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .75, side: THREE.DoubleSide, depthWrite: false }));
+    ring.name = 'terrain-blast'; ring.position.set(x, 0, z);
+    ring.userData.groundRingCenter = { ...pos }; ring.userData.groundRingOffset = .04;
+    this.updateGroundRing(ring, 1);
+    ring.userData.ttl = .75; ring.userData.max = .75; this.effectGroup.add(ring);
     const flash = new THREE.Mesh(new THREE.SphereGeometry(.2, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffc469, transparent: true, opacity: .9, depthWrite: false })); this.placeOnGround(flash, x, .25, z); flash.userData.ttl = .3; flash.userData.max = .3; this.effectGroup.add(flash);
+  }
+
+  private updateGroundRing(ring: THREE.Mesh, scale: number): void {
+    const center = ring.userData.groundRingCenter as Vec2;
+    const positions = ring.geometry.getAttribute('position');
+    ring.scale.set(scale, 1, scale);
+    for (let i = 0; i < positions.count; i++) {
+      positions.setY(i, this.groundHeight(center.x + positions.getX(i) * scale / WORLD_UNITS_PER_PIXEL,
+        center.y + positions.getZ(i) * scale / WORLD_UNITS_PER_PIXEL) + (ring.userData.groundRingOffset as number));
+    }
+    positions.needsUpdate = true;
+    ring.geometry.computeBoundingSphere();
+  }
+
+  private updateTacticalVisibility(state: SimState, selection: readonly number[]): void {
+    const soldiers = state.units.filter((unit) => selection.includes(unit.id) && !unit.dead && unit.health > 0 && !unit.crossed).slice(0, 14);
+    this.tacticalCount.value = this.prefs.fadeObstructions ? soldiers.length : 0;
+    soldiers.forEach((unit, index) => this.tacticalPoints[index]!.set(...this.groundWorld(unit.pos.x, unit.pos.y)));
+    for (const building of state.buildings) {
+      const root = this.buildingViews.get(building.id);
+      if (!root || building.destroyed) continue;
+      const fade = this.prefs.fadeObstructions && soldiers.some((unit) =>
+        unit.pos.x >= building.pos.x - 18 && unit.pos.x <= building.pos.x + building.cols * state.terrain.cell + 18
+        && unit.pos.y >= building.pos.y - 24 && unit.pos.y <= building.pos.y + building.rows * state.terrain.cell + 8);
+      root.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+        const original = (object.userData.unfadedMaterial ?? object.material) as THREE.Material;
+        object.userData.unfadedMaterial = original;
+        if (!fade) { object.material = original; return; }
+        let material = this.fadedMaterials.get(original);
+        if (!material) { material = original.clone(); material.transparent = true; material.opacity = .2; material.depthWrite = false; this.fadedMaterials.set(original, material); this.sharedMaterials.push(material); }
+        object.material = material;
+      });
+    }
+    // Scorch nearby fences while retaining their physical, unbreached outline.
+    const marks = state.groundImpacts ?? [];
+    const key = marks.map((mark) => mark.id).join(',');
+    if (key === this.fenceImpactKey) return;
+    this.fenceImpactKey = key;
+    const matrix = new THREE.Matrix4(), position = new THREE.Vector3(), color = new THREE.Color();
+    for (const object of this.propsGroup.children) {
+      if (!(object instanceof THREE.InstancedMesh) || !object.userData.fenceKind) continue;
+      const newlyColored = !object.instanceColor;
+      for (let index = 0; index < object.count; index++) {
+        object.getMatrixAt(index, matrix); position.setFromMatrixPosition(matrix);
+        const damaged = marks.some((mark) => { const world = simulationToWorld(mark.pos.x, mark.pos.y); return Math.hypot(world[0] - position.x, world[2] - position.z) < .9; });
+        object.setColorAt(index, color.set(damaged ? 0x65574b : 0xffffff));
+      }
+      if (object.instanceColor) object.instanceColor.needsUpdate = true;
+      if (newlyColored) (object.material as THREE.Material).needsUpdate = true;
+    }
   }
 
   private updateGroundImpacts(state: SimState): void {
     const marks = state.groundImpacts ?? [], live = new Set(marks.map((mark) => mark.id));
     for (const [id, view] of this.groundImpactViews) if (!live.has(id)) {
-      this.groundImpactGroup.remove(view); view.geometry.dispose(); this.groundImpactViews.delete(id);
+      this.clearGroup(view, true, false); this.groundImpactGroup.remove(view); this.groundImpactViews.delete(id);
     }
     for (const mark of marks) {
       if (this.groundImpactViews.has(mark.id)) continue;
@@ -1251,14 +1507,46 @@ export class BattleRenderer3D implements RendererPort {
         const px = mark.pos.x + dx / WORLD_UNITS_PER_PIXEL, py = mark.pos.y + dz / WORLD_UNITS_PER_PIXEL;
         if (!insideField(px, py)) return false;
         const terrain = state.terrain, index = Math.floor(py / terrain.cell) * terrain.cols + Math.floor(px / terrain.cell);
-        return terrain.kinds?.[index] !== TERRAIN_KIND.river && !terrain.bridges?.some((bridge) => bridgeContains(bridge, { x: px, y: py }));
+        return terrain.kinds?.[index] !== TERRAIN_KIND.river && (!this.terrainZones || !isRiverAt(this.terrainZones, state.seed, px, py)) && !terrain.bridges?.some((bridge) => bridgeContains(bridge, { x: px, y: py }));
       };
       const geometry = groundImpactGeometry(mark.kind, state.seed ^ mark.id,
         (dx, dz) => this.groundHeight(mark.pos.x + dx / WORLD_UNITS_PER_PIXEL, mark.pos.y + dz / WORLD_UNITS_PER_PIXEL) - y, land);
       const mesh = new THREE.Mesh(geometry, this.fortificationMaterial);
       mesh.name = `ground-impact-${mark.kind}`; mesh.userData.impactId = mark.id;
       mesh.position.set(x, y + (mark.id % 1024) * .00001, z); mesh.castShadow = true; mesh.receiveShadow = true;
-      this.groundImpactGroup.add(mesh); this.groundImpactViews.set(mark.id, mesh);
+      const root = new THREE.Group(); root.name = 'persistent-ground-damage';
+      const scorchMaterial = this.cachedWearMaterial();
+      const scorch = new THREE.Mesh(scorchGeometry(GROUND_IMPACT_LOOK[mark.kind].radius, state.seed ^ mark.id,
+        (dx, dz) => this.groundHeight(mark.pos.x + dx / WORLD_UNITS_PER_PIXEL, mark.pos.y + dz / WORLD_UNITS_PER_PIXEL) - y, land), scorchMaterial);
+      scorch.position.copy(mesh.position); root.add(scorch, mesh);
+      this.groundImpactGroup.add(root); this.groundImpactViews.set(mark.id, root);
+    }
+  }
+
+  private cachedWearMaterial(): THREE.MeshBasicMaterial {
+    const key = 'scorch-alpha';
+    const existing = this.basicMaterialCache.get(key);
+    if (existing) return existing;
+    const material = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+    this.basicMaterialCache.set(key, material); this.sharedMaterials.push(material); return material;
+  }
+
+  private updateVehicleTracks(state: SimState): void {
+    const tracks = state.vehicleTracks ?? [];
+    const key = `${tracks.length}:${tracks.reduce((latest, track) => Math.max(latest, track.tick), -1)}`;
+    if (this.vehicleTracksKey === key) return;
+    this.vehicleTracksKey = key;
+    if (!tracks.length) {
+      if (this.vehicleTracksView) { this.groundImpactGroup.remove(this.vehicleTracksView); this.vehicleTracksView.geometry.dispose(); this.vehicleTracksView = null; }
+      return;
+    }
+    const geometry = vehicleTrackGeometry(tracks, (x, y) => this.groundWorld(x, y));
+    if (this.vehicleTracksView) {
+      this.vehicleTracksView.geometry.dispose(); this.vehicleTracksView.geometry = geometry;
+    } else {
+      this.vehicleTracksView = new THREE.Mesh(geometry, this.basicMaterial(0x443b2b, .22));
+      this.vehicleTracksView.name = 'persistent-vehicle-tracks'; (this.vehicleTracksView.material as THREE.Material).side = THREE.DoubleSide;
+      this.groundImpactGroup.add(this.vehicleTracksView);
     }
   }
 
@@ -1485,10 +1773,18 @@ export class BattleRenderer3D implements RendererPort {
   private drawAmbushArc(origin: Vec2, order: Pick<AmbushOrder, 'facing' | 'range' | 'arcDegrees'>, color: number, preview = false): void {
     const points = [new THREE.Vector3(...this.groundWorld(origin.x, origin.y, .07))];
     const half = order.arcDegrees * Math.PI / 360;
-    for (let i = 0; i <= 32; i++) {
-      const angle = order.facing - half + half * 2 * i / 32;
+    // Both radial edges cross terrain too: a single segment from the soldier
+    // to the perimeter can run straight through a ridge between its endpoints.
+    const radialSteps = Math.max(1, Math.ceil(order.range / 2));
+    const arcSteps = Math.max(32, Math.ceil(order.range * half * 2 / 2));
+    const radialPoint = (angle: number, fraction: number) => new THREE.Vector3(...this.groundWorld(
+      origin.x + Math.cos(angle) * order.range * fraction, origin.y + Math.sin(angle) * order.range * fraction, .07));
+    for (let i = 1; i < radialSteps; i++) points.push(radialPoint(order.facing - half, i / radialSteps));
+    for (let i = 0; i <= arcSteps; i++) {
+      const angle = order.facing - half + half * 2 * i / arcSteps;
       points.push(new THREE.Vector3(...this.groundWorld(origin.x + Math.cos(angle) * order.range, origin.y + Math.sin(angle) * order.range, .07)));
     }
+    for (let i = radialSteps - 1; i > 0; i--) points.push(radialPoint(order.facing + half, i / radialSteps));
     points.push(points[0]!.clone());
     const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),
       new THREE.LineDashedMaterial({ color, transparent: true, opacity: .8, dashSize: .16, gapSize: .08, depthWrite: false }));
@@ -1516,7 +1812,10 @@ export class BattleRenderer3D implements RendererPort {
 
   frame(state: SimState, alpha: number, preview: PreviewInfo | null, selection: readonly number[], dt: number, drag: DragRect | null = null): void {
     this.terrain = state.terrain;
+    this.updateTacticalVisibility(state, selection);
+    this.effectGroup.visible = this.prefs.particles;
     this.updateGroundImpacts(state);
+    this.updateVehicleTracks(state);
     this.updateUnits(state, alpha, selection, dt);
     this.updateDamagedTrees(state);
     this.flushTracers();
@@ -1551,7 +1850,9 @@ export class BattleRenderer3D implements RendererPort {
             object.instanceMatrix.needsUpdate = true;
           } else if (object instanceof THREE.Mesh) {
             const f = 1 - (ttl - dt) / (object.userData.max as number);
-            object.scale.setScalar(1 + Math.max(0, f) * 1.8);
+            const scale = 1 + Math.max(0, f) * 1.8;
+            if (object.userData.groundRingCenter) this.updateGroundRing(object, scale);
+            else object.scale.setScalar(scale);
           }
           const mat = (object as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
           if (mat?.transparent) mat.opacity = Math.max(0, ttl / (object.userData.max as number)) * (object.userData.earthDust ? .6 : 1);
@@ -1564,7 +1865,7 @@ export class BattleRenderer3D implements RendererPort {
     // Geometry depends on commands and cursor positions, not on render frequency.
     const overlayKey = JSON.stringify([preview, drag, state.units
       .filter((unit) => selection.includes(unit.id) && !unit.dead && unit.health > 0)
-      .map((unit) => [unit.id, unit.patrol?.area, unit.ambush && !unit.ambush.triggered && !unit.crossed
+      .map((unit) => [unit.id, unit.roleDuty && [unit.roleDuty.kind, unit.roleDuty.origin, unit.roleDuty.target], unit.scoutReports, Math.floor(state.ticks / CONFIG.tickRate), unit.deployment && [unit.pos, unit.deployment.facing, unit.deployment.ticks === 0], unit.patrol?.area, unit.ambush && !unit.ambush.triggered && !unit.crossed
         ? [unit.pos, unit.ambush.facing, unit.ambush.range, unit.ambush.arcDegrees, unit.ambush.prepTicks > 0] : null])]);
     if (overlayKey !== this.overlayKey) {
       this.overlayKey = overlayKey;
@@ -1572,6 +1873,28 @@ export class BattleRenderer3D implements RendererPort {
       for (const unit of state.units) {
         if (unit.ambush && !unit.ambush.triggered && selection.includes(unit.id) && unit.health > 0 && !unit.dead && !unit.crossed) {
           this.drawAmbushArc(unit.pos, unit.ambush, unit.ambush.prepTicks > 0 ? 0xa5ad98 : 0xe2c177);
+        }
+      }
+      for (const unit of state.units) {
+        const crew = crewTuning(unit);
+        if (!crew || !unit.deployment || !selection.includes(unit.id) || unit.dead || unit.crossed || unit.path.length) continue;
+        this.drawAmbushArc(unit.pos, { facing: unit.deployment.facing, range: getContent().weapons[unitDef(getContent(), unit.role, unit.team).weapon!]?.range ?? 300, arcDegrees: crew.arc },
+          unit.deployment.ticks === 0 ? 0x9bbf8a : 0xc6a568);
+      }
+      for (const unit of state.units) {
+        if (!selection.includes(unit.id) || unit.dead || unit.crossed || unit.health <= 0) continue;
+        const duty = unit.roleDuty;
+        if (duty) {
+          const radius = duty.kind === 'supply' ? 90 : duty.kind === 'observe' ? unit.buildingPosition ? 620 : 540 : duty.kind === 'suppress' ? 55 : 160;
+          const center = duty.target ?? unit.pos;
+          const ring = new THREE.Mesh(drapedRingGeometry(state.terrain, center, radius * WORLD_UNITS_PER_PIXEL - .025, radius * WORLD_UNITS_PER_PIXEL), this.basicMaterial(duty.kind === 'suppress' ? 0xe4a052 : 0x8bbfb4, .55));
+          ring.name = 'role-ability-radius'; this.overlayGroup.add(ring);
+        }
+        for (const report of unit.scoutReports ?? []) {
+          const age = (state.ticks - report.tick) / CONFIG.tickRate;
+          if (age > 12) continue;
+          const marker = new THREE.Mesh(drapedRingGeometry(state.terrain, report.pos, .21, .29), this.basicMaterial(0xe4a052, Math.max(.15, 1 - age / 12)));
+          marker.name = 'last-observed-contact'; marker.userData.reportAgeSeconds = age; this.overlayGroup.add(marker);
         }
       }
       const patrolAreas = new Set<string>();
@@ -1599,6 +1922,19 @@ export class BattleRenderer3D implements RendererPort {
           const danger = new THREE.Mesh(drapedRingGeometry(state.terrain, preview.pos, radius - .025, radius), new THREE.MeshBasicMaterial({ color: 0xd65c43, transparent: true, opacity: .8, side: THREE.DoubleSide, depthWrite: false }));
           danger.name = 'satchel-blast-preview'; this.overlayGroup.add(danger);
         }
+        const radius = preview.kind === 'suppress' ? 55 : preview.kind === 'artillery' ? CONFIG.artillery.radius : preview.kind === 'airSupport' ? CONFIG.airSupport.radius
+          : preview.kind === 'flare' ? CONFIG.flare.radius : preview.kind === 'smoke' ? CONFIG.smoke.radius : 0;
+        const targets = preview.kind === 'airSupport' ? Array.from({ length: CONFIG.airSupport.bombCount }, (_, index) => ({ x: preview.pos.x + (index - (CONFIG.airSupport.bombCount - 1) / 2) * CONFIG.airSupport.bombSpacing, y: preview.pos.y })) : [preview.pos];
+        if (radius > 0) for (const target of targets) {
+          const range = new THREE.Mesh(drapedRingGeometry(state.terrain, target, radius * WORLD_UNITS_PER_PIXEL - .04, radius * WORLD_UNITS_PER_PIXEL), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .85, side: THREE.DoubleSide, depthWrite: false, depthTest: false }));
+          range.name = 'support-radius-preview'; range.renderOrder = 99; this.overlayGroup.add(range);
+        }
+        if (['sandbag', 'trench', 'bunker', 'mortarPit', 'bridge'].includes(preview.kind)) {
+          const width = preview.kind === 'trench' ? CONFIG.trench.halfLength * 2 : preview.kind === 'bridge' ? (preview.bridgeHalfWidth ?? 12) * 2 : 32;
+          const depth = preview.kind === 'bridge' ? (preview.bridgeHalfLength ?? 24) * 2 : preview.kind === 'trench' ? 24 : 20;
+          ghost.geometry.dispose(); ghost.geometry = new THREE.BoxGeometry(width * WORLD_UNITS_PER_PIXEL, .05, depth * WORLD_UNITS_PER_PIXEL);
+          if (preview.kind === 'bridge' && preview.bridgeAxis === 'horizontal') ghost.rotation.y = Math.PI / 2;
+        }
       }
       if (drag) {
         const centerX = (drag.x0 + drag.x1) / 2, centerY = (drag.y0 + drag.y1) / 2;
@@ -1621,7 +1957,7 @@ export class BattleRenderer3D implements RendererPort {
     this.renderer.render(this.scene, this.camera);
   }
 
-  shake(magnitude: number, duration: number): void { this.shakeMag = Math.max(this.shakeMag, magnitude); this.shakeTime = Math.max(this.shakeTime, duration); }
+  shake(magnitude: number, duration: number): void { if (this.prefs.reducedMotion || !this.prefs.screenShake) return; this.shakeMag = Math.max(this.shakeMag, magnitude); this.shakeTime = Math.max(this.shakeTime, duration); }
   getShakeMagnitude(): number { return this.shakeMag; }
   destroy(): void {
     this.unitBatches.clear();

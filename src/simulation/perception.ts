@@ -56,8 +56,17 @@ export function recordNightGunfire(state: SimState, source: Unit, kinds: Uint8Ar
 }
 
 export function latestNightContact(unit: Unit, ticks: number): NightContact | undefined {
-  return unit.nightContacts?.filter((contact) => contact.expiresTick > ticks)
-    .sort((a, b) => b.noticedTick - a.noticedTick || distance(unit.pos, a.pos) - distance(unit.pos, b.pos) || a.sourceId - b.sourceId)[0];
+  let latest: NightContact | undefined;
+  for (const contact of unit.nightContacts ?? []) {
+    if (contact.expiresTick <= ticks) continue;
+    if (latest === undefined || contact.noticedTick > latest.noticedTick) {
+      latest = contact;
+    } else if (contact.noticedTick === latest.noticedTick) {
+      const proximity = distance(unit.pos, contact.pos) - distance(unit.pos, latest.pos);
+      if (proximity < 0 || (proximity === 0 && contact.sourceId < latest.sourceId)) latest = contact;
+    }
+  }
+  return latest;
 }
 
 export function contactBearing(from: Vec2, to: Vec2): string {

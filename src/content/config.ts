@@ -77,7 +77,7 @@ export const CONFIG: GameConfig = {
     liveEnemies: 26,
   },
   costs: {
-    recruit: { rifleman: 4, mg: 7, medic: 6, supply_officer: 6, at: 8, sniper: 10, engineer: 6, radio_engineer: 6, officer: 10, mortarman: 10, gun_truck: 25 },
+    recruit: { rifleman: 4, mg: 7, medic: 6, supply_officer: 6, at: 8, sniper: 10, engineer: 6, radio_engineer: 6, officer: 10, mortarman: 10, gun_truck: 25, scout: 6, heavy_mg: 12, assault_infantry: 8, at_gun: 18 },
     sandbag: 3,
     barbedWire: 4,
     trench: 6,
@@ -283,7 +283,7 @@ export const CONFIG: GameConfig = {
     // riflemen trade fire from a standoff that still lets them advance. This is
     // the distance at which the pair counts as having arrived: from there it
     // bounds on a fire-heavy cycle (see `bounding`) instead of a steady advance.
-    engageRangeMult: { sapper: 0.8, rifle: 0.8, assault: 0.65, vehicle: 1, observer: 0.8, gun_truck: 0.9, troop_transport: 1 },
+    engageRangeMult: { sapper: 0.8, rifle: 0.8, assault: 0.65, vehicle: 1, observer: 0.8, gun_truck: 0.9, troop_transport: 1, mg_team: 0.95, sharpshooter: 0.95, field_officer: 0.8, at_infantry: 0.9, infiltrator: 0.5 },
     /**
      * Armour is exempt from the bounding pair and always moving, so it needs a
      * separate stopping distance or it would never settle to shoot.
@@ -469,6 +469,8 @@ export const CONFIG: GameConfig = {
    * that a determined attack can clear.
    */
   buildings: {
+    collapseDamageMinMult: .8,
+    collapseDamageMaxMult: 1.2,
     footprints: {
       church: { cols: 4, rows: 3 },
       castle: { cols: 6, rows: 5 },

@@ -1,3 +1,4 @@
+import { specialistPriority } from './specialists';
 import type { Content } from '../content/validate';
 import { CONFIG } from '../content/config';
 import { threatOf } from '../content/validate';
@@ -173,6 +174,7 @@ export function targetIsValid(
 ): boolean {
   if (target.dead || target.health <= 0) return false;
   if (target.team === shooter.team) return false;
+  if (shooter.role === 'at_infantry' && !isVehicle(_content, target)) return false;
   const d = dist(shooter.pos, target.pos);
   const rangeMultiplier = typeof visibilityRangeMult === 'function' ? visibilityRangeMult(target) : visibilityRangeMult;
   if (d > weapon.range * rangeMultiplier) return false;
@@ -250,17 +252,37 @@ export function chooseGrenadeTarget(
   if (inRange.length === 0) return null;
 
   // Cluster value: the best single blast available, ties broken by proximity.
-  const clusterAt = (centre: Unit): number => inRange.filter((o) => dist(o.pos, centre.pos) <= config.grenade.radius).length;
-  const ranked = [...inRange].sort((a, b) => clusterAt(b) - clusterAt(a) || dist(shooter.pos, a.pos) - dist(shooter.pos, b.pos) || a.id - b.id);
-  const best = ranked[0]!;
-  if (clusterAt(best) >= config.grenade.clusterThreshold) return best;
+  // Count each cluster once instead of recounting it in every sort comparison.
+  let best = inRange[0]!;
+  let bestCount = -1;
+  let bestDistance = Infinity;
+  for (const cand of inRange) {
+    let count = 0;
+    for (const other of inRange) {
+      if (dist(other.pos, cand.pos) <= config.grenade.radius) count++;
+    }
+    const distance = dist(shooter.pos, cand.pos);
+    if (count > bestCount || (count === bestCount
+      && (distance < bestDistance || (distance === bestDistance && cand.id < best.id)))) {
+      best = cand;
+      bestCount = count;
+      bestDistance = distance;
+    }
+  }
+  if (bestCount >= config.grenade.clusterThreshold) return best;
 
   // A single target is only worth a grenade if gunfire cannot reach it anyway.
   if (config.grenade.throwAtCoveredTargets) {
-    const sheltered = inRange
-      .filter((cand) => isShelteredFrom(terrain, sandbags, trenches, cand.pos, shooter.pos, config))
-      .sort((a, b) => dist(shooter.pos, a.pos) - dist(shooter.pos, b.pos) || a.id - b.id)[0];
-    if (sheltered !== undefined) return sheltered;
+    let sheltered: Unit | null = null;
+    let nearestDistance = Infinity;
+    for (const cand of inRange) {
+      const distance = dist(shooter.pos, cand.pos);
+      if (distance > nearestDistance || (distance === nearestDistance && sheltered !== null && cand.id >= sheltered.id)) continue;
+      if (!isShelteredFrom(terrain, sandbags, trenches, cand.pos, shooter.pos, config)) continue;
+      sheltered = cand;
+      nearestDistance = distance;
+    }
+    return sheltered;
   }
   return null;
 }
@@ -284,7 +306,10 @@ export function chooseGrenadeTarget(
   for (const cand of candidates) {
     if (!canAcquireTarget(content, terrain, sandbags, shooter, cand, weapon, config, trenches, smokes, visibilityRangeMult, revealedByGunfire)) continue;
     const d = dist(shooter.pos, cand.pos);
-    const score = targetScoreForOrder(content, cand, d, config, fireOrder);
+    const sheltered = shooter.role === 'sharpshooter' && (cand.buildingPosition !== undefined
+      || hasDirectionalCover(sandbags, cand.pos, shooter.pos, config, trenches, terrain));
+    const priority = sheltered ? 1.5 : specialistPriority(shooter, cand);
+    const score = targetScoreForOrder(content, cand, d, config, fireOrder) * priority;
     if (score < bestScore || (score === bestScore && best !== null && cand.id < best.id)) {
       best = cand;
       bestScore = score;
@@ -300,7 +325,7 @@ export function chooseGrenadeTarget(
       return targetScoreForOrder(content, cand, d, config, fireOrder) <= bestScore * (1 + config.enemy.targetPriority.preferDamagedBonus);
     })
     .sort((a, b) => a.health / maxHealthFor(content, a) - b.health / maxHealthFor(content, b) || a.id - b.id)[0];
-  return wounded ?? best;
+  return shooter.role === 'sharpshooter' || shooter.role === 'at_gun' ? best : wounded ?? best;
 }
 
 function canAcquireTarget(

@@ -26,7 +26,7 @@ export function elevationLineOfSight(terrain: Terrain, from: Vec2, to: Vec2, fro
 }
 
 /** Three rounded terraces per hill, with a broader approach on one side. */
-export function generateElevation(terrain: Terrain, seed: number, flatAt: (x: number, y: number) => boolean): void {
+export function generateElevation(terrain: Terrain, seed: number, flatAt: (x: number, y: number) => boolean, relief = 1, defensiveRidges: readonly Vec2[] = []): void {
   const cell = terrain.cell / 2;
   const cols = terrain.cols * 2 + 1, rows = terrain.rows * 2 + 1;
   const heights = new Float32Array(cols * rows);
@@ -37,6 +37,7 @@ export function generateElevation(terrain: Terrain, seed: number, flatAt: (x: nu
     y: rngRange(rng, 150 + i * 65, 245 + i * 65),
     rx: rngRange(rng, 130, 195), ry: rngRange(rng, 95, 140), angle: rngRange(rng, -Math.PI, Math.PI),
   }));
+  for (const pos of defensiveRidges) hills.push({ x: pos.x, y: pos.y + 18, rx: 90, ry: 72, angle: Math.PI / 2 });
   for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
     const x = col * cell, y = row * cell, index = row * cols + col;
     if (x <= 72 || x >= CONFIG.field.width - 72 || y <= 72 || y >= CONFIG.deploymentZone.yMin - 16 || flatAt(x, y)) {
@@ -53,7 +54,7 @@ export function generateElevation(terrain: Terrain, seed: number, flatAt: (x: nu
       for (const edge of [1, .7, .4]) h += ELEVATION.levelHeight * smooth((edge - radius) / feather);
       height = Math.max(height, h);
     }
-    heights[index] = height;
+    heights[index] = height * relief;
   }
   // A distance transform blends the land into roads, water, foundations, and
   // protected deployment/exit routes without spending gameplay randomness.

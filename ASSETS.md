@@ -64,3 +64,9 @@ The title **Last Line**, the scenario text, wave names, telegraph texts and
 all in-game copy are original to this project. The game is inspired by the
 broad experience of classic defense games such as Mud and Blood 2; it uses no
 assets, data, or code from any such game.
+
+### Procedural battlefield soundscape
+
+`src/game/soundscape.ts` synthesizes wind, rain, sheltered drips, bird calls, distant low rumbles, and sparse adaptive music with Web Audio. No external recordings or music licenses are required for these layers. Music responds to nearby threats, pinned troops, and sector capture; music and ambience duck beneath speech and fade during pause or hidden views. Settings provide separate saved music and ambience sliders. Local field chatter omits radio static; radio exchanges retain the receiver treatment. Browser speech availability still determines spoken contextual lines; captions always remain available.
+
+Lull banter is authored in `src/content/lull-banter.ts`: 24 paired exchanges between nearby adult soldiers, using existing field voices and captions. Banter starts after 6 seconds of quiet during preparation or a secured-sector lull, repeats no sooner than 20–35 seconds, avoids the last eight lines, and is interrupted by renewed combat.

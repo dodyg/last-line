@@ -160,9 +160,61 @@ describe('multi-floor building combat', () => {
     const health = unit.health;
     sim.damageBuilding(building, building.maxHealth);
     expect(unit.health).toBeLessThan(health);
+    expect(unit.health).toBeLessThanOrEqual(sim.maxHealthOf(unit) * .2);
+    if (!unit.dead) { expect(unit.pinned).toBe(true); expect(unit.suppression).toBe(CONFIG.suppression.max); }
     expect(unit.buildingPosition).toBeUndefined(); expect(unit.buildingOrder).toBeUndefined();
     expect(sim.state.terrain.blocked[Math.floor(unit.pos.y / 24) * sim.state.terrain.cols + Math.floor(unit.pos.x / 24)]).toBe(0);
     expect(sim.command({ type: 'garrison', unitIds: [unit.id], buildingId: building.id, level: 0 }).ok).toBe(false);
+  });
+
+  it.each(['friendly', 'enemy'] as const)('kills an already wounded %s occupant exactly once', (team) => {
+    const { sim, unit, building } = fixture();
+    if (team === 'enemy') sim.spawnEnemy('rifle', { x: 300, y: 300 });
+    const occupant = team === 'friendly' ? unit : sim.state.units.at(-1)!;
+    occupant.buildingPosition = { buildingId: building.id, level: 0, slot: 0 };
+    occupant.health = sim.maxHealthOf(occupant) * .5;
+    sim.damageBuilding(building, building.maxHealth);
+    expect(occupant.dead).toBe(true); expect(occupant.health).toBe(0);
+    expect(occupant.buildingPosition).toBeUndefined();
+    const record = { ...sim.state.battleRecord };
+    sim.damageBuilding(building, building.maxHealth);
+    expect(sim.state.battleRecord).toEqual(record);
+    expect(team === 'friendly' ? record.casualties : record.enemyKills).toBe(1);
+  });
+
+  it.each([{ seed: 0, dies: false }, { seed: 1, dies: true }])('can severely injure or kill a healthy occupant (seed $seed)', ({ seed, dies }) => {
+    const { sim, unit, building } = fixture();
+    unit.buildingPosition = { buildingId: building.id, level: 0, slot: 0 };
+    unit.health = sim.maxHealthOf(unit); sim.state.rng.s = seed;
+    sim.damageBuilding(building, building.maxHealth);
+    expect(unit.dead).toBe(dies);
+    if (!dies) {
+      expect(unit.health).toBeGreaterThan(0);
+      expect(unit.health).toBeLessThanOrEqual(sim.maxHealthOf(unit) * .2);
+      expect(unit.pinned).toBe(true);
+      expect(unit.suppression).toBe(CONFIG.suppression.max);
+    }
+  });
+
+  it('cancels an approach order without injuring or teleporting a soldier outside', () => {
+    const { sim, unit, building } = fixture();
+    sim.command({ type: 'garrison', unitIds: [unit.id], buildingId: building.id, level: 0 });
+    expect(unit.buildingPosition).toBeUndefined();
+    expect(unit.buildingOrder).toBeDefined();
+    const health = unit.health, pos = { ...unit.pos };
+    sim.damageBuilding(building, building.maxHealth);
+    expect(unit.health).toBe(health); expect(unit.pos).toEqual(pos);
+    expect(unit.buildingOrder).toBeUndefined(); expect(unit.path).toHaveLength(0);
+  });
+
+  it('reproduces collapse casualties from a saved simulation', () => {
+    const { sim, unit, building, tick } = fixture();
+    sim.command({ type: 'garrison', unitIds: [unit.id], buildingId: building.id, level: 1 }); tick();
+    const restored = Simulation.fromSnapshot(sim.snapshot());
+    sim.damageBuilding(building, building.maxHealth);
+    restored.damageBuilding(restored.state.buildings[0]!, building.maxHealth);
+    expect(restored.state.units[0]!.health).toBe(unit.health);
+    expect(restored.state.units[0]!.dead).toBe(unit.dead);
   });
 
   it('preserves a stair order and firing position through validated saves, detached from live state', () => {

@@ -1,9 +1,11 @@
+import { drawHabitation, drawMeadows, drawRiverMargins } from './environment-surface';
 import { CONFIG } from '../../content/config';
 import { deriveRng, rngRange } from '../../simulation/rng';
 import { isDeciduousKind, isRapidsAt, isRiverAt, mudPatchDistance, riverHalfWidthAtPoint, riverPathPoints, TERRAIN_KIND, type TerrainData, type TerrainZone } from '../../simulation/terrain';
 import { seasonPalette } from './season-palette';
 import { roadBasePasses } from '../../game/road-drawing';
 import type { Vec2 } from '../../simulation/types';
+import { REGIONAL_STYLE } from './regional-style';
 
 /** Follow the simulation's continuous banks rather than its cell-center samples. */
 export function riverOutline(data: TerrainData, widthScale = 1, padding = 0): Vec2[] {
@@ -73,6 +75,22 @@ export function terrainSurfaceCanvas(data: TerrainData): HTMLCanvasElement | nul
     grassCtx.fillRect(x, y, 1, 1);
   }
   ctx.drawImage(grass, 0, 0, width, height);
+  const region = REGIONAL_STYLE[data.campaignCountry ?? 'france'];
+  ctx.save(); ctx.globalAlpha = data.season === 'winter' ? .035 : .11;
+  ctx.fillStyle = region.ground; ctx.fillRect(0, 0, width, height); ctx.restore();
+  // Break up vegetation boundaries without changing the movement footprint.
+  const boundaryKinds = new Set<number>([TERRAIN_KIND.trees, TERRAIN_KIND.oak, TERRAIN_KIND.beech, TERRAIN_KIND.pine, TERRAIN_KIND.shrub]);
+  for (let index = 0; index < data.kinds.length; index++) {
+    const kind = data.kinds[index]!;
+    if (!boundaryKinds.has(kind)) continue;
+    const x = (index % data.terrain.cols + .5) * data.terrain.cell, y = (Math.floor(index / data.terrain.cols) + .5) * data.terrain.cell;
+    for (let fleck = 0; fleck < 9; fleck++) {
+      ctx.fillStyle = fleck % 2 ? 'rgba(44,56,28,.08)' : 'rgba(135,145,80,.09)';
+      ctx.beginPath(); ctx.ellipse(x + rngRange(rng, -14, 14), y + rngRange(rng, -14, 14), rngRange(rng, 2, 7), rngRange(rng, 1, 3), rngRange(rng, 0, Math.PI), 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  drawMeadows(ctx, data);
 
   // Agricultural parcels stay orderly, with fine crop rows and softened edges.
   for (const field of data.layout?.fields ?? []) {
@@ -139,6 +157,8 @@ export function terrainSurfaceCanvas(data: TerrainData): HTMLCanvasElement | nul
     ctx.stroke(path); ctx.restore();
   }
 
+  drawHabitation(ctx, data);
+
   if (palette.snowCover > 0) {
     // Ground snow survives clear weather; exposed tracks keep roads readable.
     ctx.save(); ctx.fillStyle = color(palette.snow); ctx.globalAlpha = palette.snowCover;
@@ -169,7 +189,7 @@ export function terrainSurfaceCanvas(data: TerrainData): HTMLCanvasElement | nul
   }
 
   if (data.zones.river) {
-    const bank = polygon(riverOutline(data, 1, 5));
+    const bank = polygon(riverOutline(data, 1, 2.5));
     const water = polygon(riverOutline(data));
     ctx.save();
     ctx.fillStyle = palette.bank; ctx.shadowColor = palette.bank; ctx.shadowBlur = 5 * scale;
@@ -179,15 +199,15 @@ export function terrainSurfaceCanvas(data: TerrainData): HTMLCanvasElement | nul
       ctx.lineWidth = branch.halfWidth * 2 + 10; ctx.strokeStyle = palette.bank;
       ctx.stroke(polyline(branch.points));
     }
-    ctx.fillStyle = '#527472'; ctx.fill(water);
+    ctx.fillStyle = '#496967'; ctx.fill(water);
     for (const branch of data.zones.river.branches ?? []) {
       ctx.lineWidth = branch.halfWidth * 2; ctx.strokeStyle = '#527472'; ctx.stroke(polyline(branch.points));
     }
-    ctx.fillStyle = '#3c6269'; ctx.fill(polygon(riverOutline(data, .76)));
+    ctx.fillStyle = 'rgba(44,82,91,.32)'; ctx.fill(polygon(riverOutline(data, .76)));
     for (const branch of data.zones.river.branches ?? []) {
       ctx.lineWidth = branch.halfWidth * 1.5; ctx.strokeStyle = '#3c6269'; ctx.stroke(polyline(branch.points));
     }
-    ctx.fillStyle = 'rgba(41,75,87,.42)'; ctx.fill(polygon(riverOutline(data, .42)));
+    ctx.fillStyle = 'rgba(41,75,87,.16)'; ctx.fill(polygon(riverOutline(data, .42)));
     // Fine ripples and pale rapid streaks follow the real water footprint.
     for (let dot = 0; dot < 2800; dot++) {
       const x = rngRange(rng, 0, width), y = rngRange(rng, 0, height);
@@ -202,7 +222,18 @@ export function terrainSurfaceCanvas(data: TerrainData): HTMLCanvasElement | nul
     ctx.restore();
   }
 
+  if (data.zones.river) drawRiverMargins(ctx, data, riverOutline(data, 1, 3));
+
   // Subtle contour edges distinguish terraces from ordinary changes in grass.
+  // Loose pebbles and driftwood follow the banks, never blocking a crossing.
+  if (data.zones.river) {
+    for (const point of riverOutline(data, 1, 3).filter((_, index) => index % 4 === 0)) {
+      ctx.fillStyle = region.stone; ctx.globalAlpha = .35;
+      ctx.beginPath(); ctx.ellipse(point.x + rngRange(rng, -2, 2), point.y + rngRange(rng, -2, 2), rngRange(rng, .6, 1.8), .6, rngRange(rng, 0, Math.PI), 0, Math.PI * 2); ctx.fill();
+      if (rngRange(rng, 0, 1) < .14) { ctx.strokeStyle = '#75634d'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(point.x, point.y); ctx.lineTo(point.x + 4, point.y + 1.2); ctx.stroke(); }
+    }
+    ctx.globalAlpha = 1;
+  }
   const elevation = data.terrain.elevation;
   if (elevation) {
     ctx.strokeStyle = 'rgba(64,53,36,.19)'; ctx.lineWidth = .6;

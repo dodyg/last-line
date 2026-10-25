@@ -47,8 +47,8 @@ describe('map seasons', () => {
     }
   });
 
-  it.each(SEASONS)('preserves %s scenery and weather through validated save and Continue', (season) => {
-    const sim = new Simulation(2026, undefined, generateTerrain(2026, true, 3, 'germany', season));
+  it.each(SEASONS)('preserves %s scenery and weather in a non-campaign save and Continue', (season) => {
+    const sim = new Simulation(2026, undefined, generateTerrain(2026, true, 3, undefined, season));
     const parsed = validateSnapshot(JSON.parse(JSON.stringify(sim.snapshot()))); if ('error' in parsed) throw new Error(parsed.error);
     const restored = Simulation.fromSnapshot(parsed.snap);
     expect(restored.snapshot()).toEqual(sim.snapshot()); expect(restored.terrainData()).toEqual(sim.terrainData());

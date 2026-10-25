@@ -70,8 +70,8 @@ function num(value: unknown, label: string, min = 0, max = Number.MAX_SAFE_INTEG
   return value;
 }
 
-const FRIENDLY_ROLES: readonly FriendlyRole[] = ['rifleman', 'mg', 'medic', 'supply_officer', 'at', 'sniper', 'engineer', 'radio_engineer', 'officer', 'mortarman', 'gun_truck'];
-const ENEMY_ARCHETYPES: readonly EnemyArchetype[] = ['rifle', 'assault', 'vehicle', 'observer', 'gun_truck', 'troop_transport', 'sapper'];
+const FRIENDLY_ROLES: readonly FriendlyRole[] = ['rifleman', 'mg', 'medic', 'supply_officer', 'at', 'sniper', 'engineer', 'radio_engineer', 'officer', 'mortarman', 'gun_truck', 'scout', 'heavy_mg', 'assault_infantry', 'at_gun'];
+const ENEMY_ARCHETYPES: readonly EnemyArchetype[] = ['rifle', 'assault', 'vehicle', 'observer', 'gun_truck', 'troop_transport', 'sapper', 'mg_team', 'sharpshooter', 'field_officer', 'at_infantry', 'infiltrator'];
 
 function validateFriendlyDef(role: string, raw: unknown): FriendlyUnitDef {
   assert(isObject(raw), `friendly unit ${role} must be an object`);

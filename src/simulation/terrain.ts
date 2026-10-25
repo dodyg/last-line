@@ -1,4 +1,6 @@
+import { addDefensivePositions, fitRoadBridges, planLots, regionalRelief, settlementScore, type LandscapeLot, type DefensivePosition } from './landscape-details';
 import { CONFIG } from '../content/config';
+import { campaignSeason } from '../content/campaign-story';
 import type { Building, BuildingKind, CampaignCountry, Season, Terrain, TerrainEffects, Vec2, WeatherKind } from './types';
 import { seasonForSeed } from './seasons';
 import { buildingArchitecture, containsBuilding, FLOOR_HEIGHT } from './buildings';
@@ -49,6 +51,8 @@ export interface RiverBridge {
   halfWidth: number;
   /** Half-length spanning from bank to bank. */
   halfLength: number;
+  /** Open low platform shared by intersecting road crossings. */
+  junction?: boolean;
 }
 
 interface RiverRapid {
@@ -144,6 +148,8 @@ export interface LandscapeLayout {
   archetype: 'village' | 'farm' | 'fields' | 'forest' | 'bocage';
   roads: LandscapeRoad[];
   fields: LandscapeField[];
+  lots?: LandscapeLot[];
+  defensivePositions?: DefensivePosition[];
 }
 
 /** A building the generator placed, before the simulation takes ownership of it. */
@@ -161,7 +167,7 @@ export interface TerrainData {
   season: Season;
   campaignCountry?: CampaignCountry;
   localLanguage?: LocalLanguage;
-  layoutVersion?: 1 | 2 | 3;
+  layoutVersion?: 1 | 2 | 3 | 4;
   layout?: LandscapeLayout;
   terrain: Terrain;
   /** Per-cell terrain identity, including tree species, roads, crops, and yards. */
@@ -1129,7 +1135,7 @@ export function isRoadAt(zones: TerrainData['zones'], x: number, y: number): boo
   return zones.roads?.some((road) => distanceToRoad(road, { x, y }) <= road.halfWidth + 3) ?? false;
 }
 
-function planLandscape(seed: number, zones: TerrainData['zones'], terrain: Terrain, country?: CampaignCountry): LandscapeLayout {
+function planLandscape(seed: number, zones: TerrainData['zones'], terrain: Terrain, country?: CampaignCountry, enhanced = false): LandscapeLayout {
   const rng = deriveRng(seed, 0x4c41594f);
   const setting = settingForSeed(seed, country);
   const { cell, cols, rows } = terrain;
@@ -1283,7 +1289,8 @@ function planLandscape(seed: number, zones: TerrainData['zones'], terrain: Terra
             if (sine < 0.34) continue;
             const x = a.x + rdx * t;
             const y = a.y + rdy * t;
-            if (crossings.some((crossing) => Math.hypot(crossing.x - x, crossing.y - y) < 32)) continue;
+            const axis = Math.abs(rdx) >= Math.abs(rdy) ? 'horizontal' : 'vertical';
+            if (crossings.some((crossing) => (!enhanced || crossing.axis === axis) && Math.hypot(crossing.x - x, crossing.y - y) < 32)) continue;
             const riverHalfWidth = channel.halfWidthAt({ x, y });
             crossings.push({
               x, y,
@@ -1319,7 +1326,7 @@ function planLandscape(seed: number, zones: TerrainData['zones'], terrain: Terra
 }
 
 /** Road frontage is a placement constraint, not decoration painted afterward. */
-function placeLandscapeBuildings(seed: number, terrain: Terrain, kinds: Uint8Array, zones: TerrainData['zones'], layout: LandscapeLayout, reserved: Uint8Array, country?: CampaignCountry): GeneratedBuilding[] {
+function placeLandscapeBuildings(seed: number, terrain: Terrain, kinds: Uint8Array, zones: TerrainData['zones'], layout: LandscapeLayout, reserved: Uint8Array, country?: CampaignCountry, clustered = false): GeneratedBuilding[] {
   const rng = deriveRng(seed, 0x4c4f5453);
   const { cell, cols, rows, blocked } = terrain;
   const village = layout.archetype === 'village';
@@ -1390,7 +1397,10 @@ function placeLandscapeBuildings(seed: number, terrain: Terrain, kinds: Uint8Arr
       const band = Math.min(2, Math.max(0, Math.floor((centerRow - buildingTop) * 3 / Math.max(1, buildingBottom - buildingTop))));
       bandCandidates[band]!.push(spot);
     }
-    for (const band of bandCandidates) rngShuffle(rng, band);
+    for (const band of bandCandidates) {
+      rngShuffle(rng, band);
+      if (clustered) band.sort((a, b) => settlementScore(a, placed, village, seed) - settlementScore(b, placed, village, seed));
+    }
     const lowestLoad = Math.min(...buildingBandCounts.map((count, index) => count / buildingBandWeights[index]!));
     const preferredBands = [0, 1, 2]
       .sort((a, b) => buildingBandCounts[a]! / buildingBandWeights[a]! - buildingBandCounts[b]! / buildingBandWeights[b]!);
@@ -1436,7 +1446,7 @@ function placeLandscapeBuildings(seed: number, terrain: Terrain, kinds: Uint8Arr
 }
 
 /** Locations are generated as roads, lots, parcels, and vegetation in that order. */
-export function generateTerrain(seed: number, withBuildings = true, version: 1 | 2 | 3 = 3, country?: CampaignCountry, season = seasonForSeed(seed)): TerrainData {
+export function generateTerrain(seed: number, withBuildings = true, version: 1 | 2 | 3 | 4 = 4, country?: CampaignCountry, season = country === undefined ? seasonForSeed(seed) : campaignSeason(country, 0)): TerrainData {
   if (version === 1) return { ...generateLegacyTerrain(seed, withBuildings), layoutVersion: 1, season, weather: weatherForSeed(seed, country, season) };
   const cell = CONFIG.terrain.cell;
   const cols = Math.floor(CONFIG.field.width / cell);
@@ -1444,7 +1454,8 @@ export function generateTerrain(seed: number, withBuildings = true, version: 1 |
   const terrain: Terrain = { cell, cols, rows, blocked: new Uint8Array(cols * rows) };
   const kinds = new Uint8Array(cols * rows);
   const zones = generateZones(seed, true, country);
-  const layout = planLandscape(seed, zones, terrain, country);
+  const layout = planLandscape(seed, zones, terrain, country, version >= 4);
+  if (version >= 4) fitRoadBridges(seed, zones, layout, country);
   const reserved = new Uint8Array(cols * rows);
   const lanes = [1, cols - 2];
   const rng = deriveRng(seed, 0x56454745);
@@ -1459,8 +1470,13 @@ export function generateTerrain(seed: number, withBuildings = true, version: 1 |
       if (road || row < top || row >= bottom || lanes.some((lane) => Math.abs(col - lane) <= 1)) reserved[index] = 1;
     }
   }
-  const buildings = withBuildings ? placeLandscapeBuildings(seed, terrain, kinds, zones, layout, reserved, country) : [];
+  const buildings = withBuildings ? placeLandscapeBuildings(seed, terrain, kinds, zones, layout, reserved, country, version >= 4) : [];
+  const details: TerrainData = { settingId: settingForSeed(seed, country), terrain, kinds, layout, buildings, seed, zones, lanes, season, weather: weatherForSeed(seed, country, season), campaignCountry: country };
+  if (version >= 4) layout.lots = planLots(details, reserved);
   const buildingBuffer = new Uint8Array(cols * rows);
+  for (const lot of layout.lots ?? []) {
+    for (let row = lot.row; row < lot.row + lot.rows; row++) for (let col = lot.col; col < lot.col + lot.cols; col++) buildingBuffer[row * cols + col] = 1;
+  }
   for (const building of buildings) {
     for (let row = building.row - 1; row <= building.row + building.rows; row++) {
       for (let col = building.col - 1; col <= building.col + building.cols; col++) {
@@ -1605,6 +1621,43 @@ export function generateTerrain(seed: number, withBuildings = true, version: 1 |
   for (let item = 0; item < rockCount + 5; item++) {
     stamp(rngInt(rng, 3, cols - 4), balancedVerticalRow(rng, top + 1, bottom - 1, elementBandCounts, elementBandWeights), item < rockCount ? TERRAIN_KIND.rocks : TERRAIN_KIND.obstacle);
   }
+  if (version >= 4) {
+    const lotCells = new Set<number>();
+    for (const lot of layout.lots ?? []) {
+      for (let row = lot.row; row < lot.row + lot.rows; row++) for (let col = lot.col; col < lot.col + lot.cols; col++) {
+        const index = row * cols + col;
+        lotCells.add(index);
+        kinds[index] = TERRAIN_KIND.farmyard;
+        const edge = col === lot.col || col === lot.col + lot.cols - 1 || row === lot.row || row === lot.row + lot.rows - 1;
+        // Gates on opposite ends keep back lots accessible and offer a flank route.
+        const gate = row === lot.row + Math.floor(lot.rows / 2) || col === lot.col + Math.floor(lot.cols / 2);
+        if (edge && !gate) {
+          kinds[index] = lot.use === 'churchyard' || country === 'italy' ? TERRAIN_KIND.stoneFence : TERRAIN_KIND.woodFence;
+          terrain.blocked[index] = 1;
+        }
+      }
+    }
+    layout.defensivePositions = addDefensivePositions(details, reserved, lotCells);
+    // Dense woodland follows a corridor, leaving the through road as a clearing.
+    if (layout.archetype === 'forest') {
+      for (let row = top + 1; row < Math.min(bottom - 1, CONFIG.deploymentZone.yMin / cell - 1); row++) {
+        for (let col = 4; col < cols - 4; col++) {
+          const index = row * cols + col;
+          if (lotCells.has(index) || kinds[index] !== TERRAIN_KIND.open) continue;
+          const distance = Math.min(...layout.roads.map((road) => distanceToRoad(road, { x: (col + .5) * cell, y: (row + .5) * cell })));
+          if (distance > cell * 2 && distance < cell * 4 && (col + row * 3 + seed) % 5 < 2) stamp(col, row, country === 'germany' ? TERRAIN_KIND.pine : TERRAIN_KIND.beech);
+        }
+      }
+    }
+    // Dutch parcels have drainage margins; Italian farms have stone terrace edges.
+    if (country === 'netherlands' || country === 'italy') {
+      for (const field of layout.fields) for (let col = field.col; col < field.col + field.cols; col++) {
+        if ((col - field.col) % 9 < 2) continue;
+        const row = field.row + field.rows;
+        if (!lotCells.has(row * cols + col)) stamp(col, row, country === 'italy' ? TERRAIN_KIND.stoneFence : TERRAIN_KIND.tallGrass);
+      }
+    }
+  }
   terrain.baseBlocked = terrain.blocked.slice();
   for (const building of buildings) {
     for (let row = building.row; row < building.row + building.rows; row++) {
@@ -1615,10 +1668,11 @@ export function generateTerrain(seed: number, withBuildings = true, version: 1 |
   // Protected edge lanes and the reserved through roads guarantee this invariant.
   if (!connectivityHolds(terrain)) throw new Error('Landscape has no north-south route.');
   terrain.kinds = kinds;
-  if (version === 3) generateElevation(terrain, seed, (x, y) =>
+  if (version >= 3) generateElevation(terrain, seed, (x, y) =>
     [[0, 0], [-12, 0], [12, 0], [0, -12], [0, 12]].some(([dx, dy]) => isRiverAt(zones, seed, x + dx!, y + dy!))
     || layout.roads.some((road) => distanceToRoad(road, { x, y }) <= road.halfWidth + 12)
-    || buildings.some((building) => x >= building.col * cell - 6 && x <= (building.col + building.cols) * cell + 6 && y >= building.row * cell - 6 && y <= (building.row + building.rows) * cell + 6));
+    || buildings.some((building) => x >= building.col * cell - 6 && x <= (building.col + building.cols) * cell + 6 && y >= building.row * cell - 6 && y <= (building.row + building.rows) * cell + 6)
+    || (layout.lots ?? []).some((lot) => x >= lot.col * cell && x <= (lot.col + lot.cols) * cell && y >= lot.row * cell && y <= (lot.row + lot.rows) * cell), version >= 4 ? regionalRelief(country) : 1, (layout.defensivePositions ?? []).map((position) => position.pos));
   terrain.bridges = zones.bridges;
   return { terrain, kinds, lanes, layoutVersion: version, layout, settingId: settingForSeed(seed, country), season, weather: weatherForSeed(seed, country, season), seed, zones, buildings,
     ...(country === undefined ? {} : { campaignCountry: country, localLanguage: campaignSectorForSeed(country, seed).language }) };

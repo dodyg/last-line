@@ -1,3 +1,4 @@
+import { bindExtendedSettings } from './preferences';
 import type { Preferences } from '../persistence';
 import type { BestRecord } from '../persistence';
 import { CONFIG } from '../content/config';
@@ -5,6 +6,8 @@ import { getContent } from '../content/validate';
 import { soldierName, soldierRank } from '../simulation/soldiers';
 import type { CampaignCountry, FriendlyRole, Unit } from '../simulation/types';
 import { CAMPAIGNS, CAMPAIGN_COUNTRIES } from '../content/campaigns';
+import { CAMPAIGN_STORIES, type FieldDispatch } from '../content/campaign-story';
+import { renderCampaignBriefing } from './campaign-briefing';
 
 /**
  * Overlay menus: title, pause, results, help, settings, and the one-slot
@@ -21,6 +24,8 @@ export interface MenusCallbacks {
   onCloseHelp(): void;
   onPrefsChanged(prefs: Preferences): void;
   onUnlockAudio(): void;
+  onVoicePreview?(): string;
+  onResetCamera?(): void;
   onSectorSupply(choice: 'points' | 'medical', unitId?: number): void;
   onMapReviewOpen(): void;
   onMapReviewGenerate(country: CampaignCountry): string;
@@ -141,7 +146,7 @@ export class Menus {
       const name = document.createElement('strong');
       name.textContent = CAMPAIGNS[country].name;
       const detail = document.createElement('span');
-      detail.textContent = CAMPAIGNS[country].description;
+      detail.textContent = `${CAMPAIGN_STORIES[country].title}. ${CAMPAIGNS[country].description}`;
       button.append(name, detail);
       button.addEventListener('click', () => {
         this.selectedCountry = country;
@@ -174,6 +179,34 @@ export class Menus {
       button.setAttribute('aria-pressed', String(button.dataset.country === this.selectedCountry));
     }
     required('btn-campaign-start').textContent = `Start ${CAMPAIGNS[this.selectedCountry].name} campaign`;
+    let preview = this.el.campaign.querySelector<HTMLElement>('.campaign-story-preview');
+    if (!preview) {
+      preview = document.createElement('div');
+      preview.className = 'campaign-story-preview';
+      required('campaign-choices').after(preview);
+    }
+    const story = CAMPAIGN_STORIES[this.selectedCountry];
+    const premise = document.createElement('p');
+    premise.textContent = story.premise;
+    const route = document.createElement('p');
+    route.className = 'subtle';
+    route.textContent = story.chapters.map((chapter) => `${chapter.period}: ${chapter.title}`).join(' → ');
+    preview.replaceChildren(premise, route);
+  }
+
+  setCampaignDispatch(dispatch: FieldDispatch | null): void {
+    for (const overlay of [this.el.pause, this.el.sectorSupply]) {
+      overlay.querySelector('.campaign-briefing')?.remove();
+      if (dispatch) overlay.querySelector('.panel > h2')?.after(renderCampaignBriefing(dispatch));
+    }
+  }
+
+  showDeploymentBriefing(): void {
+    this.showPause(false);
+    this.el.pause.querySelector('h2')!.textContent = 'Field briefing';
+    this.pauseNote.textContent = 'Read your assignment, then deploy when ready. These orders are also available whenever you pause.';
+    required('btn-resume').textContent = 'Deploy squad';
+    required('btn-resume').focus({ preventScroll: true });
   }
 
   private showCampaignChoice(): void {
@@ -207,6 +240,8 @@ export class Menus {
 
   showPause(auto: boolean): void {
     this.el.pause.hidden = false;
+    this.el.pause.querySelector('h2')!.textContent = 'Paused';
+    required('btn-resume').textContent = 'Resume';
     this.pauseNote.textContent = auto
       ? 'Paused automatically: the tab lost focus or was hidden. Press Resume to continue.'
       : 'The battle is frozen. You may inspect the field; orders are rejected until you resume.';
@@ -241,6 +276,14 @@ export class Menus {
       table.append(tr);
     }
     this.resSummary.replaceChildren(table);
+    if (summary.campaignCountry) {
+      const epilogue = document.createElement('p');
+      epilogue.className = 'campaign-epilogue';
+      epilogue.textContent = victory
+        ? CAMPAIGN_STORIES[summary.campaignCountry].aftermath
+        : 'The detachment’s assignment ends here. This local defeat does not change the historical outcome of the wider campaign.';
+      this.resSummary.prepend(epilogue);
+    }
     const heading = document.createElement('h3');
     heading.textContent = `Survivors · ${summary.survivors.length}`;
     this.resSummary.append(heading);
@@ -339,6 +382,7 @@ export class Menus {
 
   showSettings(): void {
     this.el.settings.hidden = false;
+    this.el.settings.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus({ preventScroll: true });
   }
 
   closeSettings(): void {
@@ -433,10 +477,6 @@ export class Menus {
   }
 
   private bindSettings(): void {
-    const volume = required('set-volume') as HTMLInputElement;
-    const volumeValue = required('set-volume-value');
-    const mute = required('set-mute') as HTMLInputElement;
-    const shake = required('set-shake') as HTMLInputElement;
     const reducedNote = required('reduced-motion-note');
     const countrySelect = required<HTMLSelectElement>('map-review-country');
     for (const country of CAMPAIGN_COUNTRIES) {
@@ -450,30 +490,14 @@ export class Menus {
     if (reduced) {
       reducedNote.hidden = false;
       if (!window.localStorage.getItem('lastline/prefs/v1')) {
-        this.prefs = { ...this.prefs, screenShake: false };
+        this.prefs = { ...this.prefs, screenShake: false, reducedMotion: true };
       }
     }
 
-    const reflect = (): void => {
-      volume.value = String(Math.round(this.prefs.volume * 100));
-      volumeValue.textContent = `${Math.round(this.prefs.volume * 100)}%`;
-      mute.checked = this.prefs.muted;
-      shake.checked = this.prefs.screenShake;
-    };
-    reflect();
-
-    const emit = (): void => {
-      this.prefs = {
-        volume: Number(volume.value) / 100,
-        muted: mute.checked,
-        screenShake: shake.checked,
-      };
-      reflect();
-      this.cb.onPrefsChanged(this.prefs);
-    };
-    volume.addEventListener('input', emit);
-    mute.addEventListener('change', emit);
-    shake.addEventListener('change', emit);
+    bindExtendedSettings(this.prefs, (prefs) => {
+      this.prefs = prefs;
+      this.cb.onPrefsChanged(prefs);
+    }, () => this.cb.onVoicePreview?.() ?? 'Voice preview unavailable.', () => this.cb.onResetCamera?.());
   }
 }
 

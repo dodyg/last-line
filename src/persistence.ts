@@ -1,3 +1,5 @@
+import { ROLE_ABILITIES } from './simulation/role-abilities';
+import { MAX_VEHICLE_TRACKS } from './simulation/battle-wear';
 import { AMBUSH_ARCS, supportsAmbush } from './simulation/ambush';
 import { CONFIG } from './content/config';
 import { isCampaignCountry } from './content/campaigns';
@@ -40,12 +42,38 @@ export interface Preferences {
   volume: number;
   muted: boolean;
   screenShake: boolean;
+  effectsVolume: number;
+  voiceVolume: number;
+  ambientVolume: number;
+  musicVolume: number;
+  graphics: 'auto' | 'low' | 'medium' | 'high';
+  shadows: boolean;
+  particles: boolean;
+  weatherEffects: boolean;
+  renderScale: number;
+  zoomSensitivity: number;
+  panSpeed: number;
+  edgeScrolling: boolean;
+  uiScale: number;
+  largeCaptions: boolean;
+  reducedMotion: boolean;
+  strongOutlines: boolean;
+  friendlyColor: string;
+  enemyColor: string;
+  fadeObstructions: boolean;
+  keys: { pause: string; panel: string; resetCamera: string; zoomIn: string; zoomOut: string };
 }
 
 export const DEFAULT_PREFS: Preferences = {
   volume: 0.8,
   muted: false,
   screenShake: true,
+  effectsVolume: 1, voiceVolume: 1, ambientVolume: 0.35, musicVolume: 0.25,
+  graphics: 'auto', shadows: true, particles: true, weatherEffects: true, renderScale: 1,
+  zoomSensitivity: 1, panSpeed: 1, edgeScrolling: false,
+  uiScale: 1, largeCaptions: false, reducedMotion: false, strongOutlines: true,
+  friendlyColor: '#7fa8d8', enemyColor: '#d86a4a', fadeObstructions: true,
+  keys: { pause: 'Space', panel: 'KeyC', resetCamera: 'Digit0', zoomIn: 'Equal', zoomOut: 'Minus' },
 };
 
 export interface BestRecord {
@@ -150,10 +178,47 @@ export function loadPrefs(storage: Storage): Preferences {
   if (raw === null || typeof raw !== 'object') return { ...DEFAULT_PREFS };
   const obj = raw as Record<string, unknown>;
   return {
+    ...DEFAULT_PREFS,
     volume: typeof obj.volume === 'number' && obj.volume >= 0 && obj.volume <= 1 ? obj.volume : DEFAULT_PREFS.volume,
     muted: obj.muted === true,
     screenShake: obj.screenShake !== false,
+    effectsVolume: prefNumber(obj.effectsVolume, 1, 0, 1),
+    voiceVolume: prefNumber(obj.voiceVolume, 1, 0, 1),
+    ambientVolume: prefNumber(obj.ambientVolume, .35, 0, 1),
+    musicVolume: prefNumber(obj.musicVolume, .25, 0, 1),
+    graphics: ['auto', 'low', 'medium', 'high'].includes(String(obj.graphics)) ? obj.graphics as Preferences['graphics'] : 'auto',
+    shadows: obj.shadows !== false, particles: obj.particles !== false, weatherEffects: obj.weatherEffects !== false,
+    renderScale: prefNumber(obj.renderScale, 1, .5, 1.5),
+    zoomSensitivity: prefNumber(obj.zoomSensitivity, 1, .25, 3), panSpeed: prefNumber(obj.panSpeed, 1, .25, 3),
+    edgeScrolling: obj.edgeScrolling === true, uiScale: prefNumber(obj.uiScale, 1, .8, 1.5),
+    largeCaptions: obj.largeCaptions === true, reducedMotion: obj.reducedMotion === true,
+    strongOutlines: obj.strongOutlines !== false, fadeObstructions: obj.fadeObstructions !== false,
+    friendlyColor: prefColor(obj.friendlyColor, DEFAULT_PREFS.friendlyColor),
+    enemyColor: prefColor(obj.enemyColor, DEFAULT_PREFS.enemyColor),
+    keys: prefKeys(obj.keys),
   };
+}
+
+function prefNumber(value: unknown, fallback: number, min: number, max: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max ? value : fallback;
+}
+
+function prefColor(value: unknown, fallback: string): string {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+}
+
+function prefKeys(value: unknown): Preferences['keys'] {
+  const keys = { ...DEFAULT_PREFS.keys };
+  if (!value || typeof value !== 'object') return keys;
+  const used = new Set<string>();
+  for (const action of Object.keys(keys) as Array<keyof typeof keys>) {
+    const code = (value as Record<string, unknown>)[action];
+    if (typeof code === 'string' && /^(Key[A-Z]|Digit[0-9]|Space|Tab|Equal|Minus|Arrow(Up|Down|Left|Right))$/.test(code) && !used.has(code)) {
+      keys[action] = code;
+      used.add(code);
+    }
+  }
+  return new Set(Object.values(keys)).size === Object.keys(keys).length ? keys : { ...DEFAULT_PREFS.keys };
 }
 
 export function savePrefs(storage: Storage, prefs: Preferences): void {
@@ -454,6 +519,27 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
           || typeof ambush.triggered !== 'boolean' || !boundedNumber(ambush.bonusShots, 0, 20) || !Number.isInteger(ambush.bonusShots)
           || (ambush.triggered ? ambush.prepTicks !== 0 || ambush.bonusShots === 0 : ambush.bonusShots !== 0)) return fail('Corrupt ambush order.');
       }
+      if (u.roleCooldown !== undefined && (!boundedNumber(u.roleCooldown, 0, 45 * CONFIG.tickRate) || !Number.isInteger(u.roleCooldown))) return fail('Corrupt role cooldown.');
+      if (u.roleDuty !== undefined) {
+        const duty = u.roleDuty as Record<string, unknown>;
+        const ability = ROLE_ABILITIES[role as UnitRole];
+        const point = (value: unknown) => !!value && typeof value === 'object' && !Array.isArray(value) && boundedNumber((value as Record<string, unknown>).x, 0, CONFIG.field.width) && boundedNumber((value as Record<string, unknown>).y, 0, CONFIG.field.height);
+        if (!duty || typeof duty !== 'object' || Array.isArray(duty) || team !== 'friendly' || !ability || duty.kind !== ability.kind
+          || !point(duty.origin) || !boundedNumber(duty.ticksRemaining, 0, (duty.kind === 'rally' ? 12 : duty.kind === 'suppress' ? 10 : 0) * CONFIG.tickRate) || !Number.isInteger(duty.ticksRemaining)
+          || !boundedNumber(duty.stock, 0, duty.kind === 'repair' ? 40 : duty.kind === 'supply' ? 12 : 0)
+          || (duty.kind === 'supply' && !Number.isInteger(duty.stock))
+          || (duty.kind === 'suppress' ? !point(duty.target) : duty.target !== undefined)) return fail('Corrupt role ability.');
+      }
+      if (u.scoutReports !== undefined) {
+        if (team !== 'friendly' || role !== 'scout' || !Array.isArray(u.scoutReports) || u.scoutReports.length > 32) return fail('Corrupt scout reports.');
+        for (const raw of u.scoutReports) {
+          if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return fail('Corrupt scout report.');
+          const report = raw as Record<string, unknown>, pos = report.pos as Record<string, unknown>;
+          if (!boundedNumber(report.unitId, 1, Number.MAX_SAFE_INTEGER) || !Number.isInteger(report.unitId) || typeof report.role !== 'string' || !(report.role in content.enemy)
+            || !pos || !boundedNumber(pos.x, 0, CONFIG.field.width) || !boundedNumber(pos.y, 0, CONFIG.field.height)
+            || !boundedNumber(report.tick, 0, ticks) || !Number.isInteger(report.tick)) return fail('Corrupt scout report.');
+        }
+      }
       const fireOrder = u.fireOrder ?? 'auto';
       if (!FIRE_ORDERS.includes(fireOrder as FireOrder)) return fail('Corrupt fire order.');
       const supportedFireOrder = fireOrdersForRole(role as UnitRole).includes(fireOrder as FireOrder)
@@ -491,6 +577,26 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
         fortificationsBuilt: serviceValues.fortificationsBuilt as number,
         grenadesThrown: grenadesThrown as number,
       };
+      if (u.deployment !== undefined) {
+        const d = u.deployment as Record<string, unknown>;
+        if (!d || !['heavy_mg', 'mg_team', 'at_gun'].includes(role) || !boundedNumber(d.ticks, 0, CONFIG.tickRate * 10)
+          || !boundedNumber(d.packingTicks, 0, CONFIG.tickRate * 10) || !boundedNumber(d.facing, -1e9, 1e9)) return fail('Corrupt weapon crew deployment.');
+      }
+      if (u.aim !== undefined) {
+        const a = u.aim as Record<string, unknown>;
+        if (!a || role !== 'at_infantry' || !Number.isSafeInteger(a.targetId) || (a.targetId as number) < 1
+          || !boundedNumber(a.ticks, 0, CONFIG.tickRate * 10)) return fail('Corrupt anti-tank aim.');
+      }
+      for (const key of ['revealedUntil', 'detectedUntil']) {
+        if (u[key] !== undefined && !boundedNumber(u[key], 0, 1e12)) return fail('Corrupt detection timer.');
+      }
+      if (u.clearBuilding !== undefined) {
+        const c = u.clearBuilding as Record<string, unknown>;
+        if (!c || role !== 'assault_infantry' || team !== 'friendly' || !Number.isSafeInteger(c.buildingId) || (c.buildingId as number) < 1
+          || !(c.level === 'roof' || c.level === 'balcony' || Number.isInteger(c.level) && boundedNumber(c.level, 0, 20))
+          || (c.facing !== undefined && !['north','east','south','west'].includes(c.facing as string))
+          || !boundedNumber(c.ticks, 0, CONFIG.tickRate * 10)) return fail('Corrupt building clearing order.');
+      }
       const initialSkill = team === 'friendly'
         ? content.friendly[role as FriendlyRole].initialAccuracySkill
         : content.enemy[role as EnemyArchetype].initialAccuracySkill;
@@ -547,6 +653,21 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
       || !boundedNumber(mark.tick, 0, ticks as number) || !Number.isSafeInteger(mark.tick)) return fail('Corrupt ground impact.');
     impactIds.add(mark.id as number);
     groundImpacts.push({ id: mark.id as number, kind: mark.kind, pos: { x: pos.x as number, y: pos.y as number }, tick: mark.tick as number });
+  }
+
+  const tracksRaw = obj.vehicleTracks ?? [];
+  if (!Array.isArray(tracksRaw) || tracksRaw.length > MAX_VEHICLE_TRACKS) return fail('Corrupt vehicle track list.');
+  const vehicleTracks: NonNullable<SimSnapshot['vehicleTracks']> = [];
+  for (const raw of tracksRaw) {
+    if (!raw || typeof raw !== 'object') return fail('Corrupt vehicle track.');
+    const mark = raw as Record<string, unknown>;
+    const from = mark.from as Record<string, unknown> | null, to = mark.to as Record<string, unknown> | null;
+    if (!Number.isSafeInteger(mark.unitId) || !boundedNumber(mark.unitId, 1, Number.MAX_SAFE_INTEGER)
+      || !Number.isSafeInteger(mark.tick) || !boundedNumber(mark.tick, 0, ticks as number)
+      || !from || !to || !boundedNumber(from.x, 0, CONFIG.field.width) || !boundedNumber(from.y, 0, CONFIG.field.height)
+      || !boundedNumber(to.x, 0, CONFIG.field.width) || !boundedNumber(to.y, 0, CONFIG.field.height)
+      || Math.hypot((to.x as number) - (from.x as number), (to.y as number) - (from.y as number)) > 32) return fail('Corrupt vehicle track.');
+    vehicleTracks.push({ unitId: mark.unitId as number, tick: mark.tick as number, from: { x: from.x as number, y: from.y as number }, to: { x: to.x as number, y: to.y as number } });
   }
 
   const treesRaw = obj.treeDamage ?? [], cells = Math.ceil(CONFIG.field.width / CONFIG.terrain.cell) * Math.ceil(CONFIG.field.height / CONFIG.terrain.cell);
@@ -873,7 +994,7 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
   // generates its map without any structures so the record stays consistent.
   const buildingsRaw = obj.buildings ?? [];
   const terrainLayoutVersion = obj.terrainLayoutVersion ?? 1;
-  if (terrainLayoutVersion !== 1 && terrainLayoutVersion !== 2 && terrainLayoutVersion !== 3) return fail('Unknown terrain layout version.');
+  if (terrainLayoutVersion !== 1 && terrainLayoutVersion !== 2 && terrainLayoutVersion !== 3 && terrainLayoutVersion !== 4) return fail('Unknown terrain layout version.');
   if (obj.campaignCountry !== undefined && terrainLayoutVersion === 1) return fail('Country campaigns require the current terrain layout.');
   if (!Array.isArray(buildingsRaw) || buildingsRaw.length > 200) return fail('Corrupt building list.');
   const buildings: SimSnapshot['buildings'] = [];
@@ -1042,6 +1163,7 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
     satchelCharges,
     strikes: strikes as SimSnapshot['strikes'],
     groundImpacts,
+    vehicleTracks,
     treeDamage,
     sandbags: sandbags as SimSnapshot['sandbags'],
     trenches,

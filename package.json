@@ -25,11 +25,11 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
+    "@tsrs/wasm": "0.18.0-ts7.1.0-dev.20260929",
     "@types/three": "0.183.1",
     "happy-dom": "^20.14.5",
-    "@tsrs/wasm": "0.18.0-ts7.1.0-dev.20260929",
     "tsrs": "0.18.0-ts7.1.0-dev.20260929",
-    "vite": "8.3.1",
+    "vite": "^8.3.5",
     "vitest": "^4.1.11"
   }
 }

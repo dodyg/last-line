@@ -36,7 +36,8 @@ export function heightfieldGeometry(terrain?: Terrain, bounds?: { x: number; y: 
 
 /** Large range/strike markers follow slopes rather than disappearing into hills. */
 export function drapedRingGeometry(terrain: Terrain | null, center: { x: number; y: number }, inner: number, outer: number, offset = .045): THREE.BufferGeometry {
-  const geometry = new THREE.RingGeometry(inner, outer, 64);
+  const segments = Math.max(64, Math.ceil(2 * Math.PI * outer / (2 * WORLD_UNITS_PER_PIXEL)));
+  const geometry = new THREE.RingGeometry(inner, outer, segments);
   geometry.rotateX(-Math.PI / 2);
   const [x, , z] = simulationToWorld(center.x, center.y);
   geometry.translate(x, 0, z);
