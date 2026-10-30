@@ -5,15 +5,47 @@ import { bridgeContains, bridgeKey, bridgeTraversal } from './bridges';
 
 /**
  * Compact grid A* with 8-directional movement and no corner cutting.
- * The grid is small (40 x 30), so a binary-heap-free implementation with a
- * simple open list is plenty; this is only called on orders and occasional
- * enemy re-paths, not every tick.
+ * A stable min-heap keeps pending-node selection logarithmic while preserving
+ * insertion order for equal scores, so route choices remain deterministic.
  */
 
 interface Node {
   idx: number;
   g: number;
   f: number;
+  order: number;
+}
+
+function precedes(a: Node, b: Node): boolean {
+  return a.f < b.f || (a.f === b.f && a.order < b.order);
+}
+
+function pushOpen(open: Node[], node: Node): void {
+  let index = open.length;
+  open.push(node);
+  while (index > 0) {
+    const parent = (index - 1) >>> 1;
+    if (!precedes(node, open[parent]!)) break;
+    open[index] = open[parent]!;
+    index = parent;
+  }
+  open[index] = node;
+}
+
+function popOpen(open: Node[]): Node {
+  const first = open[0]!;
+  const last = open.pop()!;
+  if (open.length === 0) return first;
+  let index = 0;
+  while (index * 2 + 1 < open.length) {
+    let child = index * 2 + 1;
+    if (child + 1 < open.length && precedes(open[child + 1]!, open[child]!)) child++;
+    if (!precedes(open[child]!, last)) break;
+    open[index] = open[child]!;
+    index = child;
+  }
+  open[index] = last;
+  return first;
 }
 
 const NEIGHBORS: readonly (readonly [number, number, number])[] = [
@@ -48,39 +80,37 @@ export function findPath(terrain: Terrain, start: Vec2, goal: Vec2, cellCostMult
   const startRow = posToRow(terrain, start.y);
   let goalCol = posToCol(terrain, goal.x);
   let goalRow = posToRow(terrain, goal.y);
+  let destination = goal;
 
   if (isCellBlocked(terrain, goalCol, goalRow)) {
     const nearest = nudgeToOpen(terrain, goalCol, goalRow);
     if (nearest === null) return { waypoints: [], reachable: false };
     goalCol = nearest.col;
     goalRow = nearest.row;
+    destination = cellCenter(terrain, goalCol, goalRow);
   }
 
   const layers = terrain.bridges?.length ? 2 : 1;
   const startCell = startRow * cols + startCol, goalCell = goalRow * cols + goalCol;
   const startDeck = startBridge?.level === 'deck' || (!startBridge && terrain.bridges?.some((bridge) => bridgeContains(bridge, start)));
   const startIdx = startCell * layers + (layers === 2 && startDeck ? 1 : 0);
-  if (startCell === goalCell && bridgeTraversal(terrain, start, goal, startBridge, mode).allowed) return { waypoints: [{ x: goal.x, y: goal.y }], reachable: elevationTraversal(terrain, start, goal, mode).allowed };
+  if (startCell === goalCell && bridgeTraversal(terrain, start, destination, startBridge, mode).allowed) return { waypoints: [{ ...destination }], reachable: elevationTraversal(terrain, start, destination, mode).allowed };
 
   const total = cols * rows * layers;
   const gScore = new Float32Array(total).fill(Infinity);
   const cameFrom = new Int32Array(total).fill(-1);
   const closed = new Uint8Array(total);
 
-  // Tiny open list with linear min extraction - grids this small don't care.
   const open: Node[] = [];
+  let order = 0;
   gScore[startIdx] = 0;
-  open.push({ idx: startIdx, g: 0, f: octile(startCol, startRow, goalCol, goalRow) });
+  pushOpen(open, { idx: startIdx, g: 0, f: octile(startCol, startRow, goalCol, goalRow), order: order++ });
 
   const goalCenter = cellCenter(terrain, goalCol, goalRow);
   let goalIdx = -1;
 
   while (open.length > 0) {
-    let bestI = 0;
-    for (let i = 1; i < open.length; i++) {
-      if (open[i]!.f < open[bestI]!.f) bestI = i;
-    }
-    const current = open.splice(bestI, 1)[0]!;
+    const current = popOpen(open);
     const currentCell = Math.floor(current.idx / layers);
     closed[current.idx] = 1;
     const col = currentCell % cols;
@@ -114,7 +144,7 @@ export function findPath(terrain: Terrain, start: Vec2, goal: Vec2, cellCostMult
       if (tentative < existing) {
         gScore[nIdx] = tentative;
         cameFrom[nIdx] = current.idx;
-        open.push({ idx: nIdx, g: tentative, f: tentative + octile(nc, nr, goalCol, goalRow) });
+        pushOpen(open, { idx: nIdx, g: tentative, f: tentative + octile(nc, nr, goalCol, goalRow), order: order++ });
       }
     }
   }
