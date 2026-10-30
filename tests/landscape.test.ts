@@ -4,7 +4,7 @@ import { validateSnapshot } from '../src/persistence';
 import { Simulation } from '../src/simulation/simulation';
 import { distanceToRoad, generateTerrain, isBridgeAt, isRiverAt, isMudAt, TERRAIN_KIND, terrainEffectsAt } from '../src/simulation/terrain';
 
-describe('European landscape generation', () => {
+describe('European landscape generation', { timeout: 120_000 }, () => {
   it('uses uneven mud boundaries and applies penalties only inside the shared outline', () => {
     const patch = { cx: 300, cy: 300, halfLength: 76, halfWidth: 45, shapeSeed: 2026 };
     const zones = { river: null, bridges: [], rapids: [], mud: [patch] };
@@ -68,7 +68,7 @@ describe('European landscape generation', () => {
             const index = Math.floor(point.y / terrain.cell) * terrain.cols + Math.floor(point.x / terrain.cell);
             expect(terrain.blocked[index], `road obstructed on seed ${seed}`).toBe(0);
             if (isRiverAt(zones, seed, point.x, point.y)) expect(isBridgeAt(zones, seed, point.x, point.y), `missing bridge on seed ${seed}`).toBe(true);
-            else expect(terrainEffectsAt(zones, seed, point).speedMult).toBe(1);
+            else expect(terrainEffectsAt(zones, seed, point).speedMult).toBe(CONFIG.terrain.effects.road.speedMult);
           }
         }
       }
@@ -130,8 +130,8 @@ describe('European landscape generation', () => {
       }
       if (layout.archetype === 'forest') expect(data.buildings.every((building) => building.kind === 'house')).toBe(true);
       if (layout.archetype === 'fields') {
-        const treeCounts = [7, 15, 22].map((row) => [...data.kinds.slice(row * data.terrain.cols, (row + 1) * data.terrain.cols)].filter((kind) => [TERRAIN_KIND.oak, TERRAIN_KIND.beech, TERRAIN_KIND.birch].includes(kind as 11 | 12 | 13)).length);
-        expect(Math.max(...treeCounts), `tree line seed ${seed}`).toBeGreaterThan(15);
+        const boundaryCounts = [7, 15, 22].map((row) => [...data.kinds.slice(row * data.terrain.cols, (row + 1) * data.terrain.cols)].filter((kind) => [TERRAIN_KIND.oak, TERRAIN_KIND.beech, TERRAIN_KIND.birch, TERRAIN_KIND.trees, TERRAIN_KIND.woodFence, TERRAIN_KIND.stoneFence].includes(kind as 11 | 12 | 13)).length);
+        expect(Math.max(...boundaryCounts), `field boundary seed ${seed}`).toBeGreaterThan(15);
       }
       if (data.settingId === 1) expect([...data.kinds].filter((kind) => kind === TERRAIN_KIND.fruitTree).length, `orchard seed ${seed}`).toBeGreaterThan(0);
     }

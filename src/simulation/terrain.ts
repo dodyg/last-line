@@ -1224,8 +1224,8 @@ function planLandscape(seed: number, zones: TerrainData['zones'], terrain: Terra
   // Keep bridges on the through road while joining all four approaches at the
   // circular carriageway. The island is rendered inside the ring below.
   if (hasRoundabout) {
-    road(curvedVerticalRoute(mainX, verticalRouteAnchors(mainX, [0, roundaboutY - roundaboutRadius]), rngRange(rng, 4, 7)));
-    road(curvedVerticalRoute(mainX, verticalRouteAnchors(mainX, [roundaboutY + roundaboutRadius, height]), rngRange(rng, 4, 7)));
+    road(curvedVerticalRoute(mainX, verticalRouteAnchors(mainX, [0, roundaboutY - roundaboutRadius]), rngRange(rng, enhanced ? 8 : 4, enhanced ? 12 : 7)));
+    road(curvedVerticalRoute(mainX, verticalRouteAnchors(mainX, [roundaboutY + roundaboutRadius, height]), rngRange(rng, enhanced ? 8 : 4, enhanced ? 12 : 7)));
     road([{ x: 0, y: roundaboutY }, { x: mainX - roundaboutRadius, y: roundaboutY }]);
     road([{ x: mainX + roundaboutRadius, y: roundaboutY }, { x: width, y: roundaboutY }]);
     const ring: Vec2[] = [];
@@ -1235,13 +1235,13 @@ function planLandscape(seed: number, zones: TerrainData['zones'], terrain: Terra
     }
     road(ring, halfWidth, true);
   } else {
-    road(curvedVerticalRoute(mainX, verticalRouteAnchors(mainX, [0, roundaboutY, secondRoadY, height]), rngRange(rng, 4, 7)));
+    road(curvedVerticalRoute(mainX, verticalRouteAnchors(mainX, [0, roundaboutY, secondRoadY, height]), rngRange(rng, enhanced ? 8 : 4, enhanced ? 12 : 7)));
   }
   if (village && variant !== 1) {
     const secondCol = rngInt(rng, 26, 29);
     verticalColumns.push(secondCol);
     const x = (secondCol + 0.5) * cell;
-    road(curvedVerticalRoute(x, verticalRouteAnchors(x, [0, roundaboutY, secondRoadY, height]), rngRange(rng, 4, 7)), 10);
+    road(curvedVerticalRoute(x, verticalRouteAnchors(x, [0, roundaboutY, secondRoadY, height]), rngRange(rng, enhanced ? 8 : 4, enhanced ? 12 : 7)), 10);
   }
   if (!hasRoundabout) road(curvedHorizontal(roundaboutY, rngRange(rng, 12, 20), 0, width, horizontalRouteAnchors(roundaboutY)));
   if (archetype !== 'fields' && archetype !== 'forest') {
@@ -1446,7 +1446,7 @@ function placeLandscapeBuildings(seed: number, terrain: Terrain, kinds: Uint8Arr
 }
 
 /** Locations are generated as roads, lots, parcels, and vegetation in that order. */
-export function generateTerrain(seed: number, withBuildings = true, version: 1 | 2 | 3 | 4 = 4, country?: CampaignCountry, season = country === undefined ? seasonForSeed(seed) : campaignSeason(country, 0)): TerrainData {
+export function generateTerrain(seed: number, withBuildings = true, version: 1 | 2 | 3 | 4 = 4, country?: CampaignCountry, season = country === undefined || version < 4 ? seasonForSeed(seed) : campaignSeason(country, 0)): TerrainData {
   if (version === 1) return { ...generateLegacyTerrain(seed, withBuildings), layoutVersion: 1, season, weather: weatherForSeed(seed, country, season) };
   const cell = CONFIG.terrain.cell;
   const cols = Math.floor(CONFIG.field.width / cell);
@@ -1657,6 +1657,12 @@ export function generateTerrain(seed: number, withBuildings = true, version: 1 |
         if (!lotCells.has(row * cols + col)) stamp(col, row, country === 'italy' ? TERRAIN_KIND.stoneFence : TERRAIN_KIND.tallGrass);
       }
     }
+  }
+  if (version >= 4 && settingForSeed(seed, country) === 1 && !kinds.includes(TERRAIN_KIND.fruitTree)) {
+    // Small reserved parcels can miss every orchard lattice point. Keep at
+    // least one fruit tree in the remaining orchard without occupying a road.
+    const index = kinds.findIndex((kind, index) => kind === TERRAIN_KIND.orchard && !reserved[index] && !terrain.blocked[index]);
+    if (index >= 0) kinds[index] = TERRAIN_KIND.fruitTree;
   }
   terrain.baseBlocked = terrain.blocked.slice();
   for (const building of buildings) {

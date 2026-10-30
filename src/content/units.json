@@ -45,7 +45,7 @@
       "radius": 9,
       "initialAccuracySkill": 0.84,
       "threat": 2,
-      "blurb": "Carries an M1 Garand and ammunition supplies. Refills riflemen, engineers and assault infantry with grenades, plus bazooka rockets and mortar bombs. Serves requests in order."
+      "blurb": "Carries an M1 Garand and ammunition supplies. Refills hand grenades, bazooka rockets, mortar bombs, rifle grenades and flamethrower fuel. Serves requests in order."
     },
     "at": {
       "label": "Anti-Tank",
@@ -160,9 +160,36 @@
       "initialAccuracySkill": 0.96,
       "threat": 3.8,
       "blurb": "57 mm anti-tank gun. Packs for 3 seconds, deploys for 4 seconds and covers a 50-degree arc. Slow traverse; prioritizes vehicles. Cannot garrison buildings."
+    },
+    "grenadier": {
+      "label": "Grenadier",
+      "health": 95,
+      "speed": 31,
+      "weapon": "rifle_grenade",
+      "radius": 9,
+      "initialAccuracySkill": 0.96,
+      "threat": 2.6,
+      "specialistAmmo": 6,
+      "blurb": "Six rifle grenades reach 340px and arc over cover. Slow reload; blast can hurt friendlies. Uses an M1 Garand when empty. Request ammunition from a Supply Officer to restore rifle grenades."
+    },
+    "flamethrower": {
+      "label": "Flamethrower Operator",
+      "health": 100,
+      "speed": 25,
+      "weapon": "flamethrower",
+      "radius": 10,
+      "initialAccuracySkill": 0.9,
+      "threat": 3,
+      "specialistAmmo": 12,
+      "blurb": "Twelve fuel bursts. Sweeps a short 110px cone, ignoring infantry cover protection and suppressing survivors. Solid obstacles and smoke block the stream. Slow and weak against armor. Uses an M1 Garand indoors or when empty; a Supply Officer refills fuel."
     }
   },
   "enemy": {
+    "mortar_team": {
+      "label": "German Mortar Team", "health": 90, "speed": 20,
+      "weapon": null, "radius": 10, "initialAccuracySkill": 0.7,
+      "killValue": 28, "breakthroughDamage": 1, "threat": 3.2
+    },
     "sapper": {
       "label": "German Combat Engineer",
       "health": 75,

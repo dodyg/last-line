@@ -30,15 +30,16 @@ describe.each(['engineer', 'radio_engineer'] as const)('%s STEN loadout', (role)
 
   it('fires an eight-round hitscan burst, reloads, and then starts another burst', () => {
     const { sim, soldier, enemy, step } = fixture(role), weapon = sim.weaponOf(soldier)!;
+    const reloadTicks = sim.reloadTicksFor(soldier, weapon);
     const shotTicks: number[] = [];
-    for (let i = 0; i < weapon.shotIntervalTicks * 8 + weapon.reloadTicks + 5; i++) {
+    for (let i = 0; i < weapon.shotIntervalTicks * 8 + reloadTicks + 5; i++) {
       for (const event of step()) if (event.type === 'shot' && event.shooterId === soldier.id) {
         expect(event.weapon).toBe('STEN Submachine Gun'); shotTicks.push(sim.state.ticks);
       }
     }
     expect(shotTicks.length).toBeGreaterThan(8);
     for (let i = 1; i < 8; i++) expect(shotTicks[i]! - shotTicks[i - 1]!).toBe(weapon.shotIntervalTicks);
-    expect(shotTicks[8]! - shotTicks[7]!).toBeGreaterThanOrEqual(weapon.reloadTicks);
+    expect(shotTicks[8]! - shotTicks[7]!).toBeGreaterThanOrEqual(reloadTicks);
     expect(enemy.health).toBeLessThan(100_000); expect(sim.state.projectiles).toEqual([]);
   });
 

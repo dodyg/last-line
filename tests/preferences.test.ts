@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_PREFS, KEYS, loadPrefs, savePrefs, Storage } from '../src/persistence';
 import { bindExtendedSettings } from '../src/ui/preferences';
 
-beforeEach(() => { localStorage.clear(); document.body.replaceChildren(); });
+beforeEach(() => { window.localStorage.clear(); document.body.replaceChildren(); });
 
 describe('Expanded preferences', () => {
   it('migrates legacy preferences without losing volume or mute', () => {

@@ -1,2 +1,28 @@
-# last-line
-It's an AI generated phase based game
+# Last Line
+
+A tactical defense game with persistent squads, destructible terrain, and country campaigns.
+
+Choose a country and a length when starting a new game:
+
+- **Campaign:** 100 secured sectors, with 15 waves per sector.
+- **Operation:** three sectors and 13 waves total. Repel three waves and hold a bridgehead or forward position for ten seconds; repel four and hold the next marked position for eight seconds; then repel six and extract the squad. Capture requires an unpinned soldier inside the gold ring and no enemies in the area. Leaving resets the timer.
+
+The battle strip scouts the next wave and lists its composition. **Call wave now** starts the attack immediately and grants 1 supply point per 10 seconds of preparation skipped (rounded up, maximum 3). Call a wave early and hold it without casualties or breakthroughs to earn a **Clean defense** bonus: +1 point, then +2, then +3 per consecutive early, clean wave. A casualty, breakthrough, or waiting out preparation resets the streak. The streak and active-wave tracking survive saves and sector transitions. During combat, the strip shows enemies on the field and still inbound. Toggle **1× / 2× speed** to fast-forward quiet stretches, combat, or the march north; pause stops either speed. New and restored runs begin at normal speed.
+
+March every survivor through the north exit after completing a sector. Leaving early evacuates the squad without earning sector credit. Both lengths support automatic saves, Continue, and endless play after victory.
+
+Click or tap a soldier to select them. A subtle ring at their feet marks selection; hover for their name, role, health, and pinned status. Full identification stays in the squad roster and selected-unit panel. Right-click a destination to walk, or double right-click to run. Shift-click adds or removes soldiers from the selection. **Cancel** or Escape cancels targeting. Restart asks for confirmation before replacing the current run.
+
+Each soldier has persistent attributes, visible under **Attributes** in the selected-unit panel: strength improves stamina recovery, agility improves reload speed, speed affects movement, stealth reduces detection range while concealed, marksmanship modifies role aim skill, endurance extends running time, and resolve speeds suppression recovery. Ratings use a 1–100 scale with 50 as average; recruits start between 25 and 75, with each point changing the relevant multiplier by 0.4%. Vehicles keep their equipment stats. Older saves use neutral ratings for soldiers recruited before attributes were added.
+
+Select one soldier and open **Weapon issue** in the Squad panel to inspect and assign equipment. Ten firearms are available across trained roles: M1 Garand, M1 Carbine, M1A1 Thompson, STEN, M3 Grease Gun, unscoped M1903 Springfield, Lee–Enfield No. 4 Mk I, M1918A2 BAR, Bren Mk II, and scoped M1903A4 Springfield. Machine gunners choose BAR or Bren; the scoped Springfield requires a sniper. Medics, heavy-weapon crews, and vehicles retain their specialist equipment. British weapons are optional Allied cross-issue, rather than standard U.S. Army issue.
+
+Weapon cards describe cartridge, action, magazine capacity, strengths, and weaknesses, with historical reference links. Game range is in pixels, and base aim is a combat coefficient modified by soldier skill, distance, posture, morale, and cover. Firing cycles abstract aimed fire and magazine changes; historical magazine capacities are descriptive. Issuing costs 2–8 points, takes three seconds without firing or throwing, preserves personal attributes and upgrades, and is saved with the soldier.
+
+Recruitment now opens a **Prepare soldier** screen when you choose a role in the Army tab. The battle pauses while you choose a compatible firearm, posture, and fire order. The screen shows the role’s included kit, combat stats, and full point cost. Standard weapons are included; alternative weapons add their usual costs. Specialist roles retain their equipment. Confirm to choose a southern deployment position; points and the soldier’s random attributes are committed only on a valid placement. Cancel or Escape leaves points untouched. Recruits arrive with standard upgrade levels; weapon upgrades can be purchased in the field. The complete build survives saves and sector changes.
+
+Run locally with `npm install` and `npm run dev`. Validate with `npm run build`, `npm test`, and `npm run test:e2e`. Install browser test runtimes once with `npx playwright install chromium firefox`. The balance tests exercise complete fifteen-wave sectors; generated-map sweeps have longer time budgets than individual rule tests.
+
+Weapon issue orders require a living Supply Officer to deliver the firearm and its ammunition to the soldier. The soldier keeps their current weapon while waiting; points are spent at handover, followed by a three-second weapon change. A delivery waits if points are no longer available. Giving the assigned supplier a replacement order cancels the delivery without a charge.
+
+Grenadiers cost 9 points and carry six rifle grenades with 340px range and a seven-second base reload. Their rounds arc over cover and explode on arrival; nearby friendly soldiers can be hit. Flamethrower Operators cost 12 points and carry twelve fuel bursts, sweeping a 40-degree cone within 110px every 2.5 seconds. Flames bypass infantry cover protection, suppress survivors, and deal little damage to armor; solid obstacles and smoke block the stream. Both roles switch to an M1 Garand when empty; flamethrower operators also use the rifle for interior fighting. Request rifle grenades or fuel from the roster context menu, or use a Supply Officer’s forward supply position. Their ammunition, upgrades, and posture survive saves; sector transitions restock their kit.

@@ -44,17 +44,17 @@ describe('enemy sapper teams', () => {
     expect(team.target).toMatchObject({ kind: 'bunker' });
   });
 
-  it('keeps wave sizes unchanged and reserves both escorts for atomic spawning from wave eight', () => {
+  it('preserves authored wave size and reserves both escorts for atomic spawning from wave eight', () => {
     const { sim, tick } = fixture();
     sim.state.scheduler.waveIndex = 7;
     const built = buildSpawnQueue(deriveRng(1, 2), sim.state.scheduler, false);
-    expect(built.queue).toHaveLength(7); expect(built.queue[0]).toBe('sapper');
+    expect(built.queue).toHaveLength(8); expect(built.queue[0]).toBe('sapper');
     expect(built.queue.filter((role) => role === 'rifle')).toHaveLength(2);
     sim.state.scheduler.phase = 'spawning'; sim.state.scheduler.spawnQueue = built.queue; sim.state.scheduler.spawnTimer = 1;
     tick(1);
     expect(sim.state.enemySapperTeams).toHaveLength(1);
     expect(sim.state.units.filter((unit) => unit.team === 'enemy')).toHaveLength(3);
-    expect(sim.state.scheduler.spawnQueue).toHaveLength(4);
+    expect(sim.state.scheduler.spawnQueue).toHaveLength(5);
   });
 
   it('waits for three cap slots without partially spawning or consuming the queue', () => {

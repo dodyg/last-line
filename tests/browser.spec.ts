@@ -4,7 +4,7 @@ import { soldierName } from '../src/simulation/soldiers';
 import { CONFIG } from '../src/content/config';
 import { CAMPAIGN_COUNTRIES, CAMPAIGNS } from '../src/content/campaigns';
 import { buildingArchitecture, buildingSlot } from '../src/simulation/buildings';
-import { generateTerrain, isBridgeAt, riverPathPoints } from '../src/simulation/terrain';
+import { generateTerrain, isBridgeAt, riverPathPoints, TERRAIN_KIND } from '../src/simulation/terrain';
 import { isTreeKind, treeCellPosition, treeOnShot } from '../src/simulation/tree-damage';
 import { bridgeKey } from '../src/simulation/bridges';
 import { SEASONS, SEASON_NAMES } from '../src/simulation/seasons';
@@ -123,6 +123,147 @@ async function gamePoint(page: Page, x: number, y: number): Promise<{ x: number;
 }
 
 test.describe('Last Line smoke', () => {
+  test('combat engineer demolishes a fence section and keeps the gap after reload', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.addInitScript(() => localStorage.setItem('lastline/prefs/v1', JSON.stringify({ graphics: 'low', shadows: false, particles: false, muted: true, renderScale: .6 })));
+    await startRun(page, 7);
+    const staged = (await getState(page))!;
+    const data = generateTerrain(staged.seed, staged.terrainHasBuildings, staged.terrainLayoutVersion, staged.campaignCountry, staged.season);
+    const terrain = data.terrain;
+    const cell = data.kinds.findIndex((kind, index) => {
+      const col = index % terrain.cols, row = Math.floor(index / terrain.cols);
+      return (kind === TERRAIN_KIND.woodFence || kind === TERRAIN_KIND.stoneFence) && col > 6 && col < terrain.cols - 6 && row > 10 && row < terrain.rows - 5
+        && [-1, 1, -terrain.cols, terrain.cols].some((offset) => !terrain.blocked[index + offset]);
+    });
+    expect(cell).toBeGreaterThanOrEqual(0);
+    const adjacent = [-1, 1, -terrain.cols, terrain.cols].map((offset) => cell + offset).find((index) => !terrain.blocked[index])!;
+    const center = (index: number) => ({ x: (index % terrain.cols + .5) * terrain.cell, y: (Math.floor(index / terrain.cols) + .5) * terrain.cell });
+    const engineer = staged.units[0]!;
+    engineer.role = 'engineer'; engineer.pos = center(adjacent); engineer.prevPos = { ...engineer.pos };
+    engineer.path = []; engineer.moveGoal = null; engineer.pinned = false; engineer.suppression = 0;
+    staged.scheduler.prepTicksLeft = 100_000;
+    staged.demolishedFenceCells = [];
+    await call<void>(page, 'pause');
+    await page.evaluate((snapshot) => localStorage.setItem('lastline/save/v1', JSON.stringify(snapshot)), staged);
+    await page.reload(); await page.locator('#btn-continue').click(); await page.locator('#btn-resume').click();
+    await page.locator('.roster-soldier').first().click();
+    await expect(page.locator('#btn-demolish-fence')).toBeVisible();
+    await page.locator('#btn-demolish-fence').click();
+    expect(await call<string>(page, 'mode')).toBe('demolishFence');
+    const pos = center(cell), screen = await gamePoint(page, pos.x, pos.y);
+    await page.mouse.move(screen.x, screen.y);
+    await page.screenshot({ path: testInfo.outputPath('fence-before.png') });
+    await page.mouse.click(screen.x, screen.y);
+    await expect.poll(async () => (await getState(page))!.demolishedFenceCells).toContain(cell);
+    expect(await call<string>(page, 'mode')).toBe('none');
+    await page.screenshot({ path: testInfo.outputPath('fence-after.png') });
+    await call<void>(page, 'save');
+    await page.reload(); await page.locator('#btn-continue').click(); await page.locator('#btn-resume').click();
+    expect((await getState(page))!.demolishedFenceCells).toContain(cell);
+    await page.screenshot({ path: testInfo.outputPath('fence-reloaded.png') });
+    expect(errors).toEqual([]);
+  });
+
+  test('customizes recruits before deployment and cancels without spending points', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.addInitScript(() => localStorage.setItem('lastline/prefs/v1', JSON.stringify({ graphics: 'low', shadows: false, particles: false, muted: true, renderScale: .6 })));
+    await startRun(page, 7); await call<void>(page, 'givePoints', 100);
+    await page.locator('#tab-army').click();
+    const recruit = page.locator('.recruit-button[data-role="rifleman"]');
+    await recruit.click();
+    const dialog = page.getByRole('dialog', { name: 'Prepare Rifleman' });
+    await expect(dialog).toBeVisible(); expect(await call<boolean>(page, 'paused')).toBe(true);
+    const ticks = (await getState(page))!.ticks;
+    await page.locator('#recruit-weapon').selectOption('m3');
+    await expect(dialog.getByText('Starting upgrades', { exact: true })).toHaveCount(0);
+    await page.locator('#recruit-stance').selectOption('crouching');
+    await page.locator('#recruit-fire-order').selectOption('holdGrenades');
+    await expect(page.locator('#recruit-cost-breakdown')).toContainText('6 / 100 pt');
+    expect((await getState(page))!.ticks).toBe(ticks);
+    await page.screenshot({ path: testInfo.outputPath('recruit-build-desktop.png') });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator('#btn-recruit-deploy').scrollIntoViewIfNeeded();
+    await expect(page.locator('#btn-recruit-deploy')).toBeInViewport();
+    expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath('recruit-build-mobile.png') });
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden(); expect(await call<boolean>(page, 'paused')).toBe(false);
+    expect((await getState(page))!.points).toBe(100);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await recruit.click(); await page.locator('#recruit-weapon').selectOption('m3');
+    await page.locator('#recruit-stance').selectOption('crouching'); await page.locator('#recruit-fire-order').selectOption('holdGrenades');
+    await page.locator('#btn-recruit-deploy').click();
+    expect(await call<string>(page, 'mode')).toBe('recruit'); expect((await getState(page))!.points).toBe(100);
+    const spot = await gamePoint(page, 520, 680); await page.mouse.click(spot.x, spot.y);
+    const state = (await getState(page))!;
+    expect(state.points).toBe(94);
+    expect(state.units.filter((unit) => unit.team === 'friendly')).toHaveLength(5);
+    expect(state.units.at(-1)).toMatchObject({ assignedWeaponId: 'm3', weaponUpgrades: { accuracy: 0, reload: 0, damage: 0 }, stance: 'crouching', fireOrder: 'holdGrenades' });
+    expect(await call<string>(page, 'mode')).toBe('none');
+    expect(errors).toEqual([]);
+  });
+
+  test('issues individual weapons with descriptions, combat stats, and saved equipment', async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.addInitScript(() => {
+      localStorage.setItem('lastline/prefs/v1', JSON.stringify({ graphics: 'low', shadows: false, particles: false, weatherEffects: false, renderScale: .6, muted: true }));
+    });
+    await startRun(page, 2026);
+    await call<void>(page, 'givePoints', 106);
+    expect(await call<boolean>(page, 'recruit', 'supply_officer', 250, 680)).toBe(true);
+    await page.locator('#squad-roster button').first().click();
+    const choice = page.locator('#weapon-choice');
+    await expect(choice).toBeVisible();
+    await choice.selectOption('m3');
+    await expect(page.locator('#weapon-description')).toContainText('Grease Gun');
+    await expect(page.locator('#weapon-history')).toContainText('30-round');
+    await expect(page.locator('#weapon-stats')).toContainText('165 px');
+    await expect(page.locator('#weapon-source')).toHaveAttribute('href', /^https:\/\//);
+    await page.locator('#btn-issue-weapon').click();
+    await call<void>(page, 'step', 600);
+    await expect(page.locator('#weapon-current')).toContainText('M3 Grease Gun');
+    expect((await getState(page))!.units[0]!.assignedWeaponId).toBe('m3');
+    expect((await getState(page))!.points).toBe(98);
+    await page.locator('#weapon-issue').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: testInfo.outputPath('weapon-issue.png') });
+    await call<void>(page, 'save');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.locator('#btn-continue').click();
+    await page.locator('#btn-resume').click();
+    await page.locator('#squad-roster button').first().click();
+    await expect(page.locator('#weapon-current')).toContainText('M3 Grease Gun');
+    await expect(choice).toHaveValue('m3');
+    expect(errors).toEqual([]);
+  });
+
+  test('selected soldiers show their individual attribute ratings', async ({ page }, testInfo) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await startRun(page, 2026);
+    await page.locator('#squad-roster button').nth(0).click();
+    const panel = page.locator('#sel-attributes');
+    await expect(panel).toBeVisible();
+    await expect(panel.locator('meter')).toHaveCount(7);
+    for (const index of [0, 1]) {
+      if (index > 0) await page.locator('#squad-roster button').nth(index).click();
+      const unit = (await getState(page))!.units[index]!;
+      for (const [key, rating] of Object.entries(unit.attributes!)) {
+        const row = panel.locator(`[data-attribute="${key}"]`);
+        await expect(row.locator('output')).toHaveText(String(rating));
+        await expect(row.locator('meter')).toHaveJSProperty('value', rating);
+      }
+    }
+    await panel.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: testInfo.outputPath('soldier-attributes.png') });
+    expect(errors).toEqual([]);
+  });
+
   test('ambush orders prepare a selected squad, hold fire outside the arc, and survive Continue', async ({ page }, testInfo) => {
     const errors: string[] = []; page.on('pageerror', (error) => errors.push(error.message));
     await startRun(page, 2026); await call<void>(page, 'pause');
@@ -886,6 +1027,7 @@ test.describe('Last Line smoke', () => {
     await call<void>(page, 'step', 0); await page.locator('#tab-army').click();
     const recruit = page.locator('.recruit-button[data-role="supply_officer"]');
     await expect(recruit).toContainText('Supply Officer'); await recruit.click();
+    await page.locator('#btn-recruit-deploy').click();
     const deployment = await gamePoint(page, 480, 680); await page.mouse.click(deployment.x, deployment.y);
     expect((await getState(page))!.units.some((u) => u.role === 'supply_officer')).toBe(true);
     await call<void>(page, 'pause');
@@ -2015,6 +2157,7 @@ test.describe('Last Line smoke', () => {
       expect((await getState(page))!.campaignCountry).toBe(country);
       await expect(page.locator('#hud-setting')).toContainText(CAMPAIGNS[country].name);
       await page.locator('#btn-restart').click();
+      await page.getByRole('dialog', { name: 'Restart this run?' }).getByRole('button', { name: 'Restart Run', exact: true }).click();
       const restarted = (await getState(page))!;
       expect(restarted.campaignCountry).toBe(country);
       expect(restarted.seed).toBe(before.seed);
@@ -2276,6 +2419,8 @@ test.describe('Last Line smoke', () => {
     await startRun(page, 7);
     await page.locator('#tab-army').click();
     await page.locator('.recruit-button[data-role="rifleman"]').click();
+    await expect(page.locator('#overlay-recruitment')).toBeVisible();
+    await page.locator('#btn-recruit-deploy').click();
     expect(await call<string>(page, 'mode')).toBe('recruit');
     // Confirm inside the deployment zone.
     const spot = await gamePoint(page, 520, 680);
@@ -2577,6 +2722,7 @@ test.describe('Last Line smoke', () => {
     await page.locator('#tab-army').click();
     const medic = page.locator('.recruit-button[data-role="medic"]');
     if (await medic.isEnabled()) await medic.click();
+    await page.locator('#btn-recruit-deploy').click();
     expect(await call<string>(page, 'mode')).toBe('recruit');
     // Escape cancels the mode.
     await page.keyboard.press('Escape');

@@ -1,3 +1,4 @@
+import { UnitMarkers } from './unit-markers';
 import { BattleRenderer3D } from '../BattleRenderer3D';
 import type { GameController } from '../../game/controller';
 import type { Vec2 } from '../../simulation/types';
@@ -7,6 +8,7 @@ export class BattleRuntime {
   readonly renderer: BattleRenderer3D;
   private readonly canvas: HTMLCanvasElement;
   private readonly observer: ResizeObserver | null;
+  private readonly markers: UnitMarkers;
   private raf = 0;
   private lastFrame = 0;
   private activePointer: number | null = null;
@@ -28,12 +30,14 @@ export class BattleRuntime {
     this.canvas.setAttribute('role', 'img');
     this.canvas.tabIndex = 0;
     this.canvas.style.display = 'block';
+    this.canvas.style.touchAction = 'none';
     this.canvas.style.width = '100%';
     this.canvas.style.height = '100%';
     this.container.replaceChildren(this.canvas);
     const bounds = this.container.getBoundingClientRect();
     this.renderer = new BattleRenderer3D(this.canvas, Math.max(1, bounds.width), Math.max(1, bounds.height));
     this.controller.attachRenderer(this.renderer);
+    this.markers = new UnitMarkers(container, controller, (pos, height) => this.worldToClient(pos, height));
     this.installInput();
     this.installContextLifecycle();
     this.observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => this.resize()) : null;
@@ -54,6 +58,7 @@ export class BattleRuntime {
     this.lastFrame = time;
     if (!document.hidden) this.renderer.updateFrameTime(elapsed);
     this.controller.frame(delta);
+    this.markers.update();
     if (!this.cameraBlocked() && this.renderer.getZoom() > 1 && this.controller.prefs.edgeScrolling && this.hoverPoint && this.activePointer === null) {
       const bounds = this.canvas.getBoundingClientRect(), edge = 24;
       const x = this.hoverPoint.x - bounds.left, y = this.hoverPoint.y - bounds.top;
@@ -252,6 +257,7 @@ export class BattleRuntime {
     this.canvas.removeEventListener('webglcontextlost', this.onContextLost);
     this.canvas.removeEventListener('webglcontextrestored', this.onContextRestored);
     this.clearGesture();
+    this.markers.destroy();
     this.renderer.destroy();
   }
 }

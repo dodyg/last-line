@@ -26,6 +26,50 @@ function fixture(axis: BridgeSurface['axis'] = 'horizontal', type: BridgeSurface
 }
 
 describe('independent bridge routes', () => {
+  it.each(['horizontal', 'vertical'] as const)('prefers a nearby %s bridge over wading between dry banks', (axis) => {
+    const { sim, unit, bridge, pos, move } = fixture(axis);
+    expect(move(pos(-144, 72), pos(144, 72)).ok).toBe(true);
+    expect(unit.path.some((point) => Math.abs(point.x - bridge.x) <= 12 && Math.abs(point.y - bridge.y) <= 12)).toBe(true);
+    let usedDeck = false;
+    for (let tick = 0; tick < 1400 && unit.path.length; tick++) {
+      sim.step();
+      if (unit.bridgePosition?.level === 'deck') usedDeck = true;
+    }
+    expect(usedDeck).toBe(true);
+    expect(unit.path).toHaveLength(0);
+  });
+
+  it('uses an engineer-built pontoon for a nearby river crossing', () => {
+    const { unit, bridge, pos, move } = fixture('horizontal', 'pontoon');
+    expect(move(pos(-144, 72), pos(144, 72)).ok).toBe(true);
+    expect(unit.path.some((point) => Math.abs(point.x - bridge.x) <= 12 && Math.abs(point.y - bridge.y) <= 12)).toBe(true);
+  });
+
+  it('still wades when the bridge would require a long detour', () => {
+    const { unit, bridge, pos, move } = fixture();
+    expect(move(pos(-144, 300), pos(144, 300)).ok).toBe(true);
+    expect(unit.path.every((point) => Math.abs(point.y - bridge.y) > bridge.halfWidth)).toBe(true);
+  });
+
+  it('still finds a crossing when no bridge exists', () => {
+    const { sim, unit, pos, move, data } = fixture();
+    data.zones.bridges = [];
+    sim.state.terrain.bridges = [];
+    expect(move(pos(-144, 72), pos(144, 72)).ok).toBe(true);
+    expect(unit.path.length).toBeGreaterThan(0);
+  });
+
+  it('wades around an inaccessible nearby bridge', () => {
+    const { sim, unit, bridge, pos, move } = fixture();
+    const terrain = sim.state.terrain;
+    for (let row = 0; row < terrain.rows; row++) for (let col = 0; col < terrain.cols; col++) {
+      if (Math.abs((col + .5) * terrain.cell - bridge.x) <= bridge.halfLength
+        && Math.abs((row + .5) * terrain.cell - bridge.y) <= bridge.halfWidth) terrain.blocked[row * terrain.cols + col] = 1;
+    }
+    expect(move(pos(-144, 72), pos(144, 72)).ok).toBe(true);
+    expect(unit.path.every((point) => Math.abs(point.y - bridge.y) > bridge.halfWidth)).toBe(true);
+  });
+
   it.each(['horizontal', 'vertical'] as const)('walks underneath a raised %s bridge and leaves at ground level', (axis) => {
     const { sim, unit, bridge, pos, move } = fixture(axis);
     expect(move(pos(0, -72), pos(0, 72)).ok).toBe(true);

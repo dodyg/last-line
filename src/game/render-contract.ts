@@ -3,7 +3,8 @@ import type { TerrainData } from '../simulation/terrain';
 import type { Preferences } from '../persistence';
 
 export interface PreviewInfo {
-  kind: 'suppress' | 'ambush' | 'recruit' | 'barbedWire' | 'sandbag' | 'trench' | 'bunker' | 'mortarPit' | 'bridge' | 'mine' | 'artillery' | 'airSupport' | 'flare' | 'smoke' | 'satchel' | 'patrol';
+  cost?: number;
+  kind: 'suppress' | 'ambush' | 'recruit' | 'barbedWire' | 'sandbag' | 'trench' | 'bunker' | 'mortarPit' | 'bridge' | 'mine' | 'artillery' | 'airSupport' | 'flare' | 'smoke' | 'satchel' | 'patrol' | 'demolishFence';
   patrolArea?: PatrolArea;
   ambushArcs?: { origin: { x: number; y: number }; facing: number; range: number; arcDegrees: number }[];
   role?: string;

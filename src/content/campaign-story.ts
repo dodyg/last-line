@@ -108,6 +108,8 @@ export function campaignChapter(country: CampaignCountry, mapsCleared: number, g
 }
 
 export interface FieldDispatch {
+  runMode?: import('./operations').RunMode;
+  objective?: string;
   country: CampaignCountry;
   mapsCleared: number;
   mapNumber: number;

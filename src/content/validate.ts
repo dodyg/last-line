@@ -34,6 +34,8 @@ export interface FriendlyUnitDef {
   rockets?: number;
   /** Starting mortar bombs; only mortarmen use this ammunition. */
   mortarBombs?: number;
+  /** Rifle grenades or fuel bursts for dedicated specialists. */
+  specialistAmmo?: number;
   heal?: { amount: number; range: number; cooldownSeconds: number; seekRange: number };
 }
 
@@ -70,8 +72,8 @@ function num(value: unknown, label: string, min = 0, max = Number.MAX_SAFE_INTEG
   return value;
 }
 
-const FRIENDLY_ROLES: readonly FriendlyRole[] = ['rifleman', 'mg', 'medic', 'supply_officer', 'at', 'sniper', 'engineer', 'radio_engineer', 'officer', 'mortarman', 'gun_truck', 'scout', 'heavy_mg', 'assault_infantry', 'at_gun'];
-const ENEMY_ARCHETYPES: readonly EnemyArchetype[] = ['rifle', 'assault', 'vehicle', 'observer', 'gun_truck', 'troop_transport', 'sapper', 'mg_team', 'sharpshooter', 'field_officer', 'at_infantry', 'infiltrator'];
+const FRIENDLY_ROLES: readonly FriendlyRole[] = ['rifleman', 'mg', 'medic', 'supply_officer', 'at', 'sniper', 'engineer', 'radio_engineer', 'officer', 'mortarman', 'gun_truck', 'scout', 'heavy_mg', 'assault_infantry', 'at_gun', 'grenadier', 'flamethrower'];
+const ENEMY_ARCHETYPES: readonly EnemyArchetype[] = ['mortar_team', 'rifle', 'assault', 'vehicle', 'observer', 'gun_truck', 'troop_transport', 'sapper', 'mg_team', 'sharpshooter', 'field_officer', 'at_infantry', 'infiltrator'];
 
 function validateFriendlyDef(role: string, raw: unknown): FriendlyUnitDef {
   assert(isObject(raw), `friendly unit ${role} must be an object`);
@@ -91,6 +93,7 @@ function validateFriendlyDef(role: string, raw: unknown): FriendlyUnitDef {
           })();
   if (raw.rockets !== undefined) assert(role === 'at' && Number.isInteger(raw.rockets), `friendly ${role}.rockets must be an integer on the anti-tank role`);
   if (raw.mortarBombs !== undefined) assert(role === 'mortarman' && Number.isInteger(raw.mortarBombs), `friendly ${role}.mortarBombs must be an integer on the mortarman role`);
+  if (raw.specialistAmmo !== undefined) assert(['grenadier', 'flamethrower'].includes(role) && Number.isInteger(raw.specialistAmmo), `friendly ${role}.specialistAmmo must be an integer on a specialist`);
   return {
     label: raw.label,
     blurb: raw.blurb,
@@ -99,6 +102,7 @@ function validateFriendlyDef(role: string, raw: unknown): FriendlyUnitDef {
     radius: num(raw.radius, `friendly ${role}.radius`, 1, 100),
     initialAccuracySkill: num(raw.initialAccuracySkill, `friendly ${role}.initialAccuracySkill`, 0.4, 1.3),
     threat: raw.threat === undefined ? undefined : num(raw.threat, `friendly ${role}.threat`, 0.1, 100),
+    specialistAmmo: raw.specialistAmmo === undefined ? undefined : num(raw.specialistAmmo, `friendly ${role}.specialistAmmo`, 0, 20),
     grenades: raw.grenades === undefined ? undefined : num(raw.grenades, `friendly ${role}.grenades`, 0, 20),
     rockets: raw.rockets === undefined ? undefined : num(raw.rockets, `friendly ${role}.rockets`, 0, 20),
     mortarBombs: raw.mortarBombs === undefined ? undefined : num(raw.mortarBombs, `friendly ${role}.mortarBombs`, 0, 20),

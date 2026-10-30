@@ -290,7 +290,10 @@ export class RadioDirector {
           candidates.push({ team: 'enemy', cue: 'flare', priority: 2, pos: event.pos });
         }
       } else if (event.type === 'mortarFired') {
-        candidates.push({ team: 'friendly', role: 'mortarman', cue: 'artillery', priority: 1, speakerId: event.unitId, pos: event.pos, text: 'Mortar round away!' });
+        const enemy = units.find((unit) => unit.id === event.unitId)?.team === 'enemy';
+        candidates.push(enemy
+          ? { team: 'friendly', cue: 'artillery', priority: 4, pos: event.pos, text: 'Incoming mortars! Spread out!' }
+          : { team: 'friendly', role: 'mortarman', cue: 'artillery', priority: 1, speakerId: event.unitId, pos: event.pos, text: 'Mortar round away!' });
       } else if (event.type === 'enemyBarrageIncoming') {
         // Enemy guns ranging the line: the Axis call it to their own troops, and
         // the Allied line shouts the warning back.

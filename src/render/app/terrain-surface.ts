@@ -1,4 +1,4 @@
-import { drawHabitation, drawMeadows, drawRiverMargins } from './environment-surface';
+import { drawGroundTransitions, drawHabitation, drawMeadows, drawRiverMargins } from './environment-surface';
 import { CONFIG } from '../../content/config';
 import { deriveRng, rngRange } from '../../simulation/rng';
 import { isDeciduousKind, isRapidsAt, isRiverAt, mudPatchDistance, riverHalfWidthAtPoint, riverPathPoints, TERRAIN_KIND, type TerrainData, type TerrainZone } from '../../simulation/terrain';
@@ -261,6 +261,7 @@ export function terrainSurfaceCanvas(data: TerrainData): HTMLCanvasElement | nul
       ctx.stroke();
     }
   }
+  drawGroundTransitions(ctx, data);
   // High-frequency grain gives soil, banks, and grass detail at tactical zoom.
   for (let dot = 0; dot < 55_000; dot++) {
     ctx.fillStyle = dot % 2 ? 'rgba(235,224,176,.045)' : 'rgba(22,30,21,.055)';

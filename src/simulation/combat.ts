@@ -183,7 +183,7 @@ export function targetIsValid(
   if (weapon.kind === 'hitscan' && !elevationLineOfSight(terrain, shooter.pos, target.pos, unitEyeHeight(terrain, shooter), unitEyeHeight(terrain, target))) return false;
   if (weapon.kind === 'hitscan' && !hasLineOfSight(terrain, shooter.pos, target.pos, unitEyeHeight(terrain, shooter), unitEyeHeight(terrain, target), ownBuildings)) {
     // Except: a covered defender may still be engaged point-blank over cover.
-    if (!hasDirectionalCover(sandbags, target.pos, shooter.pos, config, trenches, terrain) || d > config.cover.radius * 2.5) {
+    if (weapon === _content.weapons.flamethrower || !hasDirectionalCover(sandbags, target.pos, shooter.pos, config, trenches, terrain) || d > config.cover.radius * 2.5) {
       return false;
     }
   }

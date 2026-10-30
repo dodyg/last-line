@@ -1,9 +1,11 @@
 import * as THREE from 'three';
+import { applyFoliageWind, type FoliageWind } from './foliage-wind';
 
 /** Fade individual instanced crowns near selected troops without splitting batches. */
-export function tacticalFoliageMaterial(color: number, points: THREE.Vector3[], active: { value: number }): THREE.MeshStandardMaterial {
+export function tacticalFoliageMaterial(color: number, points: THREE.Vector3[], active: { value: number }, wind?: FoliageWind): THREE.MeshStandardMaterial {
   const material = new THREE.MeshStandardMaterial({ color, roughness: .95, transparent: true, depthWrite: false });
   material.onBeforeCompile = (shader) => {
+    if (wind) applyFoliageWind(shader, wind);
     shader.uniforms.tacticalPoints = { value: points };
     shader.uniforms.tacticalCount = active;
     shader.vertexShader = 'varying vec3 tacticalWorld;\n' + shader.vertexShader;
@@ -22,6 +24,6 @@ export function tacticalFoliageMaterial(color: number, points: THREE.Vector3[], 
       }
       #include <alphatest_fragment>`);
   };
-  material.customProgramCacheKey = () => 'tactical-foliage-v1';
+  material.customProgramCacheKey = () => wind ? 'tactical-foliage-wind-v2' : 'tactical-foliage-v1';
   return material;
 }

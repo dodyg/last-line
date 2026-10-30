@@ -1,7 +1,10 @@
 import { ROLE_ABILITIES } from './simulation/role-abilities';
+import { operationSector } from './content/operations';
 import { MAX_VEHICLE_TRACKS } from './simulation/battle-wear';
 import { AMBUSH_ARCS, supportsAmbush } from './simulation/ambush';
 import { CONFIG } from './content/config';
+import { canIssueWeapon } from './content/armory';
+import { ATTRIBUTE_GROWTH_WAVES, SOLDIER_ATTRIBUTES } from './simulation/soldiers';
 import { isCampaignCountry } from './content/campaigns';
 import { getContent } from './content/validate';
 import type {
@@ -502,6 +505,9 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
         if (!Number.isInteger(transport.unloadTicks) || !boundedNumber(transport.unloadTicks, 0, CONFIG.troopTransport.unloadSeconds * CONFIG.tickRate)
           || !Number.isSafeInteger(transport.retryTick) || !boundedNumber(transport.retryTick, 0, Number.MAX_SAFE_INTEGER)) return fail('Corrupt transport progress.');
       }
+      for (const field of ['nextTacticTick', 'flankUntilTick'] as const) {
+        if (u[field] !== undefined && !boundedNumber(u[field], 0, 1e12)) return fail('Corrupt enemy tactic timer.');
+      }
       const mortarTimer = u.mortarTimer ?? (role === 'mortarman' ? Math.round(CONFIG.mortar.initialDelaySeconds * CONFIG.tickRate) : 0);
       if (!boundedNumber(mortarTimer, 0, 1e6)) return fail('Corrupt mortar timer.');
       // The weapon-upgrade work timer arrived with schema v7; a save from before
@@ -549,10 +555,13 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
       if (typeof headlightsOn !== 'boolean') return fail('Corrupt vehicle headlight state.');
       const smokeGrenades = u.smokeGrenades ?? (team === 'friendly' && (role === 'rifleman' || role === 'engineer') ? CONFIG.smoke.startingGrenades : 0);
       if (!boundedNumber(smokeGrenades, 0, 20) || !Number.isInteger(smokeGrenades)) return fail('Corrupt smoke ammunition.');
+      const specialistCapacity = team === 'friendly' ? content.friendly[role as FriendlyRole]?.specialistAmmo ?? 0 : 0;
+      const specialistAmmo = u.specialistAmmo === undefined ? specialistCapacity : u.specialistAmmo;
+      if (!boundedNumber(specialistAmmo, 0, specialistCapacity) || !Number.isInteger(specialistAmmo)) return fail('Corrupt specialist ammunition.');
       const rocketCapacity = team === 'friendly' && role === 'at' ? content.friendly.at.rockets ?? 0 : 0;
       const rockets = u.rockets === undefined ? rocketCapacity : u.rockets;
       if (!boundedNumber(rockets, 0, rocketCapacity) || !Number.isInteger(rockets)) return fail('Corrupt bazooka ammunition.');
-      const mortarCapacity = team === 'friendly' && role === 'mortarman' ? content.friendly.mortarman.mortarBombs ?? 0 : 0;
+      const mortarCapacity = team === 'enemy' && role === 'mortar_team' ? CONFIG.enemy.mortarTeam.bombs : team === 'friendly' && role === 'mortarman' ? content.friendly.mortarman.mortarBombs ?? 0 : 0;
       const mortarBombs = u.mortarBombs === undefined ? mortarCapacity : u.mortarBombs;
       if (!boundedNumber(mortarBombs, 0, mortarCapacity) || !Number.isInteger(mortarBombs)) return fail('Corrupt mortar ammunition.');
       for (const timer of [u.autoMedicCallAfter, u.autoSupplyCallAfter]) {
@@ -602,8 +611,19 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
         : content.enemy[role as EnemyArchetype].initialAccuracySkill;
       const accuracySkill = u.accuracySkill === undefined ? initialSkill : u.accuracySkill;
       if (!boundedNumber(accuracySkill, 0.4, 1.3)) return fail('Corrupt marksmanship skill.');
+      if (u.assignedWeaponId !== undefined && (typeof u.assignedWeaponId !== 'string'
+        || !canIssueWeapon({ team, role: role as UnitRole }, u.assignedWeaponId) || !content.weapons[u.assignedWeaponId])) return fail('Corrupt issued weapon.');
+      if (u.pendingWeaponId !== undefined && (typeof u.pendingWeaponId !== 'string'
+        || !canIssueWeapon({ team, role: role as UnitRole }, u.pendingWeaponId) || !content.weapons[u.pendingWeaponId])) return fail('Corrupt weapon delivery.');
+      if (u.attributeTrainingWaves !== undefined && (!Number.isInteger(u.attributeTrainingWaves)
+        || !boundedNumber(u.attributeTrainingWaves, 0, ATTRIBUTE_GROWTH_WAVES - 1))) return fail('Corrupt attribute training progress.');
+      if (u.attributes !== undefined) {
+        if (typeof u.attributes !== 'object' || u.attributes === null || Array.isArray(u.attributes)) return fail('Corrupt soldier attributes.');
+        const ratings = u.attributes as Record<string, unknown>;
+        if (SOLDIER_ATTRIBUTES.some(({ key }) => !boundedNumber(ratings[key], 1, 100) || !Number.isInteger(ratings[key]))) return fail('Corrupt soldier attributes.');
+      }
       if (!boundedNumber(u.laneX, -100, CONFIG.field.width + 100)) return fail('Corrupt lane.');
-      parsed.push({ ...u, fireOrder: supportedFireOrder, headlightsOn, smokeGrenades, rockets, mortarBombs, mortarTimer, accuracySkill, morale, service, weaponUpgrades: unitWeaponUpgrades } as unknown as Unit);
+      parsed.push({ ...u, fireOrder: supportedFireOrder, headlightsOn, smokeGrenades, rockets, mortarBombs, specialistAmmo, mortarTimer, accuracySkill, morale, service, weaponUpgrades: unitWeaponUpgrades } as unknown as Unit);
     }
     return parsed;
   };
@@ -682,6 +702,10 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
   }
 
   const smokesRaw = obj.smokes ?? [];
+  const demolishedFenceCells = obj.demolishedFenceCells ?? [];
+  if (!Array.isArray(demolishedFenceCells) || demolishedFenceCells.length > cells
+    || demolishedFenceCells.some((cell) => !Number.isSafeInteger(cell) || cell < 0 || cell >= cells)
+    || new Set(demolishedFenceCells).size !== demolishedFenceCells.length) return fail('Corrupt demolished fence cells.');
   if (!Array.isArray(smokesRaw) || smokesRaw.length > 200) return fail('Corrupt smoke cloud list.');
   const smokes: NonNullable<SimSnapshot['smokes']> = [];
   for (const raw of smokesRaw) {
@@ -1055,9 +1079,11 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
   const mapsCleared = obj.mapsCleared ?? Math.max(0, (mapNumber as number) - 1);
   if (!boundedNumber(mapsCleared, 0, 1e6) || !Number.isInteger(mapsCleared)) return fail('Corrupt maps cleared.');
   const captureTicks = obj.captureTicks ?? 0;
-  if (!boundedNumber(captureTicks, 0, CONFIG.crossing.captureSeconds * CONFIG.tickRate)) return fail('Corrupt capture objective progress.');
+  const captureSeconds = obj.runMode === 'operation' ? operationSector({ mapsCleared: mapsCleared as number }).holdSeconds : CONFIG.crossing.captureSeconds;
+  if (!boundedNumber(captureTicks, 0, captureSeconds * CONFIG.tickRate)) return fail('Corrupt capture objective progress.');
   if (obj.sectorCaptured !== undefined && typeof obj.sectorCaptured !== 'boolean') return fail('Corrupt capture objective state.');
   if (obj.sectorSupplyPending !== undefined && typeof obj.sectorSupplyPending !== 'boolean') return fail('Corrupt sector supply state.');
+  if (obj.runMode !== undefined && obj.runMode !== 'campaign' && obj.runMode !== 'operation') return fail('Corrupt operation mode.');
   const baseTerrainSeed = obj.baseTerrainSeed ?? seed;
   if (!boundedNumber(baseTerrainSeed, 0, 0xffffffff)) return fail('Corrupt base terrain seed.');
 
@@ -1138,6 +1164,7 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
 
   const snap: SimSnapshot = {
     schemaVersion: 30,
+    ...(obj.runMode === 'operation' || obj.runMode === 'campaign' ? { runMode: obj.runMode } : {}),
     season,
     ...(isCampaignCountry(obj.campaignCountry) ? { campaignCountry: obj.campaignCountry } : {}),
     seed: seed as number,
@@ -1165,6 +1192,7 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
     groundImpacts,
     vehicleTracks,
     treeDamage,
+    demolishedFenceCells: [...demolishedFenceCells],
     sandbags: sandbags as SimSnapshot['sandbags'],
     trenches,
     bunkers,

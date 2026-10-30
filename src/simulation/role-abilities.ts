@@ -61,12 +61,12 @@ export function updateRoleAbilities(state: SimState, emit: (event: SimEvent) => 
         if (ally.team !== 'friendly' || ally.dead || ally.crossed || ally.health <= 0 || dist(ally.pos, unit.pos) > 90 || !observes(unit, ally)) continue;
         const def = content.friendly[ally.role as keyof typeof content.friendly];
         if (!def) continue;
-        const field = ally.role === 'at' ? 'rockets' : ally.role === 'mortarman' ? 'mortarBombs' : 'grenades';
+        const field = ally.role === 'grenadier' || ally.role === 'flamethrower' ? 'specialistAmmo' : ally.role === 'at' ? 'rockets' : ally.role === 'mortarman' ? 'mortarBombs' : 'grenades';
         const max = def[field] ?? 0;
         if ((ally[field] ?? max) >= max) continue;
         ally[field] = (ally[field] ?? max) + 1; duty.stock--;
         clearSupply(ally);
-        emit({ type: field === 'rockets' ? 'rocketsResupplied' : field === 'mortarBombs' ? 'mortarBombsResupplied' : 'grenadesResupplied', officerId: unit.id, targetId: ally.id, amount: 1 });
+        emit({ type: field === 'specialistAmmo' ? 'specialistResupplied' : field === 'rockets' ? 'rocketsResupplied' : field === 'mortarBombs' ? 'mortarBombsResupplied' : 'grenadesResupplied', officerId: unit.id, targetId: ally.id, amount: 1 });
         break;
       }
     } else if (duty.kind === 'repair' && unit.targetId === null && !state.constructionSites.some((site) => site.builderId === unit.id) && unit.suppression <= CONFIG.suppression.recoverThreshold) {

@@ -1339,7 +1339,7 @@ describe('river and mud', () => {
     const share = withRiver / 120;
     expect(share).toBeGreaterThan(CONFIG.terrain.river.presenceChance - 0.2);
     expect(share).toBeLessThan(CONFIG.terrain.river.presenceChance + 0.2);
-  }, 30_000); // Generating 120 complete landscapes exceeds the default timeout under parallel load.
+  }, 120_000); // Keep all 120 landscapes in the sweep under parallel load.
 
   it('never marks a blocked cell as water or mud', () => {
     for (const seed of [11, 88, 777]) {
@@ -1482,6 +1482,8 @@ describe('suppression and pausing', () => {
   it('pins units and recovers through the configured hysteresis', () => {
     const sim = new Simulation(11);
     const unit = sim.state.units[0]!;
+    // Check the base hysteresis independently of personal resolve.
+    delete unit.attributes;
     // Decay runs before the pin check, so pre-arm above the threshold.
     unit.suppression = CONFIG.suppression.pinThreshold + CONFIG.suppression.decayPerTick;
     sim.step();
@@ -2190,6 +2192,43 @@ describe('marching north to the next map', () => {
       expect(soldier.grenades).toBe(loadout.startingGrenades);
       expect(soldier.grenadeTimer).toBe(0);
       expect(soldier.service.grenadesThrown).toBe(loadout.grenadesThrown);
+    }
+  });
+
+  it.each([1, 3])('keeps all soldiers when %s pinned marchers are still at the exit', (pinnedCount) => {
+    const sim = new Simulation(31);
+    const squad = friendlies(sim);
+    const ids = squad.map((unit) => unit.id);
+    for (const soldier of squad) sendToEdge(sim, soldier.id);
+    for (const soldier of squad.slice(0, pinnedCount)) {
+      soldier.pinned = true;
+      soldier.suppression = CONFIG.suppression.max;
+      soldier.health = 60;
+      soldier.xp = 4;
+      soldier.kills = 7;
+      soldier.weaponUpgrades.damage = 2;
+      soldier.service.grenadesThrown = 3;
+    }
+
+    expect(sim.step().some((event) => event.type === 'mapCleared')).toBe(false);
+    expect(sim.state.mapNumber).toBe(1);
+    expect(sim.state.units.filter((unit) => unit.crossed)).toHaveLength(pinnedCount);
+    expect(sim.crossedCount).toBe(ids.length - pinnedCount);
+
+    let arrivals = 0;
+    for (let tick = 0; tick < 300 && sim.state.mapNumber === 1; tick++) {
+      arrivals += sim.step().filter((event) => event.type === 'mapCleared').length;
+    }
+    expect(arrivals).toBe(1);
+    expect(sim.state.mapNumber).toBe(2);
+    expect(friendlies(sim).map((unit) => unit.id).sort((a, b) => a - b)).toEqual(ids);
+    expect(sim.state.crossedUnits).toEqual([]);
+    expect(sim.state.battleRecord.casualties).toBe(0);
+    for (const soldier of squad.slice(0, pinnedCount)) {
+      expect(friendlies(sim).find((unit) => unit.id === soldier.id)).toMatchObject({
+        health: 60, xp: 4, kills: 7, weaponUpgrades: { damage: 2 },
+        service: { grenadesThrown: 3 }, dead: false, crossed: false,
+      });
     }
   });
 

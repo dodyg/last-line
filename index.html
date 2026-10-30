@@ -56,6 +56,7 @@
         <div id="stage">
 
           <div id="game-frame">
+          <div id="operation-objective" role="status" hidden></div>
 
             <div id="game" aria-label="European campaign battlefield"></div>
 
@@ -88,6 +89,7 @@
             <section id="panel-squad" class="hud-tab-panel" role="tabpanel" aria-labelledby="tab-squad">
 
               <h2 class="panel-title">Squad <span id="squad-count"></span></h2>
+              <label class="roster-group-toggle"><input id="squad-group-roles" type="checkbox"> Group by role</label>
 
               <div id="squad-roster" class="squad-roster" role="group" aria-label="Squad roster"></div>
 
@@ -115,15 +117,46 @@
 
                 <p id="sel-role" class="sel-role"></p>
 
-                <div class="bar-row"><span class="bar-label">HP</span><div class="bar"><div id="sel-hp" class="bar-fill hp"></div></div><span id="sel-hp-text" class="bar-text"></span></div>
+                <div class="soldier-indicators">
+                  <div class="bar-row"><span class="bar-label">HP</span><div class="bar"><div id="sel-hp" class="bar-fill hp"></div></div><span id="sel-hp-text" class="bar-text"></span></div>
 
-                <div class="bar-row"><span class="bar-label">Supp.</span><div class="bar"><div id="sel-supp" class="bar-fill supp"></div></div><span id="sel-supp-text" class="bar-text"></span></div>
+                  <div class="bar-row"><span class="bar-label">Supp.</span><div class="bar"><div id="sel-supp" class="bar-fill supp"></div></div><span id="sel-supp-text" class="bar-text"></span></div>
 
-                <div class="bar-row"><span class="bar-label" title="Combat confidence">Morale</span><div class="bar"><div id="sel-morale" class="bar-fill morale"></div></div><span id="sel-morale-text" class="bar-text"></span></div>
+                  <div class="bar-row"><span class="bar-label" title="Combat confidence">Morale</span><div class="bar"><div id="sel-morale" class="bar-fill morale"></div></div><span id="sel-morale-text" class="bar-text"></span></div>
 
-                <div id="stamina-row" class="bar-row" title="Running endurance. Walking recovers stamina; resting recovers it faster."><span class="bar-label">Stam.</span><div class="bar"><div id="sel-stamina" class="bar-fill stamina"></div></div><span id="sel-stamina-text" class="bar-text"></span></div>
+                  <div id="stamina-row" class="bar-row" title="Running endurance. Walking recovers stamina; resting recovers it faster."><span class="bar-label">Stam.</span><div class="bar"><div id="sel-stamina" class="bar-fill stamina"></div></div><span id="sel-stamina-text" class="bar-text"></span></div>
+                </div>
 
                 <p id="sel-xp" class="subtle"></p>
+                <details id="weapon-issue" class="weapon-issue" open>
+                  <summary>Weapon issue</summary>
+                  <p id="weapon-current" class="subtle"></p>
+                  <label for="weapon-choice">Choose a firearm</label>
+                  <select id="weapon-choice" aria-describedby="weapon-description weapon-stats"></select>
+                  <p id="weapon-handling"></p>
+                  <dl id="weapon-stats" class="weapon-stats"></dl>
+                  <button id="btn-issue-weapon" class="action-button" type="button">Issue weapon</button>
+                  <p id="weapon-issue-status" class="subtle" role="status"></p>
+                  <details class="weapon-background">
+                    <summary>Historical details &amp; specifications</summary>
+                    <p id="weapon-description"></p>
+                    <p id="weapon-history" class="subtle"></p>
+                    <p class="subtle">Shown ranges and aim percentages are game values. Aim also depends on distance, training, posture, morale, and cover. Firing cycles abstract aimed shots and magazine changes; magazine capacities above are historical.</p>
+                    <a id="weapon-source" target="_blank" rel="noopener noreferrer">Historical reference</a>
+                  </details>
+                </details>
+                <details id="sel-attributes" class="soldier-attributes" open>
+                  <summary>Attributes <span class="subtle">/ 100</span></summary>
+                  <div class="attribute-grid">
+                    <label data-attribute="strength"><span>Strength</span><meter min="1" max="100" value="50" aria-label="Strength"></meter><output>50</output></label>
+                    <label data-attribute="agility"><span>Agility</span><meter min="1" max="100" value="50" aria-label="Agility"></meter><output>50</output></label>
+                    <label data-attribute="speed"><span>Speed</span><meter min="1" max="100" value="50" aria-label="Speed"></meter><output>50</output></label>
+                    <label data-attribute="stealth"><span>Stealth</span><meter min="1" max="100" value="50" aria-label="Stealth"></meter><output>50</output></label>
+                    <label data-attribute="endurance"><span>Endurance</span><meter min="1" max="100" value="50" aria-label="Endurance"></meter><output>50</output></label>
+                    <label data-attribute="resolve"><span>Resolve</span><meter min="1" max="100" value="50" aria-label="Resolve"></meter><output>50</output></label>
+                    <label data-attribute="marksmanship"><span>Marksmanship</span><meter min="1" max="100" value="50" aria-label="Marksmanship"></meter><output>50</output></label>
+                  </div>
+                </details>
 
                 <p id="sel-action" class="sel-action"></p>
 
@@ -174,11 +207,14 @@
                 <option value="90" selected>Ambush arc: Standard (90°)</option>
                 <option value="120">Ambush arc: Wide (120°)</option>
               </select>
-              <button id="btn-patrol" class="action-button" type="button" aria-pressed="false" hidden>Patrol area</button>
 
               <button id="btn-headlights" class="action-button" hidden>Headlights: On</button>
 
-              <button id="btn-light-fire" class="action-button" type="button" hidden>Light small fire</button>
+              <div class="unit-field-actions">
+                <button id="btn-patrol" class="action-button" type="button" aria-pressed="false" hidden>Patrol area</button>
+                <button id="btn-light-fire" class="action-button" type="button" hidden>Light small fire</button>
+                <button id="btn-demolish-fence" class="action-button" type="button" hidden>Demolish fence · Free</button>
+              </div>
 
               <div id="building-controls" hidden>
 
@@ -341,6 +377,9 @@
 
           <p class="subtle">Fight through sectors in one country. Each has its own landscapes, local building names, and street signs.</p>
 
+          <label class="run-mode-label" for="run-mode">Length</label>
+          <select id="run-mode"><option value="campaign">Campaign · 100 sectors, 15 waves each</option><option value="operation">Operation · 3 sectors, 13 waves total, varied objectives</option></select>
+          <p class="subtle">Operation: take a bridgehead, secure a crossroads, then defend the extraction. Every sector ends with a squad march north. Progress saves automatically.</p>
           <div id="campaign-choices" class="campaign-choices" role="group" aria-label="Campaign country"></div>
 
           <div class="campaign-actions">
@@ -555,6 +594,7 @@
 
                 <li><strong>Food supplies</strong> can be radioed in by an unpinned Combat Radio Engineer. Each delivery adds 5 supply points and takes 60 seconds to request again.</li>
 
+                <li><strong>Weapon issue.</strong> Select one soldier, then use the Squad panel to compare and issue a compatible firearm. Inspect cartridge, action, magazine capacity, historical references, and game combat stats before issuing. Costs 2–8 points and takes 3 seconds without firing or throwing. Weapon selection and personal training survive saves and sector changes. British weapons represent optional Allied cross-issue. Medics, heavy-weapon crews, and vehicles retain specialist equipment.</li>
                 <li><strong>Weapon upgrades</strong> apply only to the selected soldier. Aim training adds 6% accuracy, reload drills shorten reloads by 8%, and improved ammunition adds 12% damage per level. Each can be purchased up to three times per soldier. The improvement is banked immediately, but the weapon then spends <strong>3 seconds in pieces</strong> while it is fitted: the soldier cannot fire or throw during that time (he can still be moved), and cannot start a second upgrade until the first is done. The panel counts the work down and the buttons grey out.</li>
 
                 <li><strong>Machine Gunners</strong> use the M1918A2 BAR to suppress and pin infantry. <strong>Medics</strong> heal the nearest wounded soldier (no reviving, no shooting). Inside a building, a medic can treat the whole floor and a balcony at the same height, but cannot heal through floors or while climbing. <strong>M1A1 Bazookas</strong> are the answer to vehicles; M1903A4 snipers pick off infantry at range but struggle against armor.</li>

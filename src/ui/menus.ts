@@ -1,6 +1,7 @@
 import { bindExtendedSettings } from './preferences';
 import type { Preferences } from '../persistence';
 import type { BestRecord } from '../persistence';
+import { campaignGoal, type RunMode } from '../content/operations';
 import { CONFIG } from '../content/config';
 import { getContent } from '../content/validate';
 import { soldierName, soldierRank } from '../simulation/soldiers';
@@ -8,6 +9,7 @@ import type { CampaignCountry, FriendlyRole, Unit } from '../simulation/types';
 import { CAMPAIGNS, CAMPAIGN_COUNTRIES } from '../content/campaigns';
 import { CAMPAIGN_STORIES, type FieldDispatch } from '../content/campaign-story';
 import { renderCampaignBriefing } from './campaign-briefing';
+import { RecruitmentScreen } from './recruitment';
 
 /**
  * Overlay menus: title, pause, results, help, settings, and the one-slot
@@ -15,7 +17,7 @@ import { renderCampaignBriefing } from './campaign-briefing';
  */
 
 export interface MenusCallbacks {
-  onNewGame(country: CampaignCountry): void;
+  onNewGame(country: CampaignCountry, runMode: RunMode): void;
   onContinue(): void;
   onResume(): void;
   onRestart(): void;
@@ -24,7 +26,7 @@ export interface MenusCallbacks {
   onCloseHelp(): void;
   onPrefsChanged(prefs: Preferences): void;
   onUnlockAudio(): void;
-  onVoicePreview?(): string;
+  onVoicePreview?(): string | Promise<string>;
   onResetCamera?(): void;
   onSectorSupply(choice: 'points' | 'medical', unitId?: number): void;
   onMapReviewOpen(): void;
@@ -35,6 +37,8 @@ export interface MenusCallbacks {
 
 export interface RunSummary {
   campaignCountry?: CampaignCountry;
+  runMode?: RunMode;
+  waveGoal?: number;
   score: number;
   waves: number;
   kills: number;
@@ -61,6 +65,7 @@ interface Overlays {
 }
 
 export class Menus {
+  readonly recruitment = new RecruitmentScreen();
   private cb: MenusCallbacks;
   private el: Overlays;
   private pauseNote: HTMLElement;
@@ -73,6 +78,7 @@ export class Menus {
   private sectorMedicalNote: HTMLElement;
   private sectorMedicalOptions: HTMLElement;
   private replaceConfirm: HTMLElement | null = null;
+  private confirmReturnFocus: HTMLElement | null = null;
   private mapReviewPreviousVisibility: Array<{ element: HTMLElement; hidden: boolean }> = [];
   private prefs: Preferences;
   private selectedCountry: CampaignCountry = 'france';
@@ -119,7 +125,7 @@ export class Menus {
     required('btn-help-title').addEventListener('click', () => this.showHelp());
     required('btn-settings-title').addEventListener('click', () => this.showSettings());
     required('btn-resume').addEventListener('click', () => this.cb.onResume());
-    required('btn-restart').addEventListener('click', () => this.cb.onRestart());
+    required('btn-restart').addEventListener('click', () => this.maybeConfirmReplace(() => this.cb.onRestart(), true));
     required('btn-settings-pause').addEventListener('click', () => this.showSettings());
     required('btn-quit').addEventListener('click', () => this.cb.onQuit());
     required('btn-endless').addEventListener('click', () => this.cb.onEndless());
@@ -154,9 +160,11 @@ export class Menus {
       });
       choices.append(button);
     }
+    required('run-mode').addEventListener('change', () => this.reflectCampaignChoice());
     required('btn-campaign-start').addEventListener('click', () => {
       const country = this.selectedCountry;
-      this.maybeConfirmReplace(() => this.cb.onNewGame(country));
+      const runMode = required<HTMLSelectElement>('run-mode').value as RunMode;
+      this.maybeConfirmReplace(() => this.cb.onNewGame(country, runMode));
     });
     required('btn-campaign-back').addEventListener('click', () => { this.el.campaign.hidden = true; });
     this.el.campaign.addEventListener('keydown', (event) => {
@@ -164,7 +172,7 @@ export class Menus {
         this.el.campaign.hidden = true;
         event.stopPropagation();
       } else if (event.key === 'Tab') {
-        const buttons = [...this.el.campaign.querySelectorAll<HTMLButtonElement>('button')];
+        const buttons = [...this.el.campaign.querySelectorAll<HTMLElement>('button, select')];
         const first = buttons[0];
         const last = buttons[buttons.length - 1];
         if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
@@ -175,10 +183,10 @@ export class Menus {
   }
 
   private reflectCampaignChoice(): void {
-    for (const button of required('campaign-choices').querySelectorAll<HTMLButtonElement>('button')) {
+    for (const button of required('campaign-choices').querySelectorAll<HTMLElement>('button, select')) {
       button.setAttribute('aria-pressed', String(button.dataset.country === this.selectedCountry));
     }
-    required('btn-campaign-start').textContent = `Start ${CAMPAIGNS[this.selectedCountry].name} campaign`;
+    required('btn-campaign-start').textContent = `Start ${CAMPAIGNS[this.selectedCountry].name} ${required<HTMLSelectElement>('run-mode').value === 'operation' ? 'operation' : 'campaign'}`;
     let preview = this.el.campaign.querySelector<HTMLElement>('.campaign-story-preview');
     if (!preview) {
       preview = document.createElement('div');
@@ -222,6 +230,7 @@ export class Menus {
   }
 
   hideAll(): void {
+    this.recruitment.hide();
     for (const el of Object.values(this.el)) el.hidden = true;
     this.closeReplaceConfirm();
   }
@@ -250,13 +259,13 @@ export class Menus {
   showResults(victory: boolean, summary: RunSummary, showEndless: boolean): void {
     this.hideAll();
     this.el.results.hidden = false;
-    const auth = getContent().waves.length;
+    const auth = summary.waveGoal ?? getContent().waves.length;
     this.resTitle.textContent = victory ? 'The line held!' : 'The line is broken';
     const rows: Array<[string, string]> = [
       ...(summary.campaignCountry === undefined ? [] : [['Campaign', CAMPAIGNS[summary.campaignCountry].name] as [string, string]]),
       // The wave counter restarts on every map, so the campaign figure is maps
       // marched clear; the wave figure describes the map the run ended on.
-      ['Maps cleared', `${summary.mapsCleared} / ${CONFIG.crossing.campaignMaps}`],
+      ['Maps cleared', `${summary.mapsCleared} / ${campaignGoal(summary)}`],
       ['Waves survived', victory ? `${auth} / ${auth}` : `${Math.max(0, summary.waves - 1)} / ${auth}`],
       ['Enemies destroyed', String(summary.kills)],
       ['Soldiers lost', String(summary.casualties)],
@@ -420,6 +429,7 @@ export class Menus {
 
   /** Close help/settings panels if open; returns whether anything was closed. */
   closePanels(): boolean {
+    if (this.recruitment.open) { this.recruitment.cancel(); return true; }
     let closed = false;
     if (!this.el.mapReview.hidden) {
       this.closeMapReview();
@@ -436,27 +446,33 @@ export class Menus {
   }
 
   /** New Game replaces the single autosave slot; explain when a run is live. */
-  private maybeConfirmReplace(start: () => void): void {
-    if (!this.cb.hasResumableRun()) {
+  private maybeConfirmReplace(start: () => void, restart = false): void {
+    if (!restart && !this.cb.hasResumableRun()) {
       start();
       return;
     }
     this.closeReplaceConfirm();
+    this.confirmReturnFocus = document.activeElement as HTMLElement | null;
     const dialog = document.createElement('div');
     dialog.className = 'overlay';
     const panel = document.createElement('div');
     panel.className = 'panel';
     const h = document.createElement('h2');
-    h.textContent = 'Replace saved run?';
+    h.id = 'replace-run-heading';
+    h.textContent = restart ? 'Restart this run?' : 'Replace saved run?';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-labelledby', h.id);
+    panel.setAttribute('aria-label', h.textContent);
     const p = document.createElement('p');
     p.className = 'subtle';
-    p.textContent = 'There is one autosave slot and it still holds a resumable run. Starting a new game overwrites it.';
+    p.textContent = restart ? 'Restart from the original seed with a fresh squad. Current soldiers, upgrades, and sector progress will be replaced.' : 'There is one autosave slot and it still holds a resumable run. Starting a new game overwrites it.';
     const yes = document.createElement('button');
     yes.className = 'menu-button primary';
-    yes.textContent = 'Start New Game';
+    yes.textContent = restart ? 'Restart Run' : 'Start New Game';
     const no = document.createElement('button');
     no.className = 'menu-button';
-    no.textContent = 'Keep Saved Run';
+    no.textContent = restart ? 'Keep Playing' : 'Keep Saved Run';
     yes.addEventListener('click', () => {
       this.closeReplaceConfirm();
       start();
@@ -469,11 +485,18 @@ export class Menus {
     dialog.append(panel);
     document.getElementById('overlay-root')?.append(dialog);
     this.replaceConfirm = dialog;
+    no.focus();
+    dialog.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); this.closeReplaceConfirm(); }
+      if (event.key === 'Tab') { event.preventDefault(); (document.activeElement === no ? yes : no).focus(); }
+    });
   }
 
   private closeReplaceConfirm(): void {
     this.replaceConfirm?.remove();
     this.replaceConfirm = null;
+    if (this.confirmReturnFocus?.isConnected) this.confirmReturnFocus.focus({ preventScroll: true });
+    this.confirmReturnFocus = null;
   }
 
   private bindSettings(): void {

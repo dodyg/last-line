@@ -56,6 +56,41 @@ html, body {
   min-width: 4.2rem;
 }
 
+.battle-pace {
+  position: relative;
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  min-width: 0;
+  padding: .5rem 0 .25rem;
+  border-top: 1px solid var(--panel-edge);
+  font-size: .78rem;
+}
+.battle-pace.preparing::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -.15rem;
+  width: var(--prep-progress);
+  height: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.battle-pace strong { color: var(--accent); white-space: nowrap; }
+.wave-intel { flex: 1; min-width: 0; color: var(--ink-dim); }
+.clean-streak { color: var(--ok); white-space: nowrap; }
+.clean-streak.broken { color: var(--ink-dim); }
+.call-wave { border-color: var(--accent); color: var(--accent); white-space: nowrap; }
+.battle-speed { white-space: nowrap; }
+.battle-speed[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+@media (max-width: 700px) {
+  .battle-pace { flex-wrap: wrap; gap: .4rem .7rem; }
+  .wave-intel { flex-basis: 60%; }
+  .clean-streak { flex: 1; font-size: .72rem; }
+  .call-wave { margin-left: auto; }
+}
+
 .battlefield-stat { min-width: 8rem; }
 .battlefield-stat .stat-value { font-size: 0.9rem; }
 
@@ -286,6 +321,13 @@ html, body {
 
 .squad-roster { display: flex; flex-direction: column; gap: 0.2rem; max-height: 12rem; overflow-y: auto; }
 #squad-count { float: right; font-variant-numeric: tabular-nums; }
+.roster-group-toggle { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.4rem; color: var(--ink-dim); font-size: 0.7rem; cursor: pointer; }
+.roster-group-toggle input { margin: 0; accent-color: var(--accent); }
+.roster-role { flex-shrink: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.roster-role-title { display: flex; justify-content: space-between; gap: 0.4rem; margin: 0.3rem 0 0.1rem; color: var(--ink); font-size: 0.7rem; font-weight: 600; }
+.roster-role-count { flex-shrink: 0; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.roster-role.empty .roster-role-title { color: var(--ink-dim); }
+.roster-role.empty .roster-role-count { color: var(--paused); }
 .roster-soldier {
   flex-shrink: 0;
   background: #252c1f;
@@ -330,6 +372,15 @@ html, body {
   gap: 0.4rem;
   min-width: 0;
 }
+
+#personal-upgrades {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .35rem;
+}
+
+#personal-upgrades .panel-title { grid-column: 1 / -1; }
+#personal-upgrades .action-button { width: 100%; min-width: 0; padding: .4rem .25rem; font-size: .75rem; white-space: normal; overflow-wrap: anywhere; }
 
 .unit-command-buttons {
   display: grid;
@@ -401,14 +452,24 @@ html, body {
 
 .sel-role { margin: 0.15rem 0; font-weight: 700; }
 
-.bar-row {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin: 0.2rem 0;
+.soldier-indicators {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 0.75rem;
+  margin: 0.35rem 0;
 }
 
-.bar-label { font-size: 0.7rem; width: 2.4rem; color: var(--ink-dim); }
+.bar-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.2rem 0.35rem;
+  min-width: 0;
+}
+
+.bar-label { font-size: 0.7rem; color: var(--ink-dim); }
+.soldier-indicators .bar { grid-column: 1 / -1; grid-row: 2; }
+.soldier-indicators .bar-text { grid-column: 2; grid-row: 1; min-width: 0; }
 
 .bar {
   flex: 1;
@@ -731,5 +792,61 @@ button:focus-visible, input:focus-visible {
 
 #panel-squad:has(#sel-details[hidden]) #personal-upgrades { display: none; }
 
-/* Field abilities use a full text row below the compact command icons. */
-.unit-command-buttons #btn-role-ability { grid-column: 1 / -1; width: 100%; min-width: 0; white-space: normal; }
+.soldier-attributes { margin: .6rem 0; font-size: .78rem; }
+.soldier-attributes summary { cursor: pointer; margin-bottom: .35rem; }
+.attribute-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem .75rem; }
+.attribute-grid label { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .2rem .35rem; align-items: center; min-width: 0; }
+.attribute-grid label > span { min-width: 0; overflow-wrap: anywhere; }
+.attribute-grid meter { grid-column: 1 / -1; grid-row: 2; width: 100%; min-width: 0; height: .65rem; accent-color: #b3bd86; }
+.attribute-grid output { grid-column: 2; grid-row: 1; text-align: right; font-variant-numeric: tabular-nums; }
+
+.weapon-issue { margin: .6rem 0; font-size: .78rem; }
+.weapon-issue summary { cursor: pointer; font-weight: 600; }
+.weapon-issue p { line-height: 1.45; margin: .45rem 0; }
+.weapon-issue select { width: 100%; margin: .35rem 0; background: var(--bg); color: var(--ink); border: 1px solid var(--panel-edge); padding: .4rem; }
+.weapon-issue a { color: var(--friendly); }
+.weapon-issue .action-button { margin-top: .5rem; }
+.weapon-stats { display: grid; grid-template-columns: 1fr auto; gap: .25rem .5rem; }
+.weapon-stats dt { color: var(--ink-dim); }
+.weapon-stats dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+
+.recruit-panel { display: flex; flex-direction: column; width: min(880px, 94vw); max-width: 880px; height: min(850px, 92dvh); max-height: 92dvh; overflow: hidden; text-align: left; }
+.recruit-panel header, .recruit-panel footer { flex: none; }
+.recruit-eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: .72rem; color: var(--accent); }
+.recruit-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin: .5rem 0; min-height: 0; overflow-y: auto; padding-right: .35rem; scrollbar-width: thin; scrollbar-color: var(--accent) var(--panel-edge); }
+.recruit-columns section { min-width: 0; }
+.recruit-panel h3 { color: var(--accent); font-size: .9rem; margin: 1rem 0 .65rem; }
+.recruit-panel label { display: block; font-size: .8rem; margin-top: .65rem; color: var(--ink-dim); }
+.recruit-panel select { width: 100%; min-height: 2.5rem; padding: .5rem; background: var(--bg); color: var(--ink); border: 1px solid var(--panel-edge); }
+.recruit-panel p { line-height: 1.5; font-size: .85rem; }
+.recruit-panel .weapon-stats { font-size: .82rem; }
+.recruit-panel footer { border-top: 1px solid var(--panel-edge); padding-top: .75rem; }
+.recruit-panel footer .weapon-stats { max-width: 360px; }
+.recruit-panel .dialog-actions { flex-wrap: wrap; }
+.recruit-panel .dialog-actions button { flex: 1 1 180px; }
+@media (max-width: 640px) {
+  .recruit-columns { grid-template-columns: 1fr; gap: .5rem; }
+  .recruit-panel { padding: 1rem; }
+}
+
+/* Field actions share a row below the compact command icons. */
+.unit-field-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: .35rem; }
+.unit-field-actions:has(> .action-button:not([hidden]) ~ .action-button:not([hidden])) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.unit-field-actions:has(> #btn-patrol:not([hidden])) #btn-role-ability { grid-column: 1 / -1; }
+.unit-field-actions:not(:has(> .action-button:not([hidden]))) { display: none; }
+.unit-field-actions .action-button { width: 100%; min-width: 0; white-space: normal; }
+/* Grounded selection cues leave the soldier models unobstructed. */
+#game { position: relative; }
+.unit-markers { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 9; }
+.unit-marker { position: absolute; left: 0; top: 0; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: transparent; box-shadow: none; cursor: pointer; pointer-events: auto; touch-action: manipulation; }
+.unit-marker::after { content: ''; position: absolute; left: 50%; top: 50%; width: 16px; height: 7px; transform: translate(-50%, -50%); border: 1px solid #c3c7ae; border-radius: 50%; background: transparent; opacity: 0; pointer-events: none; }
+.unit-marker:hover::after { opacity: .5; }
+.unit-marker.selected { z-index: 1; }
+.unit-marker.selected::after { width: 22px; height: 9px; border-color: #d2c59b; opacity: .85; box-shadow: 0 1px 1px #0007; }
+.unit-marker.pinned::after { border-style: dashed; border-color: #bda880; }
+.unit-marker:focus-visible { outline: none; }
+.unit-marker:focus-visible::after { opacity: 1; border-width: 2px; }
+#operation-objective { position: absolute; z-index: 11; top: .5rem; left: .5rem; max-width: min(440px, calc(100% - 1rem)); padding: .45rem .65rem; background: #182016ed; border-left: 3px solid var(--accent); font-size: .8rem; pointer-events: none; }
+#run-mode { width: 100%; padding: .55rem; color: var(--ink); background: #252c1e; border: 1px solid var(--panel-edge); font: inherit; }
+.run-mode-label { display: block; margin-bottom: .3rem; }
+@media (pointer: coarse) { .unit-marker { width: 36px; height: 36px; } }

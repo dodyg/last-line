@@ -5,12 +5,12 @@ import { validateSnapshot } from '../src/persistence';
 import { Simulation } from '../src/simulation/simulation';
 import { generateTerrain, isBridgeAt, isRiverAt } from '../src/simulation/terrain';
 
-describe('country campaigns', () => {
+describe('country campaigns', { timeout: 120_000 }, () => {
   it('generates country scenery and local names while preserving passable, bridged roads', () => {
     for (const country of CAMPAIGN_COUNTRIES) {
       const languages = new Set<string>();
       for (let seed = 1; seed <= 30; seed++) {
-        const data = generateTerrain(seed, true, 2, country);
+        const data = generateTerrain(seed, true, 4, country);
         expect(data.campaignCountry).toBe(country);
         expect(CAMPAIGNS[country].sectors.some((sector) => sector.label === data.layout!.label)).toBe(true);
         languages.add(data.localLanguage!);

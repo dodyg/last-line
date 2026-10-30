@@ -112,7 +112,7 @@ describe('multi-floor building combat', () => {
     expect(hasLineOfSight(sim.state.terrain, { x: 288, y: 200 }, { x: 288, y: 350 })).toBe(true);
   });
 
-  it('rejects vehicles, pinned infantry, invalid floors, unavailable roofs, and occupied enemy buildings', () => {
+  it('rejects vehicles, pinned infantry, invalid floors and unavailable roofs, but permits assaults', () => {
     const { sim, unit, building } = fixture();
     const command = () => sim.command({ type: 'garrison', unitIds: [unit.id], buildingId: building.id, level: 1 });
     unit.pinned = true; expect(command().ok).toBe(false); unit.pinned = false;
@@ -123,7 +123,44 @@ describe('multi-floor building combat', () => {
     sim.spawnEnemy('rifle', { x: 300, y: 260 });
     const enemy = sim.state.units.at(-1)!;
     enemy.buildingPosition = { buildingId: building.id, level: 0, slot: 0 };
-    expect(command().ok).toBe(false);
+    expect(command().ok).toBe(true);
+  });
+
+  it.each(['friendly', 'enemy'] as const)('fights inside when %s infantry enter an occupied building', (enteringTeam) => {
+    const { sim, unit, building, tick } = fixture();
+    sim.spawnEnemy('rifle', { x: 290, y: 214 });
+    const enemy = sim.state.units.at(-1)!;
+    const entrant = enteringTeam === 'friendly' ? unit : enemy;
+    const defender = enteringTeam === 'friendly' ? enemy : unit;
+    for (const soldier of [unit, enemy]) {
+      soldier.health = 10_000; soldier.grenades = 0; soldier.reloadTimer = 0;
+    }
+    defender.buildingPosition = { buildingId: building.id, level: 2, slot: 0 };
+    defender.pos = buildingSlot(building, defender.buildingPosition, 24);
+    if (enteringTeam === 'friendly') {
+      expect(sim.command({ type: 'garrison', unitIds: [unit.id], buildingId: building.id, level: 0 }).ok).toBe(true);
+    } else {
+      // Enemy building seeking is staggered by id and tick.
+      enemy.id += (3 - enemy.id % 3) % 3;
+      enemy.accuracySkill = 1;
+    }
+    let entered = false;
+    for (let i = 0; i < 500; i++) {
+      sim.step();
+      if (entrant.buildingPosition?.buildingId === building.id) { entered = true; break; }
+    }
+    expect(entered).toBe(true);
+    unit.reloadTimer = 0; enemy.reloadTimer = 0;
+    const hp = [unit.health, enemy.health], buildingHp = building.health;
+    // Interior combat works across floors and cannot be obscured by exterior smoke.
+    sim.state.smokes.push({ id: sim.state.nextEntityId++, pos: { ...unit.pos }, radius: 1000, ticksRemaining: 1000 });
+    const events = tick(150);
+    for (const soldier of [unit, enemy]) expect(events.some((e) => e.type === 'shot' && e.shooterId === soldier.id)).toBe(true);
+    expect(unit.health).toBeLessThan(hp[0]!); expect(enemy.health).toBeLessThan(hp[1]!);
+    expect(building.health).toBe(buildingHp);
+    expect(sim.state.projectiles).toHaveLength(0);
+    const restored = Simulation.fromSnapshot(sim.snapshot());
+    expect(restored.step()).toEqual(sim.step());
   });
 
   it('reserves distinct slots for group orders and lets soldiers walk out again', () => {
@@ -137,6 +174,57 @@ describe('multi-floor building combat', () => {
     expect(sim.command({ type: 'moveGroup', unitIds: [unit.id, second.id], pos: { x: 440, y: 400 } }).ok).toBe(true);
     expect(unit.buildingPosition).toBeUndefined(); expect(second.buildingPosition).toBeUndefined();
     tick(); expect(unit.pos.x).toBeGreaterThan(400);
+  });
+
+  it('lets infantry assault a fully occupied enemy floor', () => {
+    const { sim, unit, building } = fixture();
+    for (let slot = 0; slot < 8; slot++) {
+      sim.spawnEnemy('rifle', { x: 300, y: 260 });
+      sim.state.units.at(-1)!.buildingPosition = { buildingId: building.id, level: 0, slot };
+    }
+    expect(sim.command({ type: 'garrison', unitIds: [unit.id], buildingId: building.id, level: 0 }).ok).toBe(true);
+    expect(unit.buildingOrder).toBeDefined();
+  });
+
+  it.each(['friendly', 'enemy'] as const)('credits a CQB kill to the %s survivor and resumes normal combat', (winner) => {
+    const { sim, unit, building, tick } = fixture();
+    sim.spawnEnemy('rifle', { x: 300, y: 260 });
+    const enemy = sim.state.units.at(-1)!;
+    const survivor = winner === 'friendly' ? unit : enemy;
+    const victim = winner === 'friendly' ? enemy : unit;
+    for (const soldier of [unit, enemy]) {
+      soldier.buildingPosition = { buildingId: building.id, level: 0, slot: soldier === unit ? 0 : 4 };
+      soldier.pos = buildingSlot(building, soldier.buildingPosition, 24);
+      soldier.grenades = 0;
+    }
+    victim.health = 1; victim.reloadTimer = 100_000;
+    survivor.health = 10_000; survivor.reloadTimer = 0;
+    const kills = survivor.kills;
+    tick(300);
+    expect(victim.dead).toBe(true);
+    expect(survivor.kills).toBe(kills + 1);
+    expect(sim.state.units).not.toContain(victim);
+    expect(survivor.targetId).toBeNull();
+    expect(winner === 'friendly' ? sim.state.battleRecord.enemyKills : sim.state.battleRecord.casualties).toBe(1);
+  });
+
+  it('uses a rifle indoors for rocket troops and respects pinning', () => {
+    const { sim, unit, building, tick } = fixture();
+    unit.role = 'at'; unit.rockets = 3; unit.reloadTimer = 0;
+    sim.spawnEnemy('rifle', { x: 300, y: 260 });
+    const enemy = sim.state.units.at(-1)!;
+    for (const soldier of [unit, enemy]) {
+      soldier.buildingPosition = { buildingId: building.id, level: 0, slot: soldier === unit ? 0 : 4 };
+      soldier.pos = buildingSlot(building, soldier.buildingPosition, 24);
+      soldier.health = 10_000; soldier.grenades = 0;
+    }
+    enemy.reloadTimer = 100_000;
+    unit.pinned = true; unit.suppression = CONFIG.suppression.max;
+    expect(tick(1).some((e) => e.type === 'shot' && e.shooterId === unit.id)).toBe(false);
+    unit.pinned = false; unit.suppression = 0;
+    expect(tick(1)).toContainEqual(expect.objectContaining({ type: 'shot', shooterId: unit.id, weapon: getContent().weapons.rifle!.name }));
+    expect(unit.rockets).toBe(3);
+    expect(sim.state.projectiles).toHaveLength(0);
   });
 
   it('lets enemy infantry find a building and fire from it', () => {

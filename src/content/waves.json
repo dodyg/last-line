@@ -66,6 +66,7 @@
     {
       "label": "Spearhead",
       "composition": [
+        {"archetype": "mortar_team", "count": 1},
         {"archetype": "vehicle", "count": 1},
         {"archetype": "assault", "count": 2},
         {"archetype": "rifle", "count": 2},
@@ -73,7 +74,7 @@
         {"archetype": "sharpshooter", "count": 1}
       ],
       "spawnIntervalSeconds": 1.6,
-      "telegraph": "Sapper team inbound: one demolition specialist and two rifle escorts. Watch the marked target. Pin or eliminate the sapper before he arms a charge; an armed fuse keeps burning. A sharpshooter targets exposed support troops. Watch for muzzle flashes."
+      "telegraph": "Enemy mortars are deploying behind the assault. Disperse, watch incoming shells, and eliminate their spotters or crews. Sapper team inbound: one demolition specialist and two rifle escorts. Watch the marked target. Pin or eliminate the sapper before he arms a charge; an armed fuse keeps burning. A sharpshooter targets exposed support troops. Watch for muzzle flashes."
     },
     {
       "label": "Human Wave",
@@ -98,6 +99,7 @@
     {
       "label": "Raiders",
       "composition": [
+        {"archetype": "mortar_team", "count": 1},
         {"archetype": "assault", "count": 2},
         {"archetype": "rifle", "count": 2},
         {"archetype": "vehicle", "count": 1},
@@ -123,6 +125,7 @@
     {
       "label": "Grinding Assault",
       "composition": [
+        {"archetype": "mortar_team", "count": 1},
         {"archetype": "rifle", "count": 6},
         {"archetype": "assault", "count": 8},
         {"archetype": "observer", "count": 1},
@@ -138,6 +141,7 @@
     {
       "label": "Iron Rain",
       "composition": [
+        {"archetype": "mortar_team", "count": 2},
         {"archetype": "vehicle", "count": 3},
         {"archetype": "assault", "count": 8},
         {"archetype": "observer", "count": 1}
@@ -148,6 +152,7 @@
     {
       "label": "The Last Push",
       "composition": [
+        {"archetype": "mortar_team", "count": 2},
         {"archetype": "vehicle", "count": 2},
         {"archetype": "rifle", "count": 1},
         {"archetype": "troop_transport", "count": 1},

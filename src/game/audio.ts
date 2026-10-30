@@ -2,6 +2,9 @@ import { Soundscape, type AtmosphereContext } from './soundscape';
 import { DEFAULT_PREFS, type Preferences } from '../persistence';
 import type { WeatherKind } from '../simulation/types';
 import type { RadioCue } from './radio';
+import { SOLDIER_VOICE_CLIPS, selectSoldierClip, soldierVoice, clearLegacyVoiceCache, type SoldierVoiceClip } from './soldier-voices';
+
+type VoiceDelivery = 'shout' | 'tense' | 'panic';
 
 const alliedRadioRecordings = [
   new URL('../assets/ww2/voices/battlecries.ogg', import.meta.url).href,
@@ -12,6 +15,13 @@ const alliedRadioRecordings = [
 ];
 const medicCallRecording = new URL('../assets/ww2/voices/medic-call.wav', import.meta.url).href;
 const grenadeSupplyRecording = new URL('../assets/ww2/voices/grenade-supplies-call.wav', import.meta.url).href;
+const selectionRecording = alliedRadioRecordings[3]!;
+// Stable timbre and cadence per soldier, with a fresh recorded take on each click.
+const selectionVoices = [
+  { rate: 0.94, cents: -180 }, { rate: 1.02, cents: -70 },
+  { rate: 0.98, cents: 30 }, { rate: 1.06, cents: 120 },
+  { rate: 0.91, cents: -100 }, { rate: 1.03, cents: 70 },
+] as const;
 const axisRadioRecordings = Object.values(import.meta.glob('../assets/ww2/voices/wyrmsun_german-voice_*.wav', {
   eager: true,
   query: '?url',
@@ -25,9 +35,15 @@ interface RecordedClip { buffer: AudioBuffer; offset: number; duration: number; 
  * Shot sounds are rate-capped; voice clips load after the first user gesture.
  */
 
-export type SoundName = 'rifle' | 'mg' | 'smg' | 'rocket' | 'explosion' | 'mortar' | 'artillery' | 'airSupport' | 'airBomb' | 'heal' | 'ui' | 'horn' | 'breakthrough' | 'defeat' | 'victory';
+export type SoundName = 'rifle' | 'mg' | 'smg' | 'rocket' | 'flame' | 'explosion' | 'mortar' | 'artillery' | 'airSupport' | 'airBomb' | 'heal' | 'ui' | 'horn' | 'breakthrough' | 'defeat' | 'victory';
 
 export class AudioSys {
+  private selectionClips: Promise<RecordedClip[]> | null = null;
+  private readonly selectionTakes = new Map<number, number>();
+  private lastSelection: { id: number; at: number } | null = null;
+  private voiceVariation = 0;
+  private activeChatterGeneration: number | null = null;
+  private currentVoiceSource: AudioBufferSourceNode | null = null;
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private prefs: Preferences = { ...DEFAULT_PREFS };
@@ -63,7 +79,7 @@ export class AudioSys {
 
   setPrefs(prefs: Preferences): void {
     this.prefs = prefs;
-    if (prefs.muted || prefs.volume <= 0) this.cancelChatter();
+    if (prefs.muted || prefs.volume <= 0 || prefs.voiceVolume <= 0) this.cancelChatter();
     if (this.master !== null && this.ctx !== null) {
       this.master.gain.setTargetAtTime(this.effectiveVolume(), this.ctx.currentTime, 0.02);
       this.effectsBus?.gain.setTargetAtTime(prefs.effectsVolume, this.ctx.currentTime, .02);
@@ -71,12 +87,22 @@ export class AudioSys {
     }
   }
 
-  previewAmericanVoice(): string {
+  async previewAmericanVoice(): Promise<string> {
     this.unlock();
-    const voice = this.chooseRadioVoice('friendly', -4);
-    if (!voice || typeof SpeechSynthesisUtterance === 'undefined') return 'No American male voice is available. Install a US English voice in your system speech settings.';
-    this.speakChatter('American radio check. Ready for orders.', 'friendly', 'tense', -4, 'clear');
-    return `${voice.name} · ${voice.lang}${this.prefs.muted || this.prefs.voiceVolume === 0 ? ' · audio is muted' : ''}`;
+    if (this.prefs.muted || this.effectiveVolume() <= 0 || this.prefs.voiceVolume <= 0) return 'Audio is muted. Enable voice audio to preview.';
+    if (!this.ctx || !this.voiceBus) return 'Audio playback is unavailable in this browser.';
+    this.cancelChatter(false);
+    const generation = this.chatterGeneration;
+    this.activeChatterGeneration = generation;
+    try {
+      const clip = selectSoldierClip('American radio check. Ready for orders.', 'clear', -4, 0, true);
+      if (!clip) return 'The bundled voice preview is missing.';
+      const played = await this.playSoldierLine(clip, -4, 'field', generation);
+      if (generation !== this.chatterGeneration) return 'Voice preview canceled.';
+      return played ? `Played bundled American voice · ${soldierVoice(-4)}` : 'The voice clip could not load or play.';
+    } finally {
+      if (this.activeChatterGeneration === generation) this.activeChatterGeneration = null;
+    }
   }
 
   setAtmosphere(weather: WeatherKind, active: boolean, context: AtmosphereContext = { pressure: 0, night: false, sheltered: false }): void {
@@ -85,9 +111,98 @@ export class AudioSys {
     this.soundscape?.update(weather, active && !this.prefs.muted, this.prefs, { ...context, ducked: this.ctx.currentTime < this.voiceDuckUntil });
   }
 
-  /** Human recorded interjections lead into a soldier-specific spoken report. */
+  /** A direct acknowledgment; never interrupt a support request awaiting Control. */
+  acknowledgeSelection(speakerId: number, pan = 0): void {
+    if (this.prefs.muted || this.effectiveVolume() <= 0 || this.prefs.voiceVolume <= 0 || this.pendingRadioExchangeCancel) return;
+    const now = performance.now();
+    if (this.lastSelection?.id === speakerId && now - this.lastSelection.at < 180) return;
+    this.unlock();
+    const ctx = this.ctx, bus = this.voiceBus;
+    if (!ctx || !bus) return;
+    this.lastSelection = { id: speakerId, at: now };
+    void ctx.resume().catch(() => {});
+    this.cancelChatter(false);
+    const generation = this.chatterGeneration;
+    this.activeChatterGeneration = generation;
+    void this.loadSelectionClips().then((clips) => {
+      if (generation !== this.chatterGeneration || this.prefs.muted || this.effectiveVolume() <= 0 || this.prefs.voiceVolume <= 0) return;
+      const take = this.selectionTakes.get(speakerId) ?? Math.abs(speakerId * 7);
+      const clip = clips[take % clips.length];
+      if (!clip) return;
+      this.selectionTakes.set(speakerId, take + 1);
+      const voice = selectionVoices[Math.abs(speakerId) % selectionVoices.length]!;
+      const source = ctx.createBufferSource(), gain = ctx.createGain(), panner = ctx.createStereoPanner();
+      source.buffer = clip.buffer;
+      source.playbackRate.value = voice.rate;
+      source.detune.value = voice.cents;
+      gain.gain.value = 0.85;
+      panner.pan.value = Math.max(-1, Math.min(1, pan));
+      source.connect(gain).connect(panner).connect(bus);
+      this.currentVoiceSource = source;
+      this.voiceDuckUntil = ctx.currentTime + clip.duration / (voice.rate * 2 ** (voice.cents / 1200)) + 0.15;
+      source.onended = () => {
+        source.disconnect(); gain.disconnect(); panner.disconnect();
+        if (this.currentVoiceSource === source) this.currentVoiceSource = null;
+        if (generation === this.chatterGeneration) {
+          this.activeChatterGeneration = null;
+          this.voiceDuckUntil = 0;
+        }
+      };
+      source.start(0, clip.offset, clip.duration);
+    }).catch(() => { /* A failed acknowledgment never blocks selection. */ }).finally(() => {
+      if (generation === this.chatterGeneration && !this.currentVoiceSource) this.activeChatterGeneration = null;
+    });
+  }
+
+  private loadSelectionClips(): Promise<RecordedClip[]> {
+    return this.selectionClips ??= this.loadFieldCall(selectionRecording).then((buffer) => {
+      if (buffer) return splitRadioRecording(buffer, 'reply');
+      this.selectionClips = null;
+      return [];
+    });
+  }
+
   speakChatter(text: string, team: 'friendly' | 'enemy', delivery: 'shout' | 'tense' | 'panic' = 'shout', speakerId = 0, cue: RadioCue = 'contact', confirmation?: string, channel: 'field' | 'radio' = 'radio', reply?: { text: string; speakerId: number }): void {
-    if (this.prefs.muted || this.effectiveVolume() <= 0) return;
+    if (this.prefs.muted || this.effectiveVolume() <= 0 || this.prefs.voiceVolume <= 0) return;
+    // Let short recorded lines finish; support exchanges can still interrupt.
+    if (this.activeChatterGeneration !== null || this.pendingRadioExchangeCancel !== null) return;
+    if (team !== 'friendly') {
+      this.speakSystemChatter(text, team, delivery, speakerId, cue, confirmation, channel, reply);
+      return;
+    }
+    if (!this.ctx || !this.voiceBus) return;
+    const clip = selectSoldierClip(text, cue, speakerId, this.voiceVariation++);
+    if (!clip) return;
+    this.cancelChatter(false);
+    const generation = this.chatterGeneration;
+    this.activeChatterGeneration = generation;
+    void (async () => {
+      try {
+        let answer: SoldierVoiceClip | null = null;
+        if (reply) {
+          // Distinguish speakers even when their default voice assignments match.
+          const assignedVoice = soldierVoice(reply.speakerId);
+          const replyVoice = assignedVoice === clip.voice
+            ? (clip.voice === 'michael' ? 'puck' : 'michael') : assignedVoice;
+          answer = selectSoldierClip(reply.text, cue, reply.speakerId, 0, true, replyVoice);
+          if (answer) void this.loadFieldCall(answer.url);
+        }
+        const played = await this.playSoldierLine(clip, speakerId, channel, generation);
+        if (!played || generation !== this.chatterGeneration) return;
+        if (reply) {
+          if (!answer) return;
+          await new Promise<void>((resolve) => setTimeout(resolve, 250));
+          if (generation !== this.chatterGeneration) return;
+          await this.playSoldierLine(answer, reply.speakerId, 'field', generation);
+        } else if (confirmation !== undefined) await this.speakRadioConfirmation(confirmation, generation);
+      } finally {
+        if (this.activeChatterGeneration === generation) this.activeChatterGeneration = null;
+      }
+    })();
+  }
+
+  /** German speech uses the system engine; friendly dialogue uses bundled clips. */
+  private speakSystemChatter(text: string, team: 'friendly' | 'enemy', delivery: VoiceDelivery, speakerId: number, cue: RadioCue, confirmation?: string, channel: 'field' | 'radio' = 'radio', reply?: { text: string; speakerId: number }): void {
     this.cancelChatter(false);
     if (channel === 'radio') this.radioSquelch(team);
     if (this.ctx) this.voiceDuckUntil = this.ctx.currentTime + Math.min(12, 1 + text.length / 12);
@@ -139,99 +254,48 @@ export class AudioSys {
 
   /** Speak the request and wait for Control's spoken acknowledgment to finish. */
   speakRadioExchange(request: string, response: string, speakerId: number, onComplete: (confirmed: boolean) => void): void {
-    const utteranceSupported = typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
-    const requestVoice = this.chooseRadioVoice('friendly', speakerId);
-    const responseVoice = this.chooseRadioVoice('friendly', -3);
-    if (this.prefs.muted || this.effectiveVolume() <= 0 || !utteranceSupported || requestVoice === null || responseVoice === null) {
+    const call = selectSoldierClip(request, 'supplies', speakerId, 0, true);
+    const answer = selectSoldierClip(response, 'supplies', -3, 0, true);
+    if (!call || !answer || !this.ctx || !this.voiceBus) {
       onComplete(false);
       return;
     }
-
+    if (this.prefs.muted || this.effectiveVolume() <= 0 || this.prefs.voiceVolume <= 0) { onComplete(false); return; }
     this.cancelChatter(false);
-    if (this.ctx) this.voiceDuckUntil = this.ctx.currentTime + 20;
     const generation = this.chatterGeneration;
     let completed = false;
     const finish = (confirmed: boolean): void => {
-      if (completed || generation !== this.chatterGeneration) return;
+      if (completed) return;
       completed = true;
-      this.voiceDuckUntil = 0;
-      if (this.pendingRadioExchangeCancel !== null) this.pendingRadioExchangeCancel = null;
+      this.pendingRadioExchangeCancel = null;
       this.endRadioStatic();
       onComplete(confirmed);
     };
     this.pendingRadioExchangeCancel = () => finish(false);
-    const reply = new SpeechSynthesisUtterance(response);
-    reply.voice = responseVoice;
-    reply.lang = responseVoice.lang;
-    reply.rate = 0.88;
-    reply.pitch = 0.84;
-    reply.volume = Math.min(1, this.effectiveVolume() * this.prefs.voiceVolume * 0.66);
-    reply.onstart = () => { if (generation === this.chatterGeneration) this.startRadioStatic('enemy', true); };
-    reply.onend = () => {
-      if (generation !== this.chatterGeneration) return;
-      this.endRadioStatic();
-      this.radioSquelch('enemy');
-      finish(true);
-    };
-    reply.onerror = () => finish(false);
-
-    const call = new SpeechSynthesisUtterance(request);
-    call.voice = requestVoice;
-    call.lang = requestVoice.lang;
-    call.rate = 1;
-    call.pitch = 0.98;
-    call.volume = Math.min(1, this.effectiveVolume() * this.prefs.voiceVolume * 0.86);
-    call.onstart = () => { if (generation === this.chatterGeneration) this.startRadioStatic('friendly'); };
-    call.onend = () => {
-      if (generation !== this.chatterGeneration) return;
-      this.endRadioStatic();
-      this.radioSquelch('friendly');
-      this.startRadioStatic('enemy', true);
-      this.radioSquelch('enemy');
-      window.speechSynthesis.speak(reply);
-    };
-    call.onerror = () => finish(false);
-
-    try {
-      this.radioSquelch('friendly');
-      window.speechSynthesis.speak(call);
-    } catch {
-      finish(false);
-    }
+    void (async () => {
+      const played = await this.playSoldierLine(call, speakerId, 'radio', generation);
+      if (generation !== this.chatterGeneration || completed) return;
+      if (!played) {
+        finish(false);
+        return;
+      }
+      const answered = await this.playSoldierLine(answer, -3, 'radio', generation);
+      if (generation !== this.chatterGeneration || completed) return;
+      finish(answered);
+    })();
   }
 
   /** Radio Control answers over the set after the field operator finishes speaking. */
-  private speakRadioConfirmation(text: string, generation: number): void {
-    if (generation !== this.chatterGeneration) return;
-    if (this.prefs.muted || this.effectiveVolume() <= 0) {
-      this.endRadioStatic();
+  private async speakRadioConfirmation(text: string, generation: number): Promise<void> {
+    const clip = selectSoldierClip(text, 'supplies', -3, 0, true);
+    if (clip && this.ctx && this.voiceBus) {
+      this.activeChatterGeneration = generation;
+      try {
+        await this.playSoldierLine(clip, -3, 'radio', generation);
+      } finally {
+        if (this.activeChatterGeneration === generation) this.activeChatterGeneration = null;
+      }
       return;
-    }
-    const voice = this.chooseRadioVoice('friendly', -3);
-    if (voice === null || typeof window === 'undefined' || !('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
-      this.endRadioStatic();
-      return;
-    }
-    this.radioSquelch('enemy');
-    try {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.voice = voice;
-      utterance.lang = voice.lang;
-      // Keep Control behind the field operator: a restrained, slightly slower
-      // voice with a stronger receiver bed makes the acknowledgment feel distant.
-      utterance.rate = 0.88;
-      utterance.pitch = 0.84;
-      utterance.volume = Math.min(1, this.effectiveVolume() * this.prefs.voiceVolume * 0.66);
-      utterance.onstart = () => { if (generation === this.chatterGeneration) this.startRadioStatic('enemy', true); };
-      utterance.onend = () => {
-        if (generation !== this.chatterGeneration) return;
-        this.endRadioStatic();
-        this.radioSquelch('enemy');
-      };
-      utterance.onerror = () => { if (generation === this.chatterGeneration) this.endRadioStatic(); };
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      this.endRadioStatic();
     }
   }
 
@@ -249,12 +313,53 @@ export class AudioSys {
     this.pendingRadioExchangeCancel = null;
     cancelRadioExchange?.();
     this.chatterGeneration++;
+    this.activeChatterGeneration = null;
+    try { this.currentVoiceSource?.stop(); } catch { /* Already stopped. */ }
+    this.currentVoiceSource = null;
     try { this.currentRecordedSource?.stop(); } catch { /* Already stopped. */ }
     this.currentRecordedSource = null;
     this.endRadioStatic();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try { window.speechSynthesis.cancel(); } catch { /* Speech is optional. */ }
     }
+  }
+
+  /** Bundled PCM plays through the existing voice bus and radio effects. */
+  private async playSoldierLine(clip: SoldierVoiceClip, speakerId: number, channel: 'field' | 'radio', generation: number): Promise<boolean> {
+    const buffer = await this.loadFieldCall(clip.url);
+    if (!buffer || generation !== this.chatterGeneration || this.prefs.muted || this.prefs.voiceVolume <= 0) return false;
+    const ctx = this.ctx, bus = this.voiceBus;
+    if (!ctx || !bus) return false;
+    try {
+      const source = ctx.createBufferSource(); source.buffer = buffer;
+      const gain = ctx.createGain(); gain.gain.value = speakerId === -3 ? 0.72 : 0.95;
+      const nodes: AudioNode[] = [source, gain];
+      if (channel === 'radio') {
+        const high = ctx.createBiquadFilter(); high.type = 'highpass'; high.frequency.value = 300;
+        const low = ctx.createBiquadFilter(); low.type = 'lowpass'; low.frequency.value = 3400;
+        const compressor = ctx.createDynamicsCompressor(); compressor.threshold.value = -24; compressor.ratio.value = 4;
+        source.connect(high).connect(low).connect(compressor).connect(gain);
+        nodes.push(high, low, compressor);
+        this.radioSquelch('friendly');
+        this.startRadioStatic('friendly', speakerId === -3);
+      } else source.connect(gain);
+      gain.connect(bus);
+      this.currentVoiceSource = source;
+      this.voiceDuckUntil = ctx.currentTime + buffer.duration + 0.15;
+      return await new Promise<boolean>((resolve) => {
+        source.onended = () => {
+          for (const node of nodes) node.disconnect();
+          if (this.currentVoiceSource === source) this.currentVoiceSource = null;
+          if (generation === this.chatterGeneration) {
+            this.voiceDuckUntil = 0;
+            this.endRadioStatic();
+            if (channel === 'radio') this.radioSquelch('friendly');
+          }
+          resolve(generation === this.chatterGeneration);
+        };
+        source.start();
+      });
+    } catch { this.endRadioStatic(); this.voiceDuckUntil = 0; return false; }
   }
 
   private chooseRadioVoice(team: 'friendly' | 'enemy', speakerId: number): SpeechSynthesisVoice | null {
@@ -474,6 +579,10 @@ export class AudioSys {
       this.effectsBus = this.ctx.createGain(); this.effectsBus.gain.value = this.prefs.effectsVolume; this.effectsBus.connect(this.master);
       this.voiceBus = this.ctx.createGain(); this.voiceBus.gain.value = this.prefs.voiceVolume; this.voiceBus.connect(this.master);
       this.unlocked = true;
+      void this.loadSelectionClips();
+      void clearLegacyVoiceCache();
+      // Small audio files decode once after the first user gesture, with no model.
+      for (const clip of SOLDIER_VOICE_CLIPS) if (clip.kind !== 'banter') void this.loadFieldCall(clip.url);
       void this.loadMedicCall();
       void this.loadFieldCall(grenadeSupplyRecording);
       this.loadRadioVoices();
@@ -504,6 +613,10 @@ export class AudioSys {
         case 'mg':
           if (!this.shotAllowed()) return;
           this.firearmReport(name, pan);
+          break;
+        case 'flame':
+          if (!this.shotAllowed()) return;
+          this.noise(.45, .2, 650, pan, true);
           break;
         case 'rocket':
           this.noise(0.22, 0.16, 400, pan, true);

@@ -21,6 +21,8 @@ function fixture(team: Team = 'friendly', distance = 252) {
   shooter.pos = { x: 132, y: 132 };
   target.pos = { x: 132 + distance, y: 132 };
   for (const unit of sim.state.units) {
+    // Measure foliage visibility independently of individual stealth ratings.
+    delete unit.attributes;
     unit.prevPos = { ...unit.pos };
     unit.grenades = 0;
   }

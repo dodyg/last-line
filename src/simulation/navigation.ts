@@ -74,7 +74,7 @@ export interface PathResult {
  * Find a path of cell centers from start to goal. Returns reachable=false
  * when the goal is solid-blocked with no open neighbor or the flood fails.
  */
-export function findPath(terrain: Terrain, start: Vec2, goal: Vec2, cellCostMultiplier?: (pos: Vec2) => number, mode: TraversalMode = 'infantry', startBridge?: BridgePosition): PathResult {
+export function findPath(terrain: Terrain, start: Vec2, goal: Vec2, cellCostMultiplier?: (pos: Vec2, passage?: BridgePosition) => number, mode: TraversalMode = 'infantry', startBridge?: BridgePosition): PathResult {
   const { cols, rows, blocked } = terrain;
   const startCol = posToCol(terrain, start.x);
   const startRow = posToRow(terrain, start.y);
@@ -138,7 +138,7 @@ export function findPath(terrain: Terrain, start: Vec2, goal: Vec2, cellCostMult
       if (closed[nIdx] === 1) continue;
       const traversal = elevationTraversal(terrain, from, to, mode);
       if (!traversal.allowed) continue;
-      const terrainCost = cellCostMultiplier === undefined ? 1 : Math.max(1, cellCostMultiplier(cellCenter(terrain, nc, nr)));
+      const terrainCost = cellCostMultiplier === undefined ? 1 : Math.max(1, cellCostMultiplier(to, crossing.position));
       const tentative = current.g + cost * terrainCost * traversal.cost;
       const existing = gScore[nIdx] ?? Infinity;
       if (tentative < existing) {

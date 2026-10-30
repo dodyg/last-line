@@ -12,6 +12,8 @@ function fixture(enemy = false) {
   let unit = sim.state.units[0]!;
   sim.state.units = [unit];
   if (enemy) { sim.spawnEnemy('rifle', { x: 36, y: 600 }); unit = sim.state.units.at(-1)!; sim.state.units = [unit]; }
+  // Isolate base movement rules; individual rating effects have their own coverage.
+  delete unit.attributes;
   unit.pos = { x: 36, y: 600 }; unit.prevPos = { ...unit.pos };
   unit.grenades = 0; unit.reloadTimer = 100_000; unit.buildingCooldown = 100_000; unit.morale = 100;
   sim.state.scheduler.prepTicksLeft = 100_000;

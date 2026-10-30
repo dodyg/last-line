@@ -116,6 +116,8 @@ describe('prepared ambush orders', () => {
 
   it('makes a shot hit that the same random roll misses without the opening accuracy bonus', () => {
     const a = fixture(), b = fixture(); const targetA = a.enemy(a.aim), targetB = b.enemy(b.aim);
+    // Keep the roll calculation focused on the ambush bonus alone.
+    delete a.unit.attributes; delete b.unit.attributes;
     targetA.suppression = targetB.suppression = 0; a.unit.reloadTimer = b.unit.reloadTimer = 0;
     const weapon = a.sim.weaponOf(a.unit)!;
     const context = { weapon, distance: 120, attackerXp: 0, attackerAccuracySkill: a.unit.accuracySkill,

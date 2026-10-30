@@ -10,7 +10,7 @@ const sections: Array<[string, Field[]]> = [
 
 /** Settings remain native controls so keyboard, touch, and assistive tools work. */
 export function bindExtendedSettings(initial: Preferences, changed: (prefs: Preferences) => void,
-  preview: () => string, resetCamera: () => void): { current: () => Preferences } {
+  preview: () => string | Promise<string>, resetCamera: () => void): { current: () => Preferences } {
   let prefs = { ...initial, keys: { ...initial.keys } };
   const panel = document.querySelector<HTMLElement>('#overlay-settings .panel')!;
   panel.parentElement!.addEventListener('keydown', (event) => {
@@ -92,7 +92,13 @@ export function bindExtendedSettings(initial: Preferences, changed: (prefs: Pref
     if (title === 'Audio') {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'hud-button'; button.textContent = 'Preview American voice';
       const status = document.createElement('p'); status.className = 'subtle'; status.setAttribute('role', 'status');
-      button.addEventListener('click', () => { status.textContent = preview(); });
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        status.textContent = 'Loading voice clip…';
+        try { status.textContent = await preview(); }
+        catch { status.textContent = 'Voice clip could not play. Try again.'; }
+        finally { button.disabled = false; }
+      });
       group.append(button, status);
     }
     if (title === 'Camera') {

@@ -22,8 +22,8 @@ export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 /** `rain` is the steady, medium intensity retained for older saves. */
 export type WeatherKind = 'clear' | 'lightRain' | 'rain' | 'heavyRain' | 'lightFog' | 'fog' | 'heavyFog' | 'lightSnow' | 'snow' | 'heavySnow';
 
-export type FriendlyRole = 'rifleman' | 'mg' | 'medic' | 'supply_officer' | 'at' | 'sniper' | 'engineer' | 'radio_engineer' | 'officer' | 'mortarman' | 'gun_truck' | 'scout' | 'heavy_mg' | 'assault_infantry' | 'at_gun';
-export type EnemyArchetype = 'rifle' | 'assault' | 'vehicle' | 'observer' | 'gun_truck' | 'troop_transport' | 'sapper' | 'mg_team' | 'sharpshooter' | 'field_officer' | 'at_infantry' | 'infiltrator';
+export type FriendlyRole = 'rifleman' | 'mg' | 'medic' | 'supply_officer' | 'at' | 'sniper' | 'engineer' | 'radio_engineer' | 'officer' | 'mortarman' | 'gun_truck' | 'scout' | 'heavy_mg' | 'assault_infantry' | 'at_gun' | 'grenadier' | 'flamethrower';
+export type EnemyArchetype = 'mortar_team' | 'rifle' | 'assault' | 'vehicle' | 'observer' | 'gun_truck' | 'troop_transport' | 'sapper' | 'mg_team' | 'sharpshooter' | 'field_officer' | 'at_infantry' | 'infiltrator';
 export type UnitRole = FriendlyRole | EnemyArchetype;
 export type WeaponUpgradeType = 'accuracy' | 'reload' | 'damage';
 export type TankComponent = 'tracks' | 'turret' | 'machineGun';
@@ -57,6 +57,12 @@ export interface AmbushOrder {
 }
 
 export interface Unit {
+  /** Individually issued firearm; absent means the role's original equipment. */
+  assignedWeaponId?: string;
+  /** Personal ratings, 1–100, improved by field experience. Older saves default to 50. */
+  attributes?: SoldierAttributes;
+  /** Cleared waves toward the next attribute gain; persists between maps. */
+  attributeTrainingWaves?: number;
   /** Weapon crews pack, turn and deploy before firing. Angles use simulation XY. */
   deployment?: { ticks: number; facing: number; packingTicks: number };
   aim?: { targetId: number; ticks: number };
@@ -156,14 +162,21 @@ export interface Unit {
   medicalTargetId?: number;
   /** Soldier awaiting ammunition from this Supply Officer. */
   supplyTargetId?: number;
+  /** Weapon and ammunition requested for delivery; charged at handover. */
+  pendingWeaponId?: string;
   /** Ticks until this mortarman may fire again; omitted in older saves. */
   mortarTimer?: number;
+  /** Absolute ticks keep tactical maneuvers deterministic across Continue. */
+  nextTacticTick?: number;
+  flankUntilTick?: number;
   /** Grenades left to throw; 0 for roles that carry none. */
   grenades: number;
   /** Bazooka rockets remaining; older saves start with a full loadout. */
   rockets?: number;
   /** Mortar bombs remaining; older saves start with a full loadout. */
   mortarBombs?: number;
+  /** Rifle grenades or fuel bursts remaining. */
+  specialistAmmo?: number;
   /** Ticks until this unit may throw another grenade. */
   grenadeTimer: number;
   xp: number;
@@ -204,6 +217,15 @@ export interface Unit {
 }
 
 export interface RoleDuty { kind: 'rally' | 'observe' | 'supply' | 'repair' | 'suppress'; origin: Vec2; ticksRemaining: number; stock: number; target?: Vec2 }
+export interface SoldierAttributes {
+  strength: number;
+  agility: number;
+  speed: number;
+  stealth: number;
+  marksmanship: number;
+  endurance: number;
+  resolve: number;
+}
 export interface ScoutReport { unitId: number; role: UnitRole; pos: Vec2; tick: number }
 
 export type FireOrder = 'auto' | 'antiArmor' | 'stopBreakthrough' | 'holdGrenades' | 'seekGunfire';
@@ -562,6 +584,12 @@ export interface BridgePosition {
 export type WavePhase = 'prep' | 'spawning' | 'active' | 'advance' | 'crossing';
 
 export interface WaveScheduler {
+  /** Clean-defense tracking is optional for saves made before initiative rewards. */
+  cleanStreak?: number;
+  startCasualties?: number;
+  startBreakthroughs?: number;
+  /** Initiative rewards require choosing to skip preparation for this wave. */
+  calledEarly?: boolean;
   /** 0-based index into the wave list; >= list length means endless. */
   waveIndex: number;
   phase: WavePhase;
@@ -589,6 +617,7 @@ export type RunPhase = 'running' | 'victory' | 'defeat';
  * sprites, and audio never appear here.
  */
 export interface SimSnapshot {
+  runMode?: import('../content/operations').RunMode;
   /** Fixed for this map; missing on saves written before seasons were introduced. */
   season?: Season;
   /** Absent on older saves, which retain their original landscape generator. */
@@ -624,6 +653,7 @@ export interface SimSnapshot {
   groundImpacts?: GroundImpact[];
   vehicleTracks?: VehicleTrack[];
   treeDamage?: TreeDamage[];
+  demolishedFenceCells?: number[];
   sandbags: Sandbag[];
   trenches: Trench[];
   bunkers?: Bunker[];
@@ -682,6 +712,7 @@ export interface SimSnapshot {
 }
 
 export interface SimState {
+  runMode?: import('../content/operations').RunMode;
   season?: Season;
   campaignCountry?: CampaignCountry;
   battleRecord: BattleRecord;
@@ -707,6 +738,7 @@ export interface SimState {
   groundImpacts?: GroundImpact[];
   vehicleTracks?: VehicleTrack[];
   treeDamage?: TreeDamage[];
+  demolishedFenceCells?: number[];
   sandbags: Sandbag[];
   trenches: Trench[];
   bunkers: Bunker[];
@@ -775,6 +807,7 @@ export type SimEvent =
   | { type: 'tankComponentDisabled'; unitId: number; component: TankComponent; pos: Vec2 }
   | { type: 'transportUnloaded'; unitId: number; count: number; pos: Vec2 }
   | { type: 'transportPassengersKilled'; unitId: number; count: number; pos: Vec2 }
+  | { type: 'specialistResupplied'; officerId: number; targetId: number; amount: number }
   | { type: 'grenadesResupplied'; officerId: number; targetId: number; amount: number }
   | { type: 'rocketsResupplied'; officerId: number; targetId: number; amount: number }
   | { type: 'mortarBombsResupplied'; officerId: number; targetId: number; amount: number }
@@ -803,12 +836,13 @@ export type SimEvent =
   | { type: 'healed'; medicId: number; targetId: number; pos: Vec2; amount: number }
   | { type: 'grenadeThrown'; unitId: number; team: Team; from: Vec2; to: Vec2; remaining: number }
   | { type: 'smokeDeployed'; unitId: number; pos: Vec2; ticks: number }
-  | { type: 'automaticSupportRequested'; unitId: number; kind: 'medic' | 'grenades' | 'rockets' | 'mortarBombs' }
+  | { type: 'automaticSupportRequested'; unitId: number; kind: 'medic' | 'grenades' | 'rockets' | 'mortarBombs' | 'specialistAmmo' }
   | { type: 'enemySmokeAssaultWarned'; unitId: number; pos: Vec2; deployTick: number }
   | { type: 'enemySmokeAssaultDeployed'; unitId: number; pos: Vec2; ticks: number }
   | { type: 'enemySmokeAssaultCancelled'; unitId: number }
   | { type: 'campfireLit'; unitId: number; pos: Vec2 }
   | { type: 'satchelPlanted'; unitId: number; pos: Vec2 }
+  | { type: 'fenceDemolished'; unitId: number; cell: number; pos: Vec2 }
   | { type: 'satchelDetonated'; pos: Vec2; radius: number; victims: number }
   | { type: 'flareDeployed'; pos: Vec2; radius: number; ticks: number }
   | { type: 'sectorCaptureProgress'; ticks: number; total: number }
@@ -823,7 +857,8 @@ export type SimEvent =
    */
   | { type: 'weaponUpgraded'; unitId: number; upgrade: WeaponUpgradeType; level: number; ticks: number }
   | { type: 'wavePhase'; wave: number; phase: WavePhase; prepTicksLeft: number; endless: boolean }
-  | { type: 'waveCleared'; wave: number; reward: number }
+  | { type: 'waveCalledEarly'; reward: number }
+  | { type: 'waveCleared'; wave: number; reward: number; cleanBonus?: number; streak?: number }
   | { type: 'advanceAvailable' }
   | { type: 'crossingBegan' }
   | { type: 'unitCrossed'; unitId: number; remaining: number }
@@ -853,10 +888,21 @@ export type SimEvent =
   | { type: 'buildingDestroyed'; buildingId: number; name: string; kind: BuildingKind; pos: Vec2 }
   | { type: 'moveOrdered'; unitId: number; pos: Vec2 };
 
+export interface RecruitBuild {
+  weaponId?: string;
+  upgrades?: Partial<Record<WeaponUpgradeType, number>>;
+  stance?: SoldierStance;
+  fireOrder?: FireOrder;
+}
+
 export type Command =
+  | { type: 'callWave' }
+  | { type: 'withdraw'; unitId: number }
+  | { type: 'equipWeapon'; unitId: number; weaponId: string }
   | { type: 'callGrenadeSupplies'; unitId: number }
   | { type: 'callRocketSupplies'; unitId: number }
   | { type: 'callMortarSupplies'; unitId: number }
+  | { type: 'callSpecialistSupplies'; unitId: number }
   | { type: 'callMedic'; unitId: number }
   | { type: 'garrison'; unitIds: number[]; buildingId: number; level: BuildingLevel; facing?: BuildingFacing }
   | { type: 'leaveBuilding'; unitIds: number[] }
@@ -869,7 +915,7 @@ export type Command =
    * against who is still standing at the moment the order lands.
    */
   | { type: 'moveGroup'; unitIds: number[]; pos: Vec2 }
-  | { type: 'recruit'; role: FriendlyRole; pos: Vec2 }
+  | { type: 'recruit'; role: FriendlyRole; pos: Vec2; build?: RecruitBuild }
   | { type: 'barbedWire'; pos: Vec2 }
   | { type: 'sandbag'; pos: Vec2 }
   | { type: 'trench'; pos: Vec2 }
@@ -883,6 +929,7 @@ export type Command =
   | { type: 'foodSupplies' }
   | { type: 'smoke'; unitId: number; pos: Vec2 }
   | { type: 'satchel'; unitId: number; pos: Vec2 }
+  | { type: 'demolishFence'; unitId: number; pos: Vec2 }
   | { type: 'roleAbility'; unitId: number; pos?: Vec2 }
   | { type: 'lightFire'; unitId: number }
   | { type: 'ambush'; unitIds: readonly number[]; aim: Vec2; arcDegrees: number }
@@ -1199,6 +1246,8 @@ export interface GameConfig {
    * force advances under covering fire, and armour rolls through while firing.
    */
   enemy: {
+    tactics: { firstWave: number; sectorWaveBonus: number; decisionSeconds: number; flankSeconds: number; flankWidth: number; supportRadius: number };
+    mortarTeam: { bombs: number; setupSeconds: number; standOff: number; intervalMult: number };
     smokeAssault: {
       startWave: number;
       squadRadius: number;

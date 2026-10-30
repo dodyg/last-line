@@ -1,10 +1,10 @@
 import { CAMPAIGNS } from '../content/campaigns';
 import { campaignChapter, dispatchHandover, STORY_NOTE, type FieldDispatch } from '../content/campaign-story';
-import { CONFIG } from '../content/config';
+import { campaignGoal } from '../content/operations';
 
 /** Shared by the deployment/pause dossier and the arrival supply screen. */
 export function renderCampaignBriefing(dispatch: FieldDispatch): HTMLElement {
-  const { story, chapter, index, next, nextAt } = campaignChapter(dispatch.country, dispatch.mapsCleared);
+  const { story, chapter, index, next, nextAt } = campaignChapter(dispatch.country, dispatch.mapsCleared, campaignGoal(dispatch));
   const section = document.createElement('section');
   section.className = 'campaign-briefing';
   section.setAttribute('aria-label', 'Campaign field briefing');
@@ -21,9 +21,9 @@ export function renderCampaignBriefing(dispatch: FieldDispatch): HTMLElement {
   add('p', `Map ${dispatch.mapNumber} · ${dispatch.sector}`, 'dispatch-location');
   add('p', dispatchHandover(dispatch));
   add('h4', 'Your orders');
-  add('p', chapter.orders);
-  add('p', 'Repel all waves or capture the northern objective, then march every survivor through the north exit. Fortifications stay behind.', 'subtle');
-  add('p', `${dispatch.mapsCleared}/${CONFIG.crossing.campaignMaps} sectors secured. ${next ? `Next: ${next.title}, after ${nextAt} secured sectors.` : 'Final chapter: complete the remaining secured sectors to finish this assignment.'}`, 'dispatch-progress');
+  add('p', dispatch.objective ?? chapter.orders);
+  add('p', 'Complete this sector’s orders, then march every survivor through the north exit. Fortifications stay behind.', 'subtle');
+  add('p', `${dispatch.mapsCleared}/${campaignGoal(dispatch)} sectors secured. ${next ? `Next: ${next.title}, after ${nextAt} secured sectors.` : 'Final chapter: complete the remaining secured sectors to finish this assignment.'}`, 'dispatch-progress');
   add('h4', 'Ground and support');
   add('p', 'Wet mud and water hinder vehicles most; roads and bridges keep supply routes usable. Ruins provide infantry cover but slow movement. Scouts can establish observation posts in elevated buildings. Engineers repair standing structures; prepare another position before a strongpoint collapses.', 'subtle');
   const details = document.createElement('details');

@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: './tests',
   // Default suite: browser smoke only. Set STRESS=1 to include the
   // provisional performance probe (tests/stress.spec.ts).
-  testMatch: process.env.STRESS ? /.*(browser|stress)\.spec\.ts/ : /browser\.spec\.ts/,
+  testMatch: process.env.STRESS ? /.*(browser|improvements|stress)\.spec\.ts/ : /(browser|improvements)\.spec\.ts/,
   timeout: 60_000,
   retries: 0,
   use: { baseURL: 'http://127.0.0.1:4173' },

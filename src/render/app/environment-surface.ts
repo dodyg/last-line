@@ -1,9 +1,61 @@
 import type { TerrainData } from '../../simulation/terrain';
-import { distanceToRoad, isRiverAt } from '../../simulation/terrain';
+import { distanceToRoad, isRiverAt, isFoliageKind, TERRAIN_KIND } from '../../simulation/terrain';
 import { nearestRoadPoint } from '../../simulation/landscape-details';
 import { deriveRng, rngRange } from '../../simulation/rng';
 import { CONFIG } from '../../content/config';
 import { seasonPalette } from './season-palette';
+
+/** Map-owned wear and soft contact shading cost no additional runtime passes. */
+export function drawGroundTransitions(ctx: CanvasRenderingContext2D, data: TerrainData): void {
+  const rng = deriveRng(data.seed, 0x534f494c), { cell, cols } = data.terrain;
+  ctx.save();
+  const shade = (x: number, y: number, rx: number, ry: number, opacity: number) => {
+    ctx.save(); ctx.translate(x, y); ctx.scale(rx, ry);
+    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    gradient.addColorStop(0, `rgba(32,29,21,${opacity})`); gradient.addColorStop(1, 'rgba(32,29,21,0)');
+    ctx.fillStyle = gradient; ctx.fillRect(-1, -1, 2, 2); ctx.restore();
+  };
+  for (let i = 0; i < data.kinds.length; i++) {
+    const kind = data.kinds[i]!, x = (i % cols + .5) * cell, y = (Math.floor(i / cols) + .5) * cell;
+    if (isRiverAt(data.zones, data.seed, x, y)) continue;
+    if (isFoliageKind(kind)) {
+      const low = kind === TERRAIN_KIND.tallGrass || kind === TERRAIN_KIND.shrub;
+      shade(x, y, low ? 8 : 16, low ? 6 : 12, low ? .10 : .23);
+      if (low) continue;
+      for (let n = 0; n < 14; n++) {
+        const px = x + rngRange(rng, -12, 12), py = y + rngRange(rng, -10, 10);
+        if (isRiverAt(data.zones, data.seed, px, py)) continue;
+        ctx.fillStyle = data.season === 'winter' ? 'rgba(83,75,57,.12)' : data.season === 'autumn' ? 'rgba(153,98,39,.32)' : 'rgba(92,78,44,.23)';
+        ctx.fillRect(px, py, rngRange(rng, .7, 2), .7);
+      }
+    } else if (kind === TERRAIN_KIND.stoneFence || kind === TERRAIN_KIND.woodFence || kind === TERRAIN_KIND.rocks || kind === TERRAIN_KIND.obstacle) {
+      shade(x, y, 9, 7, .22);
+    }
+  }
+  for (const building of data.buildings) {
+    const x = building.col * cell, y = building.row * cell, w = building.cols * cell, h = building.rows * cell;
+    // A soft narrow perimeter anchors walls without painting a directional shadow.
+    ctx.save(); ctx.shadowBlur = 6; ctx.shadowColor = 'rgba(27,25,20,.38)';
+    ctx.strokeStyle = 'rgba(47,39,25,.24)'; ctx.lineWidth = 4; ctx.strokeRect(x, y, w, h); ctx.restore();
+    for (let n = 0; n < 18; n++) {
+      const px = x + rngRange(rng, -7, w + 7), py = y + rngRange(rng, -7, h + 7);
+      if (!isRiverAt(data.zones, data.seed, px, py)) shade(px, py, 4, 2, .07);
+    }
+  }
+  // Patchy soil outside road shoulders connects roads to the surrounding grass.
+  for (const road of data.layout?.roads ?? data.zones.roads ?? []) {
+    for (let i = 1; i < road.points.length; i++) {
+      const a = road.points[i - 1]!, b = road.points[i]!, dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy);
+      if (length < 1) continue;
+      for (let d = 0; d < length; d += 9) for (const side of [-1, 1]) {
+        const offset = side * (road.halfWidth + rngRange(rng, 1, 5));
+        const x = a.x + dx * d / length - dy / length * offset, y = a.y + dy * d / length + dx / length * offset;
+        if (!isRiverAt(data.zones, data.seed, x, y)) shade(x, y, rngRange(rng, 3, 7), 3, .12);
+      }
+    }
+  }
+  ctx.restore();
+}
 
 /** Low-contrast, bounded patches read as land use rather than a noise filter. */
 export function drawMeadows(ctx: CanvasRenderingContext2D, data: TerrainData): void {

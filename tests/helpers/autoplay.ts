@@ -1,4 +1,5 @@
 import { Simulation, waveTelegraph } from '../../src/simulation/simulation';
+import { getContent } from '../../src/content/validate';
 import { CONFIG } from '../../src/content/config';
 import type { FriendlyRole } from '../../src/simulation/types';
 
@@ -11,7 +12,7 @@ import type { FriendlyRole } from '../../src/simulation/types';
  */
 
 export interface AutoplayResult {
-  victory: boolean;
+  sectorSecured: boolean;
   score: number;
   waveReached: number;
   friendlies: number;
@@ -31,7 +32,7 @@ export interface AutoplayResult {
 const BAG_Y = 596;
 /** Center-out build order, wide enough that flank spawns stay in rifle range. */
 const BAG_XS = [400, 520, 280, 640, 160, 800] as const;
-/** Soldiers stand near the cell row centered at y=612: 16px south of the bags. */
+/** The cell-center firing line is just south of the bags. */
 const LINE_Y = 610;
 /**
  * Spread firing-line slots. Distinct x positions keep the squad from stacking in
@@ -50,11 +51,14 @@ function telegraphWarnsOfArmor(telegraph: string): boolean {
   return /\b(armor|armour|armored|armoured|vehicle|vehicles|tank|tanks|panzer)/i.test(telegraph);
 }
 
-export function autoplay(seed: number, maxTicks = 60 * 30 * 60): AutoplayResult {
+export function autoplay(seed: number, maxTicks = 40 * 30 * 60, indirectSupport = true): AutoplayResult {
   const sim = new Simulation(seed);
   let recruitCounter = 0;
   let bagCounter = 0;
   let movedIn = false;
+  let lastKillTick = 0;
+  const evadeHomes = new Map<number, { x: number; y: number }>();
+  const cleanupHomes = new Map<number, { x: number; y: number }>();
   let kills = 0;
   let breakthroughs = 0;
   let enemyShots = 0;
@@ -63,7 +67,7 @@ export function autoplay(seed: number, maxTicks = 60 * 30 * 60): AutoplayResult 
   const enemiesThatFired = new Set<number>();
 
   for (let t = 0; t < maxTicks; t++) {
-    if (sim.state.phase !== 'running') break;
+    if (sim.state.phase !== 'running' || sim.state.sectorCaptured) break;
     const s = sim.state;
     const wave = s.scheduler.waveIndex + 1;
     const friendlies = s.units.filter((u) => u.team === 'friendly');
@@ -78,12 +82,12 @@ export function autoplay(seed: number, maxTicks = 60 * 30 * 60): AutoplayResult 
     const atAlive = friendlies.filter((u) => u.role === 'at').length;
 
     // Dig in immediately: sandbags just north of the firing line.
-    if (bagCounter < BAG_XS.length && s.points >= CONFIG.costs.sandbag) {
+    if (bagCounter < BAG_XS.length && s.points >= CONFIG.costs.sandbag + (indirectSupport ? 10 : 0)) {
       if (sim.command({ type: 'sandbag', pos: { x: BAG_XS[bagCounter] as number, y: BAG_Y } }).ok) bagCounter++;
     }
 
-    // Once the line exists, bring the starting squad onto it (once).
-    if (!movedIn && bagCounter === BAG_XS.length) {
+    // Form up immediately; a distant unavailable build site must not block deployment.
+    if (!movedIn && (indirectSupport || bagCounter === BAG_XS.length)) {
       let settled = true;
       for (const u of friendlies) {
         if (Math.abs(u.pos.y - LINE_Y) > 8) {
@@ -94,11 +98,9 @@ export function autoplay(seed: number, maxTicks = 60 * 30 * 60): AutoplayResult 
       if (settled) movedIn = true;
     }
 
-    // Continuous recruitment from the first prep through combat, with no
-    // hoarding. Fortifications and artillery are gated behind dedicated roles,
-    // so those come first; after that the priority branch buys anti-armor the
-    // moment it is needed, a medic once the squad can spare one (two in a big
-    // squad), an occasional machine gun, and riflemen as the backbone.
+    // Sustain indirect fire against covered stragglers, keep green troops
+    // supplied, then buy specialists and respond to the armor warning.
+    // The direct-fire probe skips mortars to measure infantry exchanges.
     if (friendlies.length < CONFIG.caps.friendly) {
       const medicsAlive = friendlies.filter((u) => u.role === 'medic').length;
       const mgAlive = friendlies.filter((u) => u.role === 'mg').length;
@@ -106,17 +108,55 @@ export function autoplay(seed: number, maxTicks = 60 * 30 * 60): AutoplayResult 
       const engineerAlive = friendlies.filter((u) => u.role === 'engineer').length;
 
       let want: FriendlyRole = 'rifleman';
-      if (radioAlive === 0) want = 'radio_engineer';
+      if (indirectSupport && !friendlies.some((unit) => unit.role === 'mortarman')) want = 'mortarman';
+      else if (indirectSupport && !friendlies.some((unit) => unit.role === 'supply_officer')) want = 'supply_officer';
+      else if (indirectSupport && medicsAlive === 0) want = 'medic';
+      else if (indirectSupport && armorComing && atAlive < AT_TARGET) want = 'at';
+      else if (indirectSupport && friendlies.filter((unit) => unit.role === 'mortarman').length < 3) want = 'mortarman';
       else if (engineerAlive === 0) want = 'engineer';
+      else if (radioAlive === 0) want = 'radio_engineer';
       else if (armorComing && atAlive < AT_TARGET) want = 'at';
       else if ((medicsAlive === 0 && friendlies.length >= 6) || (medicsAlive === 1 && friendlies.length >= 10)) want = 'medic';
       else if (recruitCounter % 4 === 3 && mgAlive < 3) want = 'mg';
 
       const cost = CONFIG.costs.recruit[want];
       if (s.points >= cost) {
-        const slot = SLOT_XS[recruitCounter % SLOT_XS.length] as number;
-        const pos = { x: slot + ((recruitCounter % 3) - 1) * 16, y: LINE_Y + (recruitCounter % 2) * 8 };
-        if (sim.command({ type: 'recruit', role: want, pos }).ok) recruitCounter++;
+        const slot = want === 'at' && indirectSupport ? [96, 480, 864][atAlive % 3]! : SLOT_XS[recruitCounter % SLOT_XS.length] as number;
+        const pos = { x: slot + ((recruitCounter % 3) - 1) * 16, y: 610 + (recruitCounter % 2) * 8 };
+        if (sim.command({ type: 'recruit', role: want, pos }).ok) {
+          const recruit = s.units.filter((unit) => unit.team === 'friendly').at(-1)!;
+          sim.command({ type: 'move', unitId: recruit.id, pos: { x: pos.x, y: want === 'at' && indirectSupport ? 540 : LINE_Y } });
+          recruitCounter++;
+        }
+      }
+    }
+
+    // Green troops need explicit support requests until veteran automation unlocks.
+    if (t % CONFIG.tickRate === 0) for (const unit of friendlies) {
+      if (unit.role === 'mortarman' && (unit.mortarBombs ?? 0) <= 1) sim.command({ type: 'callMortarSupplies', unitId: unit.id });
+      if (unit.role === 'at' && (unit.rockets ?? 0) <= 1) sim.command({ type: 'callRocketSupplies', unitId: unit.id });
+      if (unit.health < getContent().friendly[unit.role as FriendlyRole].health && !s.strikes.some((strike) => strike.source === 'enemy')) sim.command({ type: 'callMedic', unitId: unit.id });
+    }
+
+    if (indirectSupport && s.scheduler.phase === 'prep' && cleanupHomes.size) {
+      for (const [id, home] of cleanupHomes) sim.command({ type: 'move', unitId: id, pos: home });
+      cleanupHomes.clear();
+    }
+    // Cover and disabled armor can survive outside a static line's sight.
+    // An active commander sends a small cleanup party, then reforms for the next wave.
+    if (indirectSupport && t - lastKillTick > 60 * CONFIG.tickRate && t % (5 * CONFIG.tickRate) === 0
+      && s.scheduler.phase === 'active' && s.scheduler.spawnQueue.length === 0) {
+      const enemy = s.units.find((unit) => unit.team === 'enemy');
+      if (enemy) {
+        const armored = enemy.role === 'vehicle' || enemy.role === 'gun_truck';
+        const party = friendlies.filter((unit) => !unit.pinned && (armored ? unit.role === 'at' : unit.role === 'rifleman' || unit.role === 'mg'))
+          .sort((a, b) => Math.hypot(a.pos.x - enemy.pos.x, a.pos.y - enemy.pos.y) - Math.hypot(b.pos.x - enemy.pos.x, b.pos.y - enemy.pos.y)).slice(0, 2);
+        for (const [index, unit] of party.entries()) {
+          const home = { ...unit.pos };
+          const target = { x: Math.max(48, Math.min(CONFIG.field.width - 48, enemy.pos.x + (index ? 64 : -64))),
+            y: Math.max(128, Math.min(620, enemy.pos.y + 64)) };
+          if (sim.command({ type: 'move', unitId: unit.id, pos: target }).ok && !cleanupHomes.has(unit.id)) cleanupHomes.set(unit.id, home);
+        }
       }
     }
 
@@ -134,7 +174,32 @@ export function autoplay(seed: number, maxTicks = 60 * 30 * 60): AutoplayResult 
             best = e;
           }
         }
-        if (bestCount >= (wave >= 8 ? 3 : 4)) sim.command({ type: 'artillery', pos: { x: best.pos.x, y: best.pos.y } });
+        if (bestCount >= (wave >= 8 ? 3 : 4) && friendlies.every((unit) => Math.hypot(unit.pos.x - best.pos.x, unit.pos.y - best.pos.y) > CONFIG.artillery.radius + 16)) sim.command({ type: 'artillery', pos: { x: best.pos.x, y: best.pos.y } });
+      }
+    }
+
+    if (indirectSupport) {
+      const hazards = s.strikes.filter((strike) => strike.landTick > s.ticks);
+      if (!hazards.length && evadeHomes.size) {
+        for (const [id, home] of evadeHomes) sim.command({ type: 'move', unitId: id, pos: home });
+        evadeHomes.clear();
+      }
+      for (const unit of friendlies) {
+        const threat = hazards.find((strike) => Math.hypot(unit.pos.x - strike.pos.x, unit.pos.y - strike.pos.y) <= strike.radius + 12);
+        if (!threat || unit.pinned) continue;
+        if (unit.path.length && unit.moveGoal && hazards.every((strike) => Math.hypot(unit.moveGoal!.x - strike.pos.x, unit.moveGoal!.y - strike.pos.y) > strike.radius + 12)) continue;
+        const candidates = Array.from({ length: 16 }, (_, index) => {
+          const angle = index * Math.PI / 8;
+          return { x: threat.pos.x + Math.cos(angle) * (threat.radius + 30), y: threat.pos.y + Math.sin(angle) * (threat.radius + 30) };
+        }).filter((pos) => pos.x >= 24 && pos.x <= CONFIG.field.width - 24 && pos.y >= 128 && pos.y <= CONFIG.field.height - 24
+          && hazards.every((strike) => Math.hypot(pos.x - strike.pos.x, pos.y - strike.pos.y) > strike.radius + 16))
+          .sort((a, b) => Math.hypot(a.x - unit.pos.x, a.y - unit.pos.y) - Math.hypot(b.x - unit.pos.x, b.y - unit.pos.y));
+        const home = { ...unit.pos };
+        for (const pos of candidates) if (sim.command({ type: 'move', unitId: unit.id, pos }).ok) {
+          if (!evadeHomes.has(unit.id)) evadeHomes.set(unit.id, home);
+          sim.command({ type: 'pace', unitIds: [unit.id], pace: 'run' });
+          break;
+        }
       }
     }
 
@@ -147,14 +212,14 @@ export function autoplay(seed: number, maxTicks = 60 * 30 * 60): AutoplayResult 
           enemiesThatFired.add(ev.shooterId);
         } else friendlyShots++;
       }
-      if (ev.type === 'unitDied' && ev.team === 'enemy') kills++;
+      if (ev.type === 'unitDied' && ev.team === 'enemy') { kills++; lastKillTick = t; }
       if (ev.type === 'breakthrough') breakthroughs++;
     }
   }
 
   const s = sim.state;
   return {
-    victory: s.phase === 'victory',
+    sectorSecured: s.sectorCaptured,
     score: s.score,
     waveReached: s.scheduler.waveIndex + 1,
     friendlies: s.units.filter((u) => u.team === 'friendly').length,
@@ -179,7 +244,7 @@ export function passiveRun(seed: number, maxTicks = 60 * 30 * 60): AutoplayResul
   let enemiesSpawned = 0;
   const enemiesThatFired = new Set<number>();
   for (let t = 0; t < maxTicks; t++) {
-    if (sim.state.phase !== 'running') break;
+    if (sim.state.phase !== 'running' || sim.state.sectorCaptured) break;
     const events = sim.step();
     for (const ev of events) {
       if (ev.type === 'unitSpawned' && ev.team === 'enemy') enemiesSpawned++;
@@ -195,7 +260,7 @@ export function passiveRun(seed: number, maxTicks = 60 * 30 * 60): AutoplayResul
   }
   const s = sim.state;
   return {
-    victory: s.phase === 'victory',
+    sectorSecured: s.sectorCaptured,
     score: s.score,
     waveReached: s.scheduler.waveIndex + 1,
     friendlies: s.units.filter((u) => u.team === 'friendly').length,

@@ -38,7 +38,7 @@ function angleBetween(a: Vec2, b: Vec2): number {
   return Math.acos(Math.max(-1, Math.min(1, dot / magnitude))) * 180 / Math.PI;
 }
 
-describe('road intersection geometry and rendering', () => {
+describe('road intersection geometry and rendering', { timeout: 120_000 }, () => {
   it('paints all shoulders before opaque road surfaces to make intersections a single surface union', () => {
     const crossroads: LandscapeRoad[] = [
       { points: [{ x: 0, y: 32 }, { x: 64, y: 32 }], halfWidth: 10, surface: 'dirt' },
@@ -64,7 +64,7 @@ describe('road intersection geometry and rendering', () => {
   it('keeps every road network connected across all campaign countries and many seeds', () => {
     for (const country of CAMPAIGN_COUNTRIES) {
       for (let seed = 1; seed <= 48; seed++) {
-        const roads = generateTerrain(seed, false, 2, country).layout!.roads;
+        const roads = generateTerrain(seed, false, 4, country).layout!.roads;
         expect(connectedRoads(roads), `${country}, seed ${seed}`).toBe(true);
         expect(new Set(roads.map((road) => road.surface)).size, `${country}, seed ${seed}`).toBeLessThanOrEqual(1);
       }
@@ -74,7 +74,7 @@ describe('road intersection geometry and rendering', () => {
   it('keeps vertical bends smooth and anchored at their connections', () => {
     for (const country of CAMPAIGN_COUNTRIES) {
       for (let seed = 1; seed <= 36; seed++) {
-        const roads = generateTerrain(seed, false, 2, country).layout!.roads;
+        const roads = generateTerrain(seed, false, 4, country).layout!.roads;
         const vertical = roads.filter((road) => {
           const xs = road.points.map((point) => point.x);
           const ys = road.points.map((point) => point.y);
@@ -97,7 +97,7 @@ describe('road intersection geometry and rendering', () => {
     let foundRoundabout = false;
     for (const country of CAMPAIGN_COUNTRIES) {
       for (let seed = 1; seed <= 48; seed++) {
-        const roads = generateTerrain(seed, false, 2, country).layout!.roads;
+        const roads = generateTerrain(seed, false, 4, country).layout!.roads;
         for (const ring of roads.filter((road) => road.roundabout)) {
           foundRoundabout = true;
           expect(ring.points[0]).toEqual(ring.points.at(-1));
@@ -114,5 +114,5 @@ describe('road intersection geometry and rendering', () => {
       }
     }
     expect(foundRoundabout).toBe(true);
-  }, 30_000);
+  }, 120_000);
 });

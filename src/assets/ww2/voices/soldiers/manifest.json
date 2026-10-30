@@ -1,0 +1,642 @@
+[
+  {
+    "id": "michael-contact-1",
+    "voice": "michael",
+    "text": "Contact front! Hold the line!",
+    "cue": "contact",
+    "file": "michael-contact-1.wav"
+  },
+  {
+    "id": "michael-contact-2",
+    "voice": "michael",
+    "text": "Enemy spotted! Keep your heads down!",
+    "cue": "contact",
+    "file": "michael-contact-2.wav"
+  },
+  {
+    "id": "michael-kill-1",
+    "voice": "michael",
+    "text": "Target down. Keep watch.",
+    "cue": "kill",
+    "file": "michael-kill-1.wav"
+  },
+  {
+    "id": "michael-kill-2",
+    "voice": "michael",
+    "text": "Good hit! Watch for the next one!",
+    "cue": "kill",
+    "file": "michael-kill-2.wav"
+  },
+  {
+    "id": "michael-wounded-1",
+    "voice": "michael",
+    "text": "I'm hit! Need cover!",
+    "cue": "wounded",
+    "file": "michael-wounded-1.wav"
+  },
+  {
+    "id": "michael-wounded-2",
+    "voice": "michael",
+    "text": "Pinned down! Cover me!",
+    "cue": "wounded",
+    "file": "michael-wounded-2.wav"
+  },
+  {
+    "id": "michael-medic-1",
+    "voice": "michael",
+    "text": "Medic here! Hold still.",
+    "cue": "medic",
+    "file": "michael-medic-1.wav"
+  },
+  {
+    "id": "michael-medic-2",
+    "voice": "michael",
+    "text": "Dressing applied. Keep behind cover.",
+    "cue": "medic",
+    "file": "michael-medic-2.wav"
+  },
+  {
+    "id": "michael-wave-1",
+    "voice": "michael",
+    "text": "Here they come! Hold your positions!",
+    "cue": "wave",
+    "file": "michael-wave-1.wav"
+  },
+  {
+    "id": "michael-wave-2",
+    "voice": "michael",
+    "text": "Check your sectors! Get ready!",
+    "cue": "wave",
+    "file": "michael-wave-2.wav"
+  },
+  {
+    "id": "michael-clear-1",
+    "voice": "michael",
+    "text": "That attack is over. Reload and check the wounded.",
+    "cue": "clear",
+    "file": "michael-clear-1.wav"
+  },
+  {
+    "id": "michael-clear-2",
+    "voice": "michael",
+    "text": "We held! Check your ammunition.",
+    "cue": "clear",
+    "file": "michael-clear-2.wav"
+  },
+  {
+    "id": "michael-ambient-1",
+    "voice": "michael",
+    "text": "Keep your eyes open.",
+    "cue": "ambient",
+    "file": "michael-ambient-1.wav"
+  },
+  {
+    "id": "michael-ambient-2",
+    "voice": "michael",
+    "text": "Stay close. Watch your sector.",
+    "cue": "ambient",
+    "file": "michael-ambient-2.wav"
+  },
+  {
+    "id": "michael-breakthrough-1",
+    "voice": "michael",
+    "text": "Enemy through the line! Cover the gap!",
+    "cue": "breakthrough",
+    "file": "michael-breakthrough-1.wav"
+  },
+  {
+    "id": "michael-breakthrough-2",
+    "voice": "michael",
+    "text": "They are getting through! Close the gap!",
+    "cue": "breakthrough",
+    "file": "michael-breakthrough-2.wav"
+  },
+  {
+    "id": "michael-artillery-1",
+    "voice": "michael",
+    "text": "Incoming artillery! Take cover!",
+    "cue": "artillery",
+    "file": "michael-artillery-1.wav"
+  },
+  {
+    "id": "michael-artillery-2",
+    "voice": "michael",
+    "text": "Incoming! Get down!",
+    "cue": "artillery",
+    "file": "michael-artillery-2.wav"
+  },
+  {
+    "id": "michael-construction-1",
+    "voice": "michael",
+    "text": "Position ready.",
+    "cue": "construction",
+    "file": "michael-construction-1.wav"
+  },
+  {
+    "id": "michael-construction-2",
+    "voice": "michael",
+    "text": "Work complete. Ready for orders.",
+    "cue": "construction",
+    "file": "michael-construction-2.wav"
+  },
+  {
+    "id": "michael-supplies-1",
+    "voice": "michael",
+    "text": "Ammunition delivered.",
+    "cue": "supplies",
+    "file": "michael-supplies-1.wav"
+  },
+  {
+    "id": "michael-supplies-2",
+    "voice": "michael",
+    "text": "Supplies are here! Pass them forward.",
+    "cue": "supplies",
+    "file": "michael-supplies-2.wav"
+  },
+  {
+    "id": "michael-airSupport-1",
+    "voice": "michael",
+    "text": "Aircraft inbound! Clear the target!",
+    "cue": "airSupport",
+    "file": "michael-airSupport-1.wav"
+  },
+  {
+    "id": "michael-airSupport-2",
+    "voice": "michael",
+    "text": "Air support is on the way!",
+    "cue": "airSupport",
+    "file": "michael-airSupport-2.wav"
+  },
+  {
+    "id": "michael-flare-1",
+    "voice": "michael",
+    "text": "Flare away! Watch the target!",
+    "cue": "flare",
+    "file": "michael-flare-1.wav"
+  },
+  {
+    "id": "michael-flare-2",
+    "voice": "michael",
+    "text": "Light is up! Keep watch!",
+    "cue": "flare",
+    "file": "michael-flare-2.wav"
+  },
+  {
+    "id": "michael-mortar-away",
+    "voice": "michael",
+    "text": "Mortar round away!",
+    "file": "michael-mortar-away.wav"
+  },
+  {
+    "id": "michael-tank-spotted",
+    "voice": "michael",
+    "text": "Tank observed.",
+    "file": "michael-tank-spotted.wav"
+  },
+  {
+    "id": "michael-mg-spotted",
+    "voice": "michael",
+    "text": "Machine-gun team observed.",
+    "file": "michael-mg-spotted.wav"
+  },
+  {
+    "id": "michael-sappers-spotted",
+    "voice": "michael",
+    "text": "Sappers observed.",
+    "file": "michael-sappers-spotted.wav"
+  },
+  {
+    "id": "michael-transport-spotted",
+    "voice": "michael",
+    "text": "Troop transport observed.",
+    "file": "michael-transport-spotted.wav"
+  },
+  {
+    "id": "michael-infantry-spotted",
+    "voice": "michael",
+    "text": "Enemy infantry observed.",
+    "file": "michael-infantry-spotted.wav"
+  },
+  {
+    "id": "michael-rally",
+    "voice": "michael",
+    "text": "Stay together! Hold this position!",
+    "file": "michael-rally.wav"
+  },
+  {
+    "id": "michael-observe",
+    "voice": "michael",
+    "text": "Observation post ready. Watching the approaches.",
+    "file": "michael-observe.wav"
+  },
+  {
+    "id": "michael-supply-point",
+    "voice": "michael",
+    "text": "Forward ammunition point ready. Bring the men here.",
+    "file": "michael-supply-point.wav"
+  },
+  {
+    "id": "michael-repair",
+    "voice": "michael",
+    "text": "Repair detail standing by. Cover us while we work.",
+    "file": "michael-repair.wav"
+  },
+  {
+    "id": "michael-suppress",
+    "voice": "michael",
+    "text": "Covering the marked ground! Keep their heads down!",
+    "file": "michael-suppress.wav"
+  },
+  {
+    "id": "michael-upgrade",
+    "voice": "michael",
+    "text": "Working on my weapon. Cover me.",
+    "file": "michael-upgrade.wav"
+  },
+  {
+    "id": "michael-grenades",
+    "voice": "michael",
+    "text": "Grenades delivered.",
+    "file": "michael-grenades.wav"
+  },
+  {
+    "id": "michael-rockets",
+    "voice": "michael",
+    "text": "Rockets delivered.",
+    "file": "michael-rockets.wav"
+  },
+  {
+    "id": "michael-mortar-bombs",
+    "voice": "michael",
+    "text": "Mortar bombs delivered.",
+    "file": "michael-mortar-bombs.wav"
+  },
+  {
+    "id": "michael-thanks",
+    "voice": "michael",
+    "text": "Thanks, doc.",
+    "file": "michael-thanks.wav"
+  },
+  {
+    "id": "michael-understood",
+    "voice": "michael",
+    "text": "Understood! Keeping low!",
+    "file": "michael-understood.wav"
+  },
+  {
+    "id": "michael-request-rations",
+    "voice": "michael",
+    "text": "Quartermaster, send rations. Over.",
+    "file": "michael-request-rations.wav"
+  },
+  {
+    "id": "michael-request-artillery",
+    "voice": "michael",
+    "text": "Battery, fire on my mark. Over.",
+    "file": "michael-request-artillery.wav"
+  },
+  {
+    "id": "michael-request-air",
+    "voice": "michael",
+    "text": "Air Control, strike on my mark. Over.",
+    "file": "michael-request-air.wav"
+  },
+  {
+    "id": "michael-request-flare",
+    "voice": "michael",
+    "text": "Flare on mark. Over.",
+    "file": "michael-request-flare.wav"
+  },
+  {
+    "id": "michael-preview",
+    "voice": "michael",
+    "text": "American radio check. Ready for orders.",
+    "file": "michael-preview.wav"
+  },
+  {
+    "id": "puck-contact-1",
+    "voice": "puck",
+    "text": "Contact front! Hold the line!",
+    "cue": "contact",
+    "file": "puck-contact-1.wav"
+  },
+  {
+    "id": "puck-contact-2",
+    "voice": "puck",
+    "text": "Enemy spotted! Keep your heads down!",
+    "cue": "contact",
+    "file": "puck-contact-2.wav"
+  },
+  {
+    "id": "puck-kill-1",
+    "voice": "puck",
+    "text": "Target down. Keep watch.",
+    "cue": "kill",
+    "file": "puck-kill-1.wav"
+  },
+  {
+    "id": "puck-kill-2",
+    "voice": "puck",
+    "text": "Good hit! Watch for the next one!",
+    "cue": "kill",
+    "file": "puck-kill-2.wav"
+  },
+  {
+    "id": "puck-wounded-1",
+    "voice": "puck",
+    "text": "I'm hit! Need cover!",
+    "cue": "wounded",
+    "file": "puck-wounded-1.wav"
+  },
+  {
+    "id": "puck-wounded-2",
+    "voice": "puck",
+    "text": "Pinned down! Cover me!",
+    "cue": "wounded",
+    "file": "puck-wounded-2.wav"
+  },
+  {
+    "id": "puck-medic-1",
+    "voice": "puck",
+    "text": "Medic here! Hold still.",
+    "cue": "medic",
+    "file": "puck-medic-1.wav"
+  },
+  {
+    "id": "puck-medic-2",
+    "voice": "puck",
+    "text": "Dressing applied. Keep behind cover.",
+    "cue": "medic",
+    "file": "puck-medic-2.wav"
+  },
+  {
+    "id": "puck-wave-1",
+    "voice": "puck",
+    "text": "Here they come! Hold your positions!",
+    "cue": "wave",
+    "file": "puck-wave-1.wav"
+  },
+  {
+    "id": "puck-wave-2",
+    "voice": "puck",
+    "text": "Check your sectors! Get ready!",
+    "cue": "wave",
+    "file": "puck-wave-2.wav"
+  },
+  {
+    "id": "puck-clear-1",
+    "voice": "puck",
+    "text": "That attack is over. Reload and check the wounded.",
+    "cue": "clear",
+    "file": "puck-clear-1.wav"
+  },
+  {
+    "id": "puck-clear-2",
+    "voice": "puck",
+    "text": "We held! Check your ammunition.",
+    "cue": "clear",
+    "file": "puck-clear-2.wav"
+  },
+  {
+    "id": "puck-ambient-1",
+    "voice": "puck",
+    "text": "Keep your eyes open.",
+    "cue": "ambient",
+    "file": "puck-ambient-1.wav"
+  },
+  {
+    "id": "puck-ambient-2",
+    "voice": "puck",
+    "text": "Stay close. Watch your sector.",
+    "cue": "ambient",
+    "file": "puck-ambient-2.wav"
+  },
+  {
+    "id": "puck-breakthrough-1",
+    "voice": "puck",
+    "text": "Enemy through the line! Cover the gap!",
+    "cue": "breakthrough",
+    "file": "puck-breakthrough-1.wav"
+  },
+  {
+    "id": "puck-breakthrough-2",
+    "voice": "puck",
+    "text": "They are getting through! Close the gap!",
+    "cue": "breakthrough",
+    "file": "puck-breakthrough-2.wav"
+  },
+  {
+    "id": "puck-artillery-1",
+    "voice": "puck",
+    "text": "Incoming artillery! Take cover!",
+    "cue": "artillery",
+    "file": "puck-artillery-1.wav"
+  },
+  {
+    "id": "puck-artillery-2",
+    "voice": "puck",
+    "text": "Incoming! Get down!",
+    "cue": "artillery",
+    "file": "puck-artillery-2.wav"
+  },
+  {
+    "id": "puck-construction-1",
+    "voice": "puck",
+    "text": "Position ready.",
+    "cue": "construction",
+    "file": "puck-construction-1.wav"
+  },
+  {
+    "id": "puck-construction-2",
+    "voice": "puck",
+    "text": "Work complete. Ready for orders.",
+    "cue": "construction",
+    "file": "puck-construction-2.wav"
+  },
+  {
+    "id": "puck-supplies-1",
+    "voice": "puck",
+    "text": "Ammunition delivered.",
+    "cue": "supplies",
+    "file": "puck-supplies-1.wav"
+  },
+  {
+    "id": "puck-supplies-2",
+    "voice": "puck",
+    "text": "Supplies are here! Pass them forward.",
+    "cue": "supplies",
+    "file": "puck-supplies-2.wav"
+  },
+  {
+    "id": "puck-airSupport-1",
+    "voice": "puck",
+    "text": "Aircraft inbound! Clear the target!",
+    "cue": "airSupport",
+    "file": "puck-airSupport-1.wav"
+  },
+  {
+    "id": "puck-airSupport-2",
+    "voice": "puck",
+    "text": "Air support is on the way!",
+    "cue": "airSupport",
+    "file": "puck-airSupport-2.wav"
+  },
+  {
+    "id": "puck-flare-1",
+    "voice": "puck",
+    "text": "Flare away! Watch the target!",
+    "cue": "flare",
+    "file": "puck-flare-1.wav"
+  },
+  {
+    "id": "puck-flare-2",
+    "voice": "puck",
+    "text": "Light is up! Keep watch!",
+    "cue": "flare",
+    "file": "puck-flare-2.wav"
+  },
+  {
+    "id": "puck-mortar-away",
+    "voice": "puck",
+    "text": "Mortar round away!",
+    "file": "puck-mortar-away.wav"
+  },
+  {
+    "id": "puck-tank-spotted",
+    "voice": "puck",
+    "text": "Tank observed.",
+    "file": "puck-tank-spotted.wav"
+  },
+  {
+    "id": "puck-mg-spotted",
+    "voice": "puck",
+    "text": "Machine-gun team observed.",
+    "file": "puck-mg-spotted.wav"
+  },
+  {
+    "id": "puck-sappers-spotted",
+    "voice": "puck",
+    "text": "Sappers observed.",
+    "file": "puck-sappers-spotted.wav"
+  },
+  {
+    "id": "puck-transport-spotted",
+    "voice": "puck",
+    "text": "Troop transport observed.",
+    "file": "puck-transport-spotted.wav"
+  },
+  {
+    "id": "puck-infantry-spotted",
+    "voice": "puck",
+    "text": "Enemy infantry observed.",
+    "file": "puck-infantry-spotted.wav"
+  },
+  {
+    "id": "puck-rally",
+    "voice": "puck",
+    "text": "Stay together! Hold this position!",
+    "file": "puck-rally.wav"
+  },
+  {
+    "id": "puck-observe",
+    "voice": "puck",
+    "text": "Observation post ready. Watching the approaches.",
+    "file": "puck-observe.wav"
+  },
+  {
+    "id": "puck-supply-point",
+    "voice": "puck",
+    "text": "Forward ammunition point ready. Bring the men here.",
+    "file": "puck-supply-point.wav"
+  },
+  {
+    "id": "puck-repair",
+    "voice": "puck",
+    "text": "Repair detail standing by. Cover us while we work.",
+    "file": "puck-repair.wav"
+  },
+  {
+    "id": "puck-suppress",
+    "voice": "puck",
+    "text": "Covering the marked ground! Keep their heads down!",
+    "file": "puck-suppress.wav"
+  },
+  {
+    "id": "puck-upgrade",
+    "voice": "puck",
+    "text": "Working on my weapon. Cover me.",
+    "file": "puck-upgrade.wav"
+  },
+  {
+    "id": "puck-grenades",
+    "voice": "puck",
+    "text": "Grenades delivered.",
+    "file": "puck-grenades.wav"
+  },
+  {
+    "id": "puck-rockets",
+    "voice": "puck",
+    "text": "Rockets delivered.",
+    "file": "puck-rockets.wav"
+  },
+  {
+    "id": "puck-mortar-bombs",
+    "voice": "puck",
+    "text": "Mortar bombs delivered.",
+    "file": "puck-mortar-bombs.wav"
+  },
+  {
+    "id": "puck-thanks",
+    "voice": "puck",
+    "text": "Thanks, doc.",
+    "file": "puck-thanks.wav"
+  },
+  {
+    "id": "puck-understood",
+    "voice": "puck",
+    "text": "Understood! Keeping low!",
+    "file": "puck-understood.wav"
+  },
+  {
+    "id": "puck-request-rations",
+    "voice": "puck",
+    "text": "Quartermaster, send rations. Over.",
+    "file": "puck-request-rations.wav"
+  },
+  {
+    "id": "puck-request-artillery",
+    "voice": "puck",
+    "text": "Battery, fire on my mark. Over.",
+    "file": "puck-request-artillery.wav"
+  },
+  {
+    "id": "puck-request-air",
+    "voice": "puck",
+    "text": "Air Control, strike on my mark. Over.",
+    "file": "puck-request-air.wav"
+  },
+  {
+    "id": "puck-request-flare",
+    "voice": "puck",
+    "text": "Flare on mark. Over.",
+    "file": "puck-request-flare.wav"
+  },
+  {
+    "id": "puck-preview",
+    "voice": "puck",
+    "text": "American radio check. Ready for orders.",
+    "file": "puck-preview.wav"
+  },
+  {
+    "id": "control-roger",
+    "voice": "fenrir",
+    "text": "Roger.",
+    "file": "control-roger.wav"
+  },
+  {
+    "id": "control-fire-away",
+    "voice": "fenrir",
+    "text": "Fire away.",
+    "file": "control-fire-away.wav"
+  }
+]

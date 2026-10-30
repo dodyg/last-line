@@ -17,7 +17,7 @@ audio.setPrefs(prefs);
 
 let controller!: GameController;
 const menus = new Menus({
-  onNewGame: (country) => controller.newRun(undefined, country),
+  onNewGame: (country, runMode) => controller.newRun(undefined, country, runMode),
   onContinue: () => controller.continueRun(),
   onResume: () => controller.resumeRun(),
   onRestart: () => controller.restartRun(),
@@ -38,8 +38,9 @@ const menus = new Menus({
 const hud = new Hud({
   onCallSupplies: (unitId) => controller.callSupplies(unitId),
   onCallMedic: (unitId) => controller.callMedic(unitId),
+  onWithdrawSoldier: (unitId) => controller.withdrawSoldier(unitId),
   onSoldierSelect: (unitId, additive) => controller.selectSoldier(unitId, additive),
-  onRecruitSelect: (role) => controller.setMode({ kind: 'recruit', role }),
+  onRecruitSelect: (role) => controller.beginRecruitment(role),
   onBarbedWire: () => controller.setMode({ kind: 'barbedWire' }),
   onSandbag: () => controller.setMode({ kind: 'sandbag' }),
   onTrench: () => controller.setMode({ kind: 'trench' }),
@@ -53,6 +54,7 @@ const hud = new Hud({
   onFoodSupplies: () => controller.requestFoodSupplies(),
   onSmoke: () => controller.beginSmoke(),
   onSatchel: () => controller.beginSatchel(),
+  onDemolishFence: () => controller.beginFenceDemolition(),
   onLightFire: () => controller.lightSelectedFire(),
   onAmbush: (arcDegrees) => controller.toggleAmbush(arcDegrees),
   onAmbushArcChange: (arcDegrees) => controller.updateAmbushArc(arcDegrees),
@@ -67,7 +69,10 @@ const hud = new Hud({
   onHeadlights: () => controller.toggleVehicleHeadlights(),
   onSpecialization: (specialization) => controller.chooseSpecialization(specialization),
   onWeaponUpgrade: (type) => controller.purchaseWeaponUpgrade(type),
+  onWeaponIssue: (weaponId) => controller.issueWeapon(weaponId),
   onCancelMode: () => controller.cancelMode(),
+  onCallWave: () => controller.callNextWave(),
+  onToggleBattleSpeed: () => controller.toggleBattleSpeed(),
   onPauseToggle: () => controller.togglePause(),
   onHelp: () => menus.showHelp(),
   onSettings: () => controller.openSettings(),
@@ -95,6 +100,7 @@ try {
 if (new URLSearchParams(window.location.search).has('e2e')) {
   void import('./e2e-hook').then((m) => m.installE2EHooks(controller, () => runtime));
 }
+
 
 const commandToggle = document.getElementById('btn-toggle-commands')!;
 commandToggle.addEventListener('click', () => {

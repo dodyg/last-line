@@ -16,32 +16,18 @@ function fixture(voices: Array<{ name: string; lang: string }>) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Radio voice accents', () => {
-  it('keeps player chatter American when other English voices are natural', () => {
-    const { audio, speak } = fixture([
-      { name: 'Microsoft David', lang: 'en-US' },
-      { name: 'George Natural', lang: 'en-GB' },
-      { name: 'James Neural', lang: 'en-AU' },
-    ]);
-    for (let soldier = 0; soldier < 10; soldier++) {
-      audio.speakChatter('Contact!', 'friendly', 'shout', soldier);
-    }
-    expect(speak).toHaveBeenCalledTimes(10);
-    for (const [utterance] of speak.mock.calls) {
-      expect(utterance.voice.name).toBe('Microsoft David');
-      expect(utterance.lang).toBe('en-US');
-    }
+  it('does not substitute system voices for friendly recorded chatter', () => {
+    const { audio, speak } = fixture([{ name: 'Microsoft David', lang: 'en-US' }]);
+    audio.speakChatter('Contact!', 'friendly');
+    expect(speak).not.toHaveBeenCalled();
   });
 
-  it('uses American voices for both sides of a player support exchange', () => {
-    const { audio, speak } = fixture([
-      { name: 'Microsoft David', lang: 'en-US' },
-      { name: 'George Natural', lang: 'en-GB' },
-    ]);
-    audio.speakRadioExchange('Requesting support.', 'Support inbound.', 1, vi.fn());
-    const call = speak.mock.calls[0]![0];
-    expect(call.lang).toBe('en-US');
-    call.onend();
-    expect(speak.mock.calls[1]![0].lang).toBe('en-US');
+  it('does not substitute system speech when recorded support audio cannot play', () => {
+    const { audio, speak } = fixture([{ name: 'Microsoft David', lang: 'en-US' }]);
+    const done = vi.fn();
+    audio.speakRadioExchange('Requesting support.', 'Support inbound.', 1, done);
+    expect(speak).not.toHaveBeenCalled();
+    expect(done).toHaveBeenCalledExactlyOnceWith(false);
   });
 
   it('does not substitute another accent when no American male voice is installed', () => {

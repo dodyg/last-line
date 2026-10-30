@@ -2,6 +2,7 @@ import { battlePressure } from './soundscape';
 import { landmarkHint, localShelter } from '../simulation/environment';
 import { ambushShape, supportsAmbush } from '../simulation/ambush';
 import { wireContains } from '../simulation/barbed-wire';
+import { operationOrders, sectorWaves, type RunMode } from '../content/operations';
 import { CONFIG } from '../content/config';
 import { CAMPAIGNS } from '../content/campaigns';
 import { campaignChapter, type FieldDispatch } from '../content/campaign-story';
@@ -35,14 +36,18 @@ import { buildingArchitecture } from '../simulation/buildings';
 import { SEASON_NAMES, seasonForSeed } from '../simulation/seasons';
 import { isPatrolRole, patrolArea, validPatrolArea } from '../simulation/patrol';
 import { satchelError } from '../simulation/satchels';
+import { fenceDemolitionError, FENCE_DEMOLITION_RANGE } from '../simulation/fence-demolition';
+import { recruitBuild } from '../simulation/recruit-build';
+import type { RecruitBuild } from '../simulation/types';
 import type { BuildingFacing, BuildingLevel } from '../simulation/types';
 
 export type UIMode =
   | { kind: 'none' }
+  | { kind: 'move' }
   | { kind: 'suppress'; unitId: number }
   | { kind: 'ambush'; unitIds: number[]; arcDegrees: number }
   | { kind: 'patrol'; unitIds: number[]; origin?: { x: number; y: number } }
-  | { kind: 'recruit'; role: FriendlyRole }
+  | { kind: 'recruit'; role: FriendlyRole; build?: RecruitBuild }
   | { kind: 'barbedWire' }
   | { kind: 'sandbag' }
   | { kind: 'trench' }
@@ -54,6 +59,7 @@ export type UIMode =
   | { kind: 'airSupport' }
   | { kind: 'flare' }
   | { kind: 'satchel' }
+  | { kind: 'demolishFence' }
   | { kind: 'smoke' };
 
 const STEP_MS = 1000 / CONFIG.tickRate;
@@ -104,6 +110,12 @@ export class GameController {
   private readonly menus: Menus;
 
   private sim: Simulation | null = null;
+
+  get battlefieldState(): SimState | null { return this.mapReviewActive ? null : this.sim?.state ?? null; }
+
+  beginMove(): void {
+    if (this.selectedUnits().length && !this.isPaused) this.setMode({ kind: 'move' });
+  }
   private terrainData: TerrainData | null = null;
   private idlePreviewState: SimState | null = null;
   private renderer: RendererPort | null = null;
@@ -367,12 +379,13 @@ export class GameController {
     return { available: true, message: null };
   }
 
-  newRun(seed?: number, country?: CampaignCountry): void {
+  newRun(seed?: number, country?: CampaignCountry, runMode: RunMode = 'campaign'): void {
     const runSeed = seed ?? (Math.random() * 0xffffffff) >>> 0;
     // Generate the battlefield once and hand it to the simulation, which would
     // otherwise generate an identical copy for itself.
     const terrainData = generateTerrain(runSeed, true, 4, country);
     this.sim = new Simulation(runSeed, undefined, terrainData);
+    this.sim.state.runMode = runMode;
     this.terrainData = terrainData;
     this.afterRunSetup();
     this.hud.notice(`${country === undefined ? '' : CAMPAIGNS[country].name + ' campaign · '}Map 1 - wave 1 approaching. Deploy your defenses.`, 'info');
@@ -445,6 +458,8 @@ export class GameController {
   }
 
   private afterRunSetup(): void {
+    this.battleSpeed = 1;
+    this.hud.setBattleSpeed(1);
     this.radio.reset();
     this.clearSelection();
     this.cancelDrag();
@@ -480,6 +495,8 @@ export class GameController {
     saveBest(this.storage, this.best);
     const summary = {
       campaignCountry: s.campaignCountry,
+      runMode: s.runMode,
+      waveGoal: sectorWaves(s),
       score,
       waves: s.scheduler.waveIndex + 1,
       kills: s.battleRecord.enemyKills,
@@ -526,6 +543,8 @@ export class GameController {
       country: s.campaignCountry,
       mapsCleared: s.mapsCleared,
       mapNumber: s.mapNumber,
+      runMode: s.runMode,
+      objective: s.runMode === 'operation' ? operationOrders(s) : undefined,
       sector: this.terrainData?.layout?.label ?? 'Forward position',
       squad: s.units.filter((unit) => unit.team === 'friendly' && !unit.dead && unit.health > 0 && !unit.crossed).length,
       arrival,
@@ -570,6 +589,22 @@ export class GameController {
     this.overlayOpen = false;
   }
 
+  private battleSpeed = 1;
+
+  toggleBattleSpeed(): void {
+    if (!this.requireSim()) return;
+    this.battleSpeed = this.battleSpeed === 1 ? 2 : 1;
+    this.hud.setBattleSpeed(this.battleSpeed);
+  }
+
+  callNextWave(): void {
+    const sim = this.requireSim();
+    if (!sim) return;
+    const result = sim.command({ type: 'callWave' });
+    if (!result.ok) this.hud.notice(result.reason ?? 'Unable to call the next wave.', 'warn');
+    else this.setMode({ kind: 'none' });
+  }
+
   togglePause(): void {
     if (this.sim === null || this.sim.state.phase !== 'running') return;
     if (this.sim.paused) {
@@ -591,7 +626,7 @@ export class GameController {
 
   restartRun(): void {
     if (this.sim === null) return;
-    this.newRun(this.sim.state.baseTerrainSeed, this.sim.state.campaignCountry);
+    this.newRun(this.sim.state.baseTerrainSeed, this.sim.state.campaignCountry, this.sim.state.runMode);
     this.audio.play('ui');
   }
 
@@ -644,7 +679,7 @@ export class GameController {
     const state = sim.state;
 
     if (!sim.paused && state.phase === 'running') {
-      this.accumulator += Math.min(deltaMs, 250);
+      this.accumulator += Math.min(deltaMs, 250) * this.battleSpeed;
       let steps = 0;
       const collected: SimEvent[] = [];
       while (this.accumulator >= STEP_MS && steps < MAX_STEPS_PER_FRAME) {
@@ -768,6 +803,7 @@ export class GameController {
     this.cancelMode();
     if (additive) this.toggleSelection(unit.id);
     else this.setSelection([unit.id]);
+    if (this.selectionIds.includes(unit.id)) this.audio.acknowledgeSelection(unit.id, (unit.pos.x / CONFIG.field.width) * 2 - 1);
   }
 
   callMedic(unitId: number): void {
@@ -792,16 +828,17 @@ export class GameController {
     if (!sim) return;
     const role = sim.state.units.find((unit) => unit.id === unitId)?.role;
     const rockets = role === 'at', mortar = role === 'mortarman';
-    const result = sim.command({ type: mortar ? 'callMortarSupplies' : rockets ? 'callRocketSupplies' : 'callGrenadeSupplies', unitId });
+    const specialist = role === 'grenadier' || role === 'flamethrower';
+    const result = sim.command({ type: specialist ? 'callSpecialistSupplies' : mortar ? 'callMortarSupplies' : rockets ? 'callRocketSupplies' : 'callGrenadeSupplies', unitId });
     if (!result.ok) { this.hud.notice(result.reason ?? 'Unable to request ammunition.', 'warn'); return; }
     const recipient = sim.state.units.find((u) => u.id === unitId)!;
-    if (rockets || mortar) this.audio.play('ui');
+    if (rockets || mortar || specialist) this.audio.play('ui');
     else this.audio.shoutGrenadeSupplies((recipient.pos.x / CONFIG.field.width) * 2 - 1);
-    this.hud.chatter('friendly', `${this.soldierLabel(unitId)}: ${mortar ? 'Mortar' : rockets ? 'Rocket' : 'Grenade'} supplies!`);
+    this.hud.chatter('friendly', `${this.soldierLabel(unitId)}: ${specialist ? role === 'flamethrower' ? 'Fuel' : 'Rifle grenade' : mortar ? 'Mortar' : rockets ? 'Rocket' : 'Grenade'} supplies!`);
     const assigned = new Set(sim.state.units.map((u) => u.supplyTargetId));
     const position = (sim.state.grenadeSupplyQueue ?? []).filter((id) => !assigned.has(id)).indexOf(unitId) + 1;
     this.hud.notice(assigned.has(unitId) ? `Supply Officer dispatched to ${this.soldierLabel(unitId)}.`
-      : `${this.soldierLabel(unitId)} is waiting for ${mortar ? 'mortar bombs' : rockets ? 'rockets' : 'grenades'} · queue position ${position}.`, 'good');
+      : `${this.soldierLabel(unitId)} is waiting for ${specialist ? role === 'flamethrower' ? 'fuel' : 'rifle grenades' : mortar ? 'mortar bombs' : rockets ? 'rockets' : 'grenades'} · queue position ${position}.`, 'good');
   }
 
   private processEvents(events: readonly SimEvent[]): void {
@@ -810,7 +847,7 @@ export class GameController {
         case 'automaticSupportRequested': {
           const caller = this.sim?.state.units.find((unit) => unit.id === ev.unitId);
           const pan = caller ? (caller.pos.x / CONFIG.field.width) * 2 - 1 : 0;
-          const label = ev.kind === 'medic' ? 'Medic' : ev.kind === 'rockets' ? 'Rocket supplies' : ev.kind === 'mortarBombs' ? 'Mortar supplies' : 'Grenade supplies';
+          const label = ev.kind === 'medic' ? 'Medic' : ev.kind === 'rockets' ? 'Rocket supplies' : ev.kind === 'specialistAmmo' ? caller?.role === 'flamethrower' ? 'Fuel supplies' : 'Rifle grenade supplies' : ev.kind === 'mortarBombs' ? 'Mortar supplies' : 'Grenade supplies';
           if (ev.kind === 'medic') this.audio.shoutMedic(pan);
           else if (ev.kind === 'grenades') this.audio.shoutGrenadeSupplies(pan);
           else this.audio.play('ui');
@@ -833,6 +870,10 @@ export class GameController {
           break;
         case 'transportPassengersKilled':
           this.hud.notice(`Enemy troop transport destroyed · all ${ev.count} passengers killed.`, 'good');
+          break;
+        case 'specialistResupplied':
+          this.hud.notice(`${this.soldierLabel(ev.targetId)} received ${ev.amount} ${this.sim?.state.units.find((u) => u.id === ev.targetId)?.role === 'flamethrower' ? 'fuel bursts' : 'rifle grenades'}.`, 'good');
+          this.audio.play('ui');
           break;
         case 'grenadesResupplied':
           this.hud.notice(`${this.soldierLabel(ev.targetId)} received ${ev.amount} fresh grenade${ev.amount === 1 ? '' : 's'}.`, 'good');
@@ -857,12 +898,16 @@ export class GameController {
             this.hud.notice(`Axis forces are attacking in wave ${ev.wave}!`, 'warn');
           }
           break;
+        case 'waveCalledEarly':
+          this.hud.notice(`Taking the initiative! +${ev.reward} supply points.`, 'good');
+          this.audio.play('ui');
+          break;
         case 'waveCleared':
-          this.hud.notice(`Wave ${ev.wave} cleared. +${ev.reward} points.`, 'good');
+          this.hud.notice(`Wave ${ev.wave} cleared. +${ev.reward} points.${ev.cleanBonus ? ` Clean defense ×${ev.streak}: +${ev.cleanBonus} bonus included!` : ''}`, 'good');
           this.audio.play('heal');
           break;
         case 'advanceAvailable':
-          this.hud.notice('All 15 waves repelled. Move the squad north to advance; the next map starts at wave 1.', 'good');
+          this.hud.notice(this.sim?.state.runMode === 'operation' ? operationOrders(this.sim.state) : 'All 15 waves repelled. Move the squad north to advance; the next map starts at wave 1.', 'good');
           this.saveRun();
           break;
         case 'crossingBegan':
@@ -1016,7 +1061,11 @@ export class GameController {
           if (this.prefs.screenShake && !this.prefs.reducedMotion && ev.radius > 40) this.renderer?.shake(3, 0.25);
           break;
         case 'shot': {
-          if (ev.weapon === 'Panzerschreck' || ev.weapon === '57 mm M1 Anti-Tank Gun') {
+          if (ev.weapon === 'Flamethrower') {
+            this.audio.play('flame', (ev.from.x / CONFIG.field.width) * 2 - 1);
+          } else if (ev.weapon === 'Rifle grenade launcher') {
+            this.audio.play('mortar', (ev.from.x / CONFIG.field.width) * 2 - 1);
+          } else if (ev.weapon === 'Panzerschreck' || ev.weapon === '57 mm M1 Anti-Tank Gun') {
             this.audio.play('rocket', (ev.from.x / CONFIG.field.width) * 2 - 1);
           } else if (ev.shooterTeam === 'enemy' || ev.weapon === 'M1918A2 BAR' || ev.weapon === 'STEN Submachine Gun' || ev.weapon === 'M1A1 Thompson' || ev.weapon.includes('Tripod')) {
             // Only some shots audible to keep the mix restrained.
@@ -1102,7 +1151,8 @@ export class GameController {
       const chatter = this.radio.consider(events, sim.state.units, sim.state.ticks, sim.state.weather, sim.state.campaignCountry, sim.state.scheduler.phase);
       if (this.radio.takeBanterInterruption()) { this.audio.cancelChatter(false); this.hud.clearChatter(); }
       if (chatter !== null) {
-        this.hud.chatter(chatter.team, chatter.reply ? `${chatter.text} — ${this.soldierLabel(chatter.reply.speakerId)}: ${chatter.reply.text}` : chatter.text, chatter.channel);
+        const caption = chatter.reply ? `${chatter.text} — ${this.soldierLabel(chatter.reply.speakerId)}: ${chatter.reply.text}` : chatter.text;
+        this.hud.chatter(chatter.team, caption, chatter.channel, chatter.reply ? 10000 : 6200);
         this.audio.speakChatter(chatter.text, chatter.team, chatter.delivery, chatter.speakerId, chatter.cue, chatter.confirmation, chatter.channel, chatter.reply);
       }
     }
@@ -1251,6 +1301,15 @@ export class GameController {
     this.setMode({ kind: 'satchel' });
   }
 
+  beginFenceDemolition(): void {
+    const sim = this.requireSim();
+    if (!sim) return;
+    const selected = this.selectedUnits();
+    const reason = selected.length === 1 ? fenceDemolitionError(sim.state, selected[0]) : 'Select one Combat Support Engineer.';
+    if (reason) { this.hud.notice(reason, 'warn'); return; }
+    this.setMode({ kind: 'demolishFence' });
+  }
+
   beginSmoke(): void {
     const selected = this.selectedUnits();
     if (selected.length !== 1 || (selected[0]!.smokeGrenades ?? 0) <= 0) {
@@ -1389,6 +1448,54 @@ export class GameController {
     } else if (result.reason) this.hud.notice(result.reason, 'error');
   }
 
+  beginRecruitment(role: FriendlyRole): void {
+    const sim = this.requireSim();
+    if (!sim || sim.paused || sim.state.phase !== 'running') return;
+    if (sim.state.units.filter((unit) => unit.team === 'friendly' && !unit.dead && unit.health > 0 && !unit.crossed).length >= CONFIG.caps.friendly) {
+      this.hud.notice('Squad is at capacity.', 'warn'); return;
+    }
+    this.cancelMode();
+    sim.paused = true; this.accumulator = 0; this.overlayOpen = true;
+    this.audio.cancelChatter(); this.hud.setPausedBadge(true);
+    const close = () => {
+      if (this.sim !== sim) return;
+      sim.paused = false; this.accumulator = 0; this.overlayOpen = false;
+      this.hud.setPausedBadge(false);
+    };
+    this.menus.recruitment.show(role, sim.state.points, (build) => {
+      close();
+      if (this.sim !== sim) return;
+      this.setMode({ kind: 'recruit', role, build });
+      this.hud.notice('Build prepared. Click the southern deployment zone to issue this soldier. Esc cancels without spending points.', 'info');
+    }, close);
+  }
+
+  withdrawSoldier(unitId: number): void {
+    const sim = this.requireSim();
+    if (!sim) return;
+    const label = this.soldierLabel(unitId);
+    const result = sim.command({ type: 'withdraw', unitId });
+    if (!result.ok) { this.hud.notice(result.reason ?? 'Unable to withdraw soldier.', 'warn'); return; }
+    this.cancelMode();
+    this.setSelection(this.selectionIds.filter((id) => id !== unitId));
+    this.hud.notice(`${label} withdrawn. A squad slot is now available. No points refunded.`, 'good');
+    this.audio.play('ui');
+    this.saveRun();
+  }
+
+  issueWeapon(weaponId: string): void {
+    const sim = this.requireSim();
+    if (sim === null) return;
+    const selected = this.selectedUnits();
+    if (selected.length !== 1) { this.hud.notice('Select one soldier to issue a weapon.', 'warn'); return; }
+    const soldier = selected[0]!;
+    const result = sim.command({ type: 'equipWeapon', unitId: soldier.id, weaponId });
+    if (!result.ok) { if (result.reason) this.hud.notice(result.reason, 'warn'); return; }
+    this.hud.notice(`${this.soldierLabel(soldier.id)} requested a weapon and ammunition delivery from the Supply Officer.`, 'good');
+    this.audio.play('ui');
+    this.saveRun();
+  }
+
   purchaseWeaponUpgrade(type: WeaponUpgradeType): void {
     const sim = this.requireSim();
     if (sim === null) return;
@@ -1471,8 +1578,7 @@ export class GameController {
     const resolved = resolvedUnitId === undefined ? undefined : sim.state.units.find((u) => u.id === resolvedUnitId && u.team === 'friendly' && !u.dead && u.health > 0 && u.crossed !== true);
     const hit = resolved ?? this.unitAt(sim.state, pos);
     if (hit !== null) {
-      if (additive) this.toggleSelection(hit.id);
-      else this.setSelection([hit.id]);
+      this.selectSoldier(hit.id, additive);
     } else if (!additive) {
       this.clearSelection();
     }
@@ -1499,10 +1605,16 @@ export class GameController {
       .filter((u) => u.pos.x >= box.x0 && u.pos.x <= box.x1 && u.pos.y >= box.y0 && u.pos.y <= box.y1)
       .map((u) => u.id);
     this.setSelection(wasAdditive ? [...this.selectionIds, ...inside] : inside);
+    const speaker = sim.state.units.find((unit) => unit.id === inside[0]);
+    if (speaker) this.audio.acknowledgeSelection(speaker.id, (speaker.pos.x / CONFIG.field.width) * 2 - 1);
   }
 
   /** Execute a placement or targeting mode's click. */
   private applyModeClick(sim: Simulation, pos: { x: number; y: number }): void {
+    if (this.mode.kind === 'move') {
+      if (this.orderMoveGroup(this.selectedUnits().map((unit) => unit.id), pos)) this.cancelMode();
+      return;
+    }
     if (this.mode.kind === 'suppress') {
       const result = sim.command({ type: 'roleAbility', unitId: this.mode.unitId, pos });
       if (result.ok) { this.saveRun(); this.cancelMode(); }
@@ -1534,11 +1646,12 @@ export class GameController {
       return;
     }
     if (this.mode.kind === 'recruit') {
-      const result = sim.command({ type: 'recruit', role: this.mode.role, pos });
+      const result = sim.command({ type: 'recruit', role: this.mode.role, pos, build: this.mode.build });
       if (result.ok) {
         const def = getContent().friendly[this.mode.role];
         this.hud.notice(`${def.label} deployed.`, 'good');
         this.cancelMode();
+        this.saveRun();
       } else if (result.reason) {
         this.hud.notice(result.reason, 'error');
       }
@@ -1647,6 +1760,21 @@ export class GameController {
         'Roger.',
         (current) => current.command({ type: 'flare', pos }),
       )) this.cancelMode();
+      return;
+    }
+    if (this.mode.kind === 'demolishFence') {
+      const selected = this.selectedUnits();
+      if (selected.length !== 1) {
+        this.hud.notice('Select one Combat Support Engineer.', 'warn');
+        this.cancelMode();
+        return;
+      }
+      const result = sim.command({ type: 'demolishFence', unitId: selected[0]!.id, pos });
+      if (result.ok) {
+        this.hud.notice('Fence section demolished. The gap is open.', 'good');
+        this.cancelMode();
+        this.saveRun();
+      } else if (result.reason) this.hud.notice(result.reason, 'warn');
       return;
     }
     if (this.mode.kind === 'satchel') {
@@ -1809,7 +1937,7 @@ export class GameController {
     const col = Math.floor(worldX / terrain.cell);
     const row = Math.floor(worldY / terrain.cell);
     const idx = row * terrain.cols + col;
-    const groundKind = kinds[idx] ?? TERRAIN_KIND.open;
+    const groundKind = state.terrain.kinds?.[idx] ?? kinds[idx] ?? TERRAIN_KIND.open;
     let info: { title: string; detail: string };
     if (isFoliageKind(groundKind)) {
       if (groundKind === TERRAIN_KIND.trees) info = { title: 'Hedgerow', detail: 'Passable dense growth. It slows soldiers, obscures shots across the row, and conceals anyone beneath it.' };
@@ -1826,8 +1954,8 @@ export class GameController {
       const kind = groundKind;
       if (kind === 1) info = { title: 'Hedgerow', detail: 'Dense growth blocks movement and line of sight. Find a gap to cross.' };
       else if (kind === 2) info = { title: 'Stone wall / rocks', detail: 'Solid obstruction blocks movement and line of sight.' };
-      else if (kind === TERRAIN_KIND.stoneFence) info = { title: 'Fieldstone fence', detail: 'A low farm wall. It blocks movement; follow it to find a gap.' };
-      else if (kind === TERRAIN_KIND.woodFence) info = { title: 'Wood rail fence', detail: 'A timber field boundary. It blocks movement; follow it to a gate or a break.' };
+      else if (kind === TERRAIN_KIND.stoneFence) info = { title: 'Fieldstone fence', detail: 'A low farm wall. Blocks movement. A nearby Combat Support Engineer can demolish a section to open a gap.' };
+      else if (kind === TERRAIN_KIND.woodFence) info = { title: 'Wood rail fence', detail: 'A timber field boundary. Blocks movement. A nearby Combat Support Engineer can demolish a section to open a gap.' };
       else if (kind === TERRAIN_KIND.obstacle) info = { title: 'Anti-tank obstacle', detail: 'Blocks movement. Tanks and infantry must route around it.' };
       else if (kind === TERRAIN_KIND.ruins) info = { title: 'Rubble / ruined position', detail: 'Wreckage blocks this tile and the view through it.' };
       else info = { title: 'Terrain obstruction', detail: 'This terrain blocks movement and line of sight.' };
@@ -1904,6 +2032,7 @@ export class GameController {
     const sim = this.sim;
     if (sim === null || sim.paused || this.mode.kind === 'none') return null;
     const pos = this.pointerPos;
+    if (this.mode.kind === 'move') return null;
     if (this.mode.kind === 'suppress') {
       const check = sim.validateSuppression(this.mode.unitId, pos);
       return { kind: 'suppress', pos, valid: check.ok, reason: check.reason };
@@ -1922,7 +2051,9 @@ export class GameController {
     }
     if (this.mode.kind === 'recruit') {
       const check = sim.validatePlacement('recruit', pos, this.mode.role);
-      return { kind: 'recruit', role: this.mode.role, pos, valid: check.ok, reason: check.reason };
+      const prepared = recruitBuild(sim.content, this.mode.role, this.mode.build);
+      const reason = 'error' in prepared ? prepared.error : sim.state.points < prepared.cost ? `Costs ${prepared.cost} points` : check.reason;
+      return { kind: 'recruit', role: this.mode.role, pos, cost: 'cost' in prepared ? prepared.cost : undefined, valid: check.ok && reason === '', reason };
     }
     if (this.mode.kind === 'barbedWire') {
       const check = sim.validatePlacement('barbedWire', pos);
@@ -1989,6 +2120,15 @@ export class GameController {
       return { kind: 'satchel', pos, valid: reason === null, reason: reason ?? undefined,
         engineerPos: engineer.pos, engineerRange: CONFIG.satchel.placementRange };
     }
+    if (this.mode.kind === 'demolishFence') {
+      const selected = this.selectedUnits();
+      const engineer = selected.length === 1 ? selected[0] : undefined;
+      const reason = fenceDemolitionError(sim.state, engineer, pos);
+      const cell = sim.state.terrain.cell;
+      const center = { x: (Math.floor(pos.x / cell) + .5) * cell, y: (Math.floor(pos.y / cell) + .5) * cell };
+      return { kind: 'demolishFence', pos: center, cost: 0, valid: reason === null, reason: reason ?? undefined,
+        engineerPos: engineer?.pos, engineerRange: FENCE_DEMOLITION_RANGE };
+    }
     if (this.mode.kind === 'smoke') {
       const thrower = this.selectedUnits()[0];
       if (thrower === undefined) return null;
@@ -2051,7 +2191,7 @@ function secSafe(seconds: number): number {
 /** Role metadata for the recruitment UI. */
 export function roleCatalog(): Array<{ role: FriendlyRole; label: string; cost: number; blurb: string }> {
   const content = getContent();
-  const roles: FriendlyRole[] = ['rifleman', 'mg', 'medic', 'supply_officer', 'at', 'sniper', 'engineer', 'radio_engineer', 'officer', 'mortarman', 'gun_truck', 'scout', 'heavy_mg', 'assault_infantry', 'at_gun'];
+  const roles: FriendlyRole[] = ['rifleman', 'mg', 'medic', 'supply_officer', 'at', 'sniper', 'engineer', 'radio_engineer', 'officer', 'mortarman', 'gun_truck', 'scout', 'heavy_mg', 'assault_infantry', 'at_gun', 'grenadier', 'flamethrower'];
   return roles.map((role) => ({
     role,
     label: content.friendly[role].label,

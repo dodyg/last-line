@@ -24,6 +24,25 @@ function fixture() {
   return { sim, friendly, enemy };
 }
 
+describe('support traffic through a settled line', () => {
+  it('lets a moving supply officer pass a dense row without being pushed backwards', () => {
+    const { sim, friendly } = fixture();
+    sim.state.units = [friendly];
+    friendly.role = 'supply_officer';
+    friendly.pos = { x: 200, y: 600 }; friendly.prevPos = { ...friendly.pos };
+    for (let index = 0; index < 6; index++) {
+      const parked = structuredClone(friendly);
+      parked.id = sim.state.nextEntityId++; parked.role = 'rifleman';
+      parked.pos = { x: 330 + index * 8, y: 600 }; parked.prevPos = { ...parked.pos };
+      parked.path = []; parked.moveGoal = null;
+      sim.state.units.push(parked);
+    }
+    expect(sim.command({ type: 'move', unitId: friendly.id, pos: { x: 600, y: 600 } }).ok).toBe(true);
+    for (let tick = 0; tick < 360; tick++) sim.step();
+    expect(friendly.pos.x).toBeGreaterThan(450);
+  });
+});
+
 describe('holding position under fire', () => {
   it.each([24, 52])('does not keep walking back into an occupied slot after yielding %s pixels', (distance) => {
     const { sim, friendly } = fixture();

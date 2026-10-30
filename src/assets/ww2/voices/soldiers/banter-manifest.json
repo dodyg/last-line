@@ -1,0 +1,962 @@
+[
+  {
+    "id": "michael-banter-01-line",
+    "file": "michael-banter-01-line.wav",
+    "voice": "michael",
+    "text": "My wife says I never last long enough.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 1,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-01-reply",
+    "file": "michael-banter-01-reply.wav",
+    "voice": "michael",
+    "text": "Tell her you’re trained for rapid deployment.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 1,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-02-line",
+    "file": "michael-banter-02-line.wav",
+    "voice": "michael",
+    "text": "Got a letter from my wife. Says the bed feels empty.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 2,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-02-reply",
+    "file": "michael-banter-02-reply.wav",
+    "voice": "michael",
+    "text": "Write back quick, before somebody volunteers.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 2,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-03-line",
+    "file": "michael-banter-03-line.wav",
+    "voice": "michael",
+    "text": "The pin-up in my helmet’s getting worn out.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 3,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-03-reply",
+    "file": "michael-banter-03-reply.wav",
+    "voice": "michael",
+    "text": "Try looking at the enemy for a change.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 3,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-04-line",
+    "file": "michael-banter-04-line.wav",
+    "voice": "michael",
+    "text": "My wife wants a man with a big bank account.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 4,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-04-reply",
+    "file": "michael-banter-04-reply.wav",
+    "voice": "michael",
+    "text": "Good. Your other qualifications weren’t helping.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 4,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-05-line",
+    "file": "michael-banter-05-line.wav",
+    "voice": "michael",
+    "text": "Think the captain ever takes his trousers off?",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 5,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-05-reply",
+    "file": "michael-banter-05-reply.wav",
+    "voice": "michael",
+    "text": "Only if headquarters signs the order.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 5,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-06-line",
+    "file": "michael-banter-06-line.wav",
+    "voice": "michael",
+    "text": "My wife says I’m a terrible lover.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 6,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-06-reply",
+    "file": "michael-banter-06-reply.wav",
+    "voice": "michael",
+    "text": "At least she gave you a reference.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 6,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-07-line",
+    "file": "michael-banter-07-line.wav",
+    "voice": "michael",
+    "text": "I’m saving myself for a woman who appreciates me.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 7,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-07-reply",
+    "file": "michael-banter-07-reply.wav",
+    "voice": "michael",
+    "text": "Better put those savings in a long-term account.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 7,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-08-line",
+    "file": "michael-banter-08-line.wav",
+    "voice": "michael",
+    "text": "That nurse said I had a lovely bedside manner.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 8,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-08-reply",
+    "file": "michael-banter-08-reply.wav",
+    "voice": "michael",
+    "text": "She told you to stop leaning on the bed.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 8,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-09-line",
+    "file": "michael-banter-09-line.wav",
+    "voice": "michael",
+    "text": "My wife says I talk too dirty.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 9,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-09-reply",
+    "file": "michael-banter-09-reply.wav",
+    "voice": "michael",
+    "text": "Try washing. Might be the smell she means.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 9,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-10-line",
+    "file": "michael-banter-10-line.wav",
+    "voice": "michael",
+    "text": "I promised my wife a week in bed when I get home.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 10,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-10-reply",
+    "file": "michael-banter-10-reply.wav",
+    "voice": "michael",
+    "text": "With your stamina, six days of that’ll be sleeping.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 10,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-11-line",
+    "file": "michael-banter-11-line.wav",
+    "voice": "michael",
+    "text": "I’ve got a photograph that could improve morale.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 11,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-11-reply",
+    "file": "michael-banter-11-reply.wav",
+    "voice": "michael",
+    "text": "Keep it downwind. Your socks are ruining the mood.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 11,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-12-line",
+    "file": "michael-banter-12-line.wav",
+    "voice": "michael",
+    "text": "The chaplain says temptation builds character.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 12,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-12-reply",
+    "file": "michael-banter-12-reply.wav",
+    "voice": "michael",
+    "text": "You must be the most characterful bastard in the army.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 12,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-13-line",
+    "file": "michael-banter-13-line.wav",
+    "voice": "michael",
+    "text": "My wife says I’m always coming home too late.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 13,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-13-reply",
+    "file": "michael-banter-13-reply.wav",
+    "voice": "michael",
+    "text": "First woman ever complained you took your time.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 13,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-14-line",
+    "file": "michael-banter-14-line.wav",
+    "voice": "michael",
+    "text": "I spent my last leave chasing a woman twice my age.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 14,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-14-reply",
+    "file": "michael-banter-14-reply.wav",
+    "voice": "michael",
+    "text": "At least one of you knew what you were doing.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 14,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-15-line",
+    "file": "michael-banter-15-line.wav",
+    "voice": "michael",
+    "text": "These trousers leave nothing to the imagination.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 15,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-15-reply",
+    "file": "michael-banter-15-reply.wav",
+    "voice": "michael",
+    "text": "That’s all right. Nobody was imagining much.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 15,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-16-line",
+    "file": "michael-banter-16-line.wav",
+    "voice": "michael",
+    "text": "I’m writing a love letter. How do you spell irresistible?",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 16,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-16-reply",
+    "file": "michael-banter-16-reply.wav",
+    "voice": "michael",
+    "text": "Start with somebody else’s name.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 16,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-17-line",
+    "file": "michael-banter-17-line.wav",
+    "voice": "michael",
+    "text": "This coffee could strip paint off a tank.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 17,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-17-reply",
+    "file": "michael-banter-17-reply.wav",
+    "voice": "michael",
+    "text": "Then stop drinking it. We need it for maintenance.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 17,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-18-line",
+    "file": "michael-banter-18-line.wav",
+    "voice": "michael",
+    "text": "The cook says tonight’s stew is a family recipe.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 18,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-18-reply",
+    "file": "michael-banter-18-reply.wav",
+    "voice": "michael",
+    "text": "What family? A pack of bloody wolves?",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 18,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-19-line",
+    "file": "michael-banter-19-line.wav",
+    "voice": "michael",
+    "text": "When I get home, I’m throwing these boots in the sea.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 19,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-19-reply",
+    "file": "michael-banter-19-reply.wav",
+    "voice": "michael",
+    "text": "Warn the navy first. They’ve suffered enough.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 19,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-20-line",
+    "file": "michael-banter-20-line.wav",
+    "voice": "michael",
+    "text": "I asked for a transfer somewhere warm.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 20,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-20-reply",
+    "file": "michael-banter-20-reply.wav",
+    "voice": "michael",
+    "text": "Stand behind the machine gun. Request approved.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 20,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-21-line",
+    "file": "michael-banter-21-line.wav",
+    "voice": "michael",
+    "text": "They said army life would make a man of me.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 21,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-21-reply",
+    "file": "michael-banter-21-reply.wav",
+    "voice": "michael",
+    "text": "Must be a delay at the factory.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 21,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-22-line",
+    "file": "michael-banter-22-line.wav",
+    "voice": "michael",
+    "text": "I haven’t changed my socks in a week.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 22,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-22-reply",
+    "file": "michael-banter-22-reply.wav",
+    "voice": "michael",
+    "text": "We know. The flies filed a complaint.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 22,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-23-line",
+    "file": "michael-banter-23-line.wav",
+    "voice": "michael",
+    "text": "I could murder a proper breakfast.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 23,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-23-reply",
+    "file": "michael-banter-23-reply.wav",
+    "voice": "michael",
+    "text": "The cook already did. It’s in that tin.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 23,
+    "part": "reply"
+  },
+  {
+    "id": "michael-banter-24-line",
+    "file": "michael-banter-24-line.wav",
+    "voice": "michael",
+    "text": "Do you reckon the brass know we’re out here?",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 24,
+    "part": "line"
+  },
+  {
+    "id": "michael-banter-24-reply",
+    "file": "michael-banter-24-reply.wav",
+    "voice": "michael",
+    "text": "Miss a shave. They’ll find us in five minutes.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 24,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-01-line",
+    "file": "puck-banter-01-line.wav",
+    "voice": "puck",
+    "text": "My wife says I never last long enough.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 1,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-01-reply",
+    "file": "puck-banter-01-reply.wav",
+    "voice": "puck",
+    "text": "Tell her you’re trained for rapid deployment.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 1,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-02-line",
+    "file": "puck-banter-02-line.wav",
+    "voice": "puck",
+    "text": "Got a letter from my wife. Says the bed feels empty.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 2,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-02-reply",
+    "file": "puck-banter-02-reply.wav",
+    "voice": "puck",
+    "text": "Write back quick, before somebody volunteers.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 2,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-03-line",
+    "file": "puck-banter-03-line.wav",
+    "voice": "puck",
+    "text": "The pin-up in my helmet’s getting worn out.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 3,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-03-reply",
+    "file": "puck-banter-03-reply.wav",
+    "voice": "puck",
+    "text": "Try looking at the enemy for a change.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 3,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-04-line",
+    "file": "puck-banter-04-line.wav",
+    "voice": "puck",
+    "text": "My wife wants a man with a big bank account.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 4,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-04-reply",
+    "file": "puck-banter-04-reply.wav",
+    "voice": "puck",
+    "text": "Good. Your other qualifications weren’t helping.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 4,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-05-line",
+    "file": "puck-banter-05-line.wav",
+    "voice": "puck",
+    "text": "Think the captain ever takes his trousers off?",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 5,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-05-reply",
+    "file": "puck-banter-05-reply.wav",
+    "voice": "puck",
+    "text": "Only if headquarters signs the order.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 5,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-06-line",
+    "file": "puck-banter-06-line.wav",
+    "voice": "puck",
+    "text": "My wife says I’m a terrible lover.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 6,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-06-reply",
+    "file": "puck-banter-06-reply.wav",
+    "voice": "puck",
+    "text": "At least she gave you a reference.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 6,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-07-line",
+    "file": "puck-banter-07-line.wav",
+    "voice": "puck",
+    "text": "I’m saving myself for a woman who appreciates me.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 7,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-07-reply",
+    "file": "puck-banter-07-reply.wav",
+    "voice": "puck",
+    "text": "Better put those savings in a long-term account.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 7,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-08-line",
+    "file": "puck-banter-08-line.wav",
+    "voice": "puck",
+    "text": "That nurse said I had a lovely bedside manner.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 8,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-08-reply",
+    "file": "puck-banter-08-reply.wav",
+    "voice": "puck",
+    "text": "She told you to stop leaning on the bed.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 8,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-09-line",
+    "file": "puck-banter-09-line.wav",
+    "voice": "puck",
+    "text": "My wife says I talk too dirty.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 9,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-09-reply",
+    "file": "puck-banter-09-reply.wav",
+    "voice": "puck",
+    "text": "Try washing. Might be the smell she means.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 9,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-10-line",
+    "file": "puck-banter-10-line.wav",
+    "voice": "puck",
+    "text": "I promised my wife a week in bed when I get home.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 10,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-10-reply",
+    "file": "puck-banter-10-reply.wav",
+    "voice": "puck",
+    "text": "With your stamina, six days of that’ll be sleeping.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 10,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-11-line",
+    "file": "puck-banter-11-line.wav",
+    "voice": "puck",
+    "text": "I’ve got a photograph that could improve morale.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 11,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-11-reply",
+    "file": "puck-banter-11-reply.wav",
+    "voice": "puck",
+    "text": "Keep it downwind. Your socks are ruining the mood.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 11,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-12-line",
+    "file": "puck-banter-12-line.wav",
+    "voice": "puck",
+    "text": "The chaplain says temptation builds character.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 12,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-12-reply",
+    "file": "puck-banter-12-reply.wav",
+    "voice": "puck",
+    "text": "You must be the most characterful bastard in the army.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 12,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-13-line",
+    "file": "puck-banter-13-line.wav",
+    "voice": "puck",
+    "text": "My wife says I’m always coming home too late.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 13,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-13-reply",
+    "file": "puck-banter-13-reply.wav",
+    "voice": "puck",
+    "text": "First woman ever complained you took your time.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 13,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-14-line",
+    "file": "puck-banter-14-line.wav",
+    "voice": "puck",
+    "text": "I spent my last leave chasing a woman twice my age.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 14,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-14-reply",
+    "file": "puck-banter-14-reply.wav",
+    "voice": "puck",
+    "text": "At least one of you knew what you were doing.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 14,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-15-line",
+    "file": "puck-banter-15-line.wav",
+    "voice": "puck",
+    "text": "These trousers leave nothing to the imagination.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 15,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-15-reply",
+    "file": "puck-banter-15-reply.wav",
+    "voice": "puck",
+    "text": "That’s all right. Nobody was imagining much.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 15,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-16-line",
+    "file": "puck-banter-16-line.wav",
+    "voice": "puck",
+    "text": "I’m writing a love letter. How do you spell irresistible?",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 16,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-16-reply",
+    "file": "puck-banter-16-reply.wav",
+    "voice": "puck",
+    "text": "Start with somebody else’s name.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 16,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-17-line",
+    "file": "puck-banter-17-line.wav",
+    "voice": "puck",
+    "text": "This coffee could strip paint off a tank.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 17,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-17-reply",
+    "file": "puck-banter-17-reply.wav",
+    "voice": "puck",
+    "text": "Then stop drinking it. We need it for maintenance.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 17,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-18-line",
+    "file": "puck-banter-18-line.wav",
+    "voice": "puck",
+    "text": "The cook says tonight’s stew is a family recipe.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 18,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-18-reply",
+    "file": "puck-banter-18-reply.wav",
+    "voice": "puck",
+    "text": "What family? A pack of bloody wolves?",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 18,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-19-line",
+    "file": "puck-banter-19-line.wav",
+    "voice": "puck",
+    "text": "When I get home, I’m throwing these boots in the sea.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 19,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-19-reply",
+    "file": "puck-banter-19-reply.wav",
+    "voice": "puck",
+    "text": "Warn the navy first. They’ve suffered enough.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 19,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-20-line",
+    "file": "puck-banter-20-line.wav",
+    "voice": "puck",
+    "text": "I asked for a transfer somewhere warm.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 20,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-20-reply",
+    "file": "puck-banter-20-reply.wav",
+    "voice": "puck",
+    "text": "Stand behind the machine gun. Request approved.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 20,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-21-line",
+    "file": "puck-banter-21-line.wav",
+    "voice": "puck",
+    "text": "They said army life would make a man of me.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 21,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-21-reply",
+    "file": "puck-banter-21-reply.wav",
+    "voice": "puck",
+    "text": "Must be a delay at the factory.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 21,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-22-line",
+    "file": "puck-banter-22-line.wav",
+    "voice": "puck",
+    "text": "I haven’t changed my socks in a week.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 22,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-22-reply",
+    "file": "puck-banter-22-reply.wav",
+    "voice": "puck",
+    "text": "We know. The flies filed a complaint.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 22,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-23-line",
+    "file": "puck-banter-23-line.wav",
+    "voice": "puck",
+    "text": "I could murder a proper breakfast.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 23,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-23-reply",
+    "file": "puck-banter-23-reply.wav",
+    "voice": "puck",
+    "text": "The cook already did. It’s in that tin.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 23,
+    "part": "reply"
+  },
+  {
+    "id": "puck-banter-24-line",
+    "file": "puck-banter-24-line.wav",
+    "voice": "puck",
+    "text": "Do you reckon the brass know we’re out here?",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 24,
+    "part": "line"
+  },
+  {
+    "id": "puck-banter-24-reply",
+    "file": "puck-banter-24-reply.wav",
+    "voice": "puck",
+    "text": "Miss a shave. They’ll find us in five minutes.",
+    "cue": "ambient",
+    "kind": "banter",
+    "exchange": 24,
+    "part": "reply"
+  }
+]

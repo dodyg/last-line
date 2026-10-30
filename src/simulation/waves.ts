@@ -32,7 +32,7 @@ function orderSappers(queue: EnemyArchetype[], enabled: boolean): EnemyArchetype
 }
 
 /** Build the spawn queue for a wave. Endless waves scale authored content with caps. */
-export function buildSpawnQueue(rng: RngState, scheduler: WaveScheduler, endless: boolean): {
+export function buildSpawnQueue(rng: RngState, scheduler: WaveScheduler, endless: boolean, mapsCleared = 0): {
   queue: EnemyArchetype[];
   spawnIntervalSeconds: number;
   label: string;
@@ -46,6 +46,8 @@ export function buildSpawnQueue(rng: RngState, scheduler: WaveScheduler, endless
     for (const part of def.composition) {
       for (let i = 0; i < part.count; i++) queue.push(part.archetype);
     }
+    // Veteran sectors retain indirect-fire support even when local waves restart.
+    if (mapsCleared >= 2 && !queue.includes('mortar_team') && scheduler.waveIndex + 1 >= 3) queue.push('mortar_team');
     return {
       queue: orderSappers(rngShuffle(rng, queue), scheduler.waveIndex + 1 >= CONFIG.enemySappers.firstWave),
       spawnIntervalSeconds: def.spawnIntervalSeconds,
@@ -76,4 +78,9 @@ export function buildSpawnQueue(rng: RngState, scheduler: WaveScheduler, endless
     label,
     telegraph,
   };
+}
+
+/** Trade remaining preparation time for a small, bounded supply advantage. */
+export function earlyWaveReward(prepTicksLeft: number): number {
+  return Math.min(3, Math.max(0, Math.ceil(prepTicksLeft / (CONFIG.tickRate * 10))));
 }

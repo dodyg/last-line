@@ -18,7 +18,7 @@ export const CONFIG: GameConfig = {
   },
   incomingFire: { artilleryWarningSeconds: 1, mortarWarningSeconds: .6, airSupportWarningSeconds: 4 },
   dayNight: {
-    startAfterWaves: 3, cycleSeconds: 300, nightVisibilityMult: 0.75, nightMovementMult: 0.75, nightAccuracyMult: 0.8, sniperDayAccuracyMult: 1.2, sniperNightAccuracyMult: 0.65, flareVisibilityMult: 1.25, headlightsOnVisibilityMult: 1.25, headlightsOnMovementMult: 1,
+    startAfterWaves: 3, cycleSeconds: 360, nightVisibilityMult: 0.75, nightMovementMult: 0.75, nightAccuracyMult: 0.8, sniperDayAccuracyMult: 1.2, sniperNightAccuracyMult: 0.65, flareVisibilityMult: 1.25, headlightsOnVisibilityMult: 1.25, headlightsOnMovementMult: 1,
     gunfire: { soundRadius: 320, flashRadius: 260, tracerRadius: 400, visualMemorySeconds: 1.5, soundMemorySeconds: 3, trackRadius: 24, heardRangeMult: .95, heardAccuracyMult: .55 },
   },
   lineY: 640,
@@ -77,7 +77,7 @@ export const CONFIG: GameConfig = {
     liveEnemies: 26,
   },
   costs: {
-    recruit: { rifleman: 4, mg: 7, medic: 6, supply_officer: 6, at: 8, sniper: 10, engineer: 6, radio_engineer: 6, officer: 10, mortarman: 10, gun_truck: 25, scout: 6, heavy_mg: 12, assault_infantry: 8, at_gun: 18 },
+    recruit: { rifleman: 4, mg: 7, medic: 6, supply_officer: 6, at: 8, sniper: 10, engineer: 6, radio_engineer: 6, officer: 10, mortarman: 10, gun_truck: 25, scout: 6, heavy_mg: 12, assault_infantry: 8, at_gun: 18, grenadier: 9, flamethrower: 12 },
     sandbag: 3,
     barbedWire: 4,
     trench: 6,
@@ -270,6 +270,8 @@ export const CONFIG: GameConfig = {
     lineVisibilityMult: 0.94,
   },
   enemy: {
+    tactics: { firstWave: 7, sectorWaveBonus: 2, decisionSeconds: 8, flankSeconds: 7, flankWidth: 150, supportRadius: 240 },
+    mortarTeam: { bombs: 6, setupSeconds: 5, standOff: 360, intervalMult: 1.25 },
     smokeAssault: {
       startWave: 4,
       squadRadius: 144,
@@ -283,7 +285,7 @@ export const CONFIG: GameConfig = {
     // riflemen trade fire from a standoff that still lets them advance. This is
     // the distance at which the pair counts as having arrived: from there it
     // bounds on a fire-heavy cycle (see `bounding`) instead of a steady advance.
-    engageRangeMult: { sapper: 0.8, rifle: 0.8, assault: 0.65, vehicle: 1, observer: 0.8, gun_truck: 0.9, troop_transport: 1, mg_team: 0.95, sharpshooter: 0.95, field_officer: 0.8, at_infantry: 0.9, infiltrator: 0.5 },
+    engageRangeMult: { mortar_team: 1, sapper: 0.8, rifle: 0.8, assault: 0.65, vehicle: 1, observer: 0.8, gun_truck: 0.9, troop_transport: 1, mg_team: 0.95, sharpshooter: 0.95, field_officer: 0.8, at_infantry: 0.9, infiltrator: 0.5 },
     /**
      * Armour is exempt from the bounding pair and always moving, so it needs a
      * separate stopping distance or it would never settle to shoot.
