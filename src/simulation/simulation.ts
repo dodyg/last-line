@@ -1,3 +1,4 @@
+import { sapperMission, resetSapperMission, assignSapperMission, plantSapperCharge, supportDispatch, supportRequest, assignSupport, clearSupport, buildingOrderPhase, transportPhase, finishTransportUnload, smokeAssaultPhase, deploySmokeAssault } from './workflow-states';
 import { inRubble, weatherGroundEffects } from './environment';
 import { roleAbility, updateRoleAbilities } from './role-abilities';
 import { crewTuning, crewArcContains, updateCrew } from './specialists';
@@ -1047,15 +1048,16 @@ export class Simulation {
     for (let i = plans.length - 1; i >= 0; i--) {
       const plan = plans[i]!;
       plan.unitIds = plan.unitIds.filter((id) => this.smokeAssaultEligible(this.findUnit(id)));
-      if (s.ticks >= plan.endTick || (plan.deployed && plan.unitIds.length === 0)) { plans.splice(i, 1); continue; }
-      if (plan.deployed) continue;
+      const phase = smokeAssaultPhase(plan, s.ticks);
+      if (phase === 'finished') { plans.splice(i, 1); continue; }
+      if (phase === 'advancing') continue;
       const leader = this.findUnit(plan.leaderId);
       if (!this.smokeAssaultEligible(leader) || (leader.smokeGrenades ?? 0) <= 0 || plan.unitIds.length < tuning.minSquadSize) {
         plans.splice(i, 1); this.emit({ type: 'enemySmokeAssaultCancelled', unitId: plan.leaderId }); continue;
       }
       if (s.ticks < plan.deployTick) continue;
       leader.smokeGrenades = (leader.smokeGrenades ?? 0) - 1;
-      plan.deployed = true;
+      deploySmokeAssault(plan);
       s.smokes.push({ id: plan.id, pos: { ...plan.pos }, radius: CONFIG.smoke.radius, ticksRemaining: plan.endTick - s.ticks + 1 });
       this.emit({ type: 'enemySmokeAssaultDeployed', unitId: leader.id, pos: { ...plan.pos }, ticks: sec(CONFIG.smoke.durationSeconds) });
     }
@@ -1090,7 +1092,7 @@ export class Simulation {
     if (!this.smokeAssaultEligible(unit)) return false;
     const plan = this.state.enemySmokeAssaults?.find((plan) => plan.unitIds.includes(unit.id));
     if (!plan) return false;
-    if (!plan.deployed) { unit.advance = false; unit.path = []; return true; }
+    if (smokeAssaultPhase(plan, this.state.ticks) === 'warning') { unit.advance = false; unit.path = []; return true; }
     const goal = nearestOpenCell(this.state.terrain, {
       x: plan.pos.x + Math.max(-CONFIG.smoke.radius * .6, Math.min(CONFIG.smoke.radius * .6, unit.pos.x - plan.pos.x)),
       y: Math.min(CONFIG.breakthroughY + 8, plan.pos.y + CONFIG.smoke.radius + this.state.terrain.cell),
@@ -1458,14 +1460,14 @@ export class Simulation {
       const patient = this.findUnit(medic.medicalTargetId);
       if (patient && patient.xp >= CONFIG.automaticSupport.unlockXp) patient.autoMedicCallAfter = this.state.ticks + sec(CONFIG.automaticSupport.retrySeconds);
       this.state.medicalQueue = this.state.medicalQueue?.filter((id) => id !== medic.medicalTargetId);
-      delete medic.medicalTargetId;
+      clearSupport(medic, 'medical');
     }
     if (medic.supplyTargetId !== undefined) {
       const recipient = this.findUnit(medic.supplyTargetId);
       if (recipient && recipient.xp >= CONFIG.automaticSupport.unlockXp) recipient.autoSupplyCallAfter = this.state.ticks + sec(CONFIG.automaticSupport.retrySeconds);
       if (recipient) delete recipient.pendingWeaponId;
       this.state.grenadeSupplyQueue = this.state.grenadeSupplyQueue?.filter((id) => id !== medic.supplyTargetId);
-      delete medic.supplyTargetId;
+      clearSupport(medic, 'supply');
     }
   }
 
@@ -1498,21 +1500,22 @@ export class Simulation {
       }
     }
     for (const id of this.state.grenadeSupplyQueue) {
-      if (officers.some((u) => u.supplyTargetId === id)) continue;
+      if (supportRequest(id, officers.map((u) => u.supplyTargetId)).phase === 'assigned') continue;
       const recipient = this.findUnit(id)!;
       const available = officers.filter((u) => u.id !== id && !u.pinned && u.supplyTargetId === undefined)
         .sort((a, b) => dist(a.pos, recipient.pos) - dist(b.pos, recipient.pos) || a.id - b.id);
       const dispatched = available.find((u) => this.routeSupport(u, recipient, CONFIG.grenadeSupplies.range));
       if (!dispatched) break;
-      dispatched.supplyTargetId = id;
+      assignSupport(dispatched, 'supply', id);
     }
   }
 
   private supplyBehavior(officer: Unit): void {
-    if (officer.supplyTargetId === undefined || officer.pinned || officer.roleDuty?.kind === 'supply') return;
-    const recipient = this.findUnit(officer.supplyTargetId);
-    if (!this.needsSupplies(recipient)) return;
-    if (!this.supportInRange(officer, recipient, CONFIG.grenadeSupplies.range)) {
+    if (officer.roleDuty?.kind === 'supply') return;
+    const recipient = officer.supplyTargetId === undefined ? undefined : this.findUnit(officer.supplyTargetId);
+    const dispatch = supportDispatch(officer.supplyTargetId, officer.pinned, !!recipient && this.supportInRange(officer, recipient, CONFIG.grenadeSupplies.range));
+    if (dispatch.phase === 'idle' || dispatch.phase === 'paused' || !this.needsSupplies(recipient)) return;
+    if (dispatch.phase === 'approaching') {
       if (!officer.path.length || !officer.moveGoal || dist(officer.moveGoal, recipient.pos) > this.state.terrain.cell) {
         if (!this.routeSupport(officer, recipient, CONFIG.grenadeSupplies.range)) {
           delete officer.supplyTargetId;
@@ -1566,14 +1569,14 @@ export class Simulation {
       }
     }
     for (const id of this.state.medicalQueue) {
-      if (medics.some((u) => u.medicalTargetId === id)) continue;
+      if (supportRequest(id, medics.map((u) => u.medicalTargetId)).phase === 'assigned') continue;
       const patient = this.findUnit(id)!;
       const available = medics.filter((u) => u.id !== id && !u.pinned && u.medicalTargetId === undefined)
         .sort((a, b) => dist(a.pos, patient.pos) - dist(b.pos, patient.pos) || a.id - b.id);
       const dispatched = available.find((medic) => this.routeMedic(medic, patient));
       // Keep the oldest waiting call first even if a path is temporarily blocked.
       if (!dispatched) break;
-      dispatched.medicalTargetId = id;
+      assignSupport(dispatched, 'medical', id);
     }
   }
 
@@ -1683,9 +1686,9 @@ export class Simulation {
     const building = this.state.buildings.find((b) => b.id === order.buildingId && !b.destroyed);
     if (!building) { delete unit.clearBuilding; unit.path = []; unit.moveGoal = null; return false; }
     if (unit.pinned || (unit.upgradeTimer ?? 0) > 0) return true;
-    if (unit.moveGoal && dist(unit.pos, unit.moveGoal) > 3) {
+    if (buildingOrderPhase(unit) === 'approachingClear') {
       if (!unit.path.length) {
-        const route = this.findUnitPath(unit, unit.pos, unit.moveGoal);
+        const route = this.findUnitPath(unit, unit.pos, unit.moveGoal!);
         if (!route.reachable) { delete unit.clearBuilding; return false; }
         unit.path = route.waypoints;
       }
@@ -1738,9 +1741,9 @@ export class Simulation {
     const building = this.state.buildings.find((b) => b.id === order.buildingId && !b.destroyed);
     if (!building) { delete unit.buildingOrder; return false; }
     if (unit.pinned) return true;
-    if (unit.moveGoal && dist(unit.pos, unit.moveGoal) > 2) {
+    if (buildingOrderPhase(unit) === 'approaching') {
       if (!unit.path.length) {
-        const route = this.findUnitPath(unit, unit.pos, unit.moveGoal);
+        const route = this.findUnitPath(unit, unit.pos, unit.moveGoal!);
         if (!route.reachable) { delete unit.buildingOrder; unit.moveGoal = null; return false; }
         unit.path = route.waypoints;
       }
@@ -2156,8 +2159,9 @@ export class Simulation {
     const s = this.state, tuning = CONFIG.enemySappers;
     for (const team of [...s.enemySapperTeams]) {
       const sapper = s.units.find((unit) => unit.id === team.sapperId && unit.health > 0 && !unit.dead);
-      if (team.chargeId !== null) {
-        if (s.enemyDemolitionCharges.some((charge) => charge.id === team.chargeId)) continue;
+      const mission = sapperMission(team, !!(sapper && team.plantPos && dist(sapper.pos, team.plantPos) <= tuning.plantReach));
+      if (mission.phase === 'withdrawing') {
+        if (s.enemyDemolitionCharges.some((charge) => charge.id === mission.chargeId)) continue;
         s.enemySapperTeams = s.enemySapperTeams.filter((candidate) => candidate.id !== team.id);
         continue;
       }
@@ -2169,18 +2173,18 @@ export class Simulation {
       const sites = demolitionSites(s);
       const site = team.target ? sites.find((candidate) => sameDemolitionTarget(candidate.target, team.target!)) : undefined;
       if (team.target && !site) {
-        team.target = null; team.plantPos = null; team.plantTicks = 0; team.nextPlanTick = s.ticks;
+        resetSapperMission(team, s.ticks);
         sapper.path = []; sapper.moveGoal = null;
       }
-      if (team.target && team.plantPos) {
-        if (!sapper.pinned && sapper.suppression < CONFIG.suppression.pinThreshold && !sapper.buildingPosition
-          && dist(sapper.pos, team.plantPos) <= tuning.plantReach) {
+      const currentMission = sapperMission(team, !!(team.plantPos && dist(sapper.pos, team.plantPos) <= tuning.plantReach));
+      if (currentMission.phase === 'approaching' || currentMission.phase === 'planting') {
+        if (currentMission.phase === 'planting' && !sapper.pinned && sapper.suppression < CONFIG.suppression.pinThreshold && !sapper.buildingPosition) {
           team.plantTicks++;
           if (team.plantTicks >= sec(tuning.plantSeconds)) {
             const id = s.nextEntityId++;
-            s.enemyDemolitionCharges.push({ id, unitId: sapper.id, target: { ...team.target }, pos: { ...team.plantPos }, ticksRemaining: sec(tuning.fuseSeconds) });
-            team.chargeId = id;
-            this.emit({ type: 'enemyChargePlanted', unitId: sapper.id, pos: { ...team.plantPos } });
+            s.enemyDemolitionCharges.push({ id, unitId: sapper.id, target: { ...currentMission.target }, pos: { ...currentMission.plantPos }, ticksRemaining: sec(tuning.fuseSeconds) });
+            plantSapperCharge(team, id);
+            this.emit({ type: 'enemyChargePlanted', unitId: sapper.id, pos: { ...currentMission.plantPos } });
             for (const unit of s.units) if (unit.id === sapper.id || team.escortIds.includes(unit.id)) { unit.path = []; unit.moveGoal = null; }
           }
         }
@@ -2201,7 +2205,7 @@ export class Simulation {
           if (!candidate.approaches.some((point) => dist(point, approach) <= s.terrain.cell * .75)) continue;
           const route = this.findUnitPath(sapper, sapper.pos, approach);
           if (!route.reachable) continue;
-          team.target = { ...candidate.target }; team.plantPos = { ...approach }; team.plantTicks = 0;
+          assignSapperMission(team, candidate.target, approach);
           sapper.path = route.waypoints; sapper.moveGoal = { ...approach };
           this.emit({ type: 'sapperTargeted', teamId: team.id, label: candidate.label, pos: { ...candidate.pos } });
           assigned = true; break;
@@ -2232,7 +2236,7 @@ export class Simulation {
       } else if (!this.sapperBehavior(unit) && (unit.path.length === 0 || !unit.moveGoal || dist(unit.moveGoal, team.plantPos) > 4)) {
         const route = this.findUnitPath(unit, unit.pos, team.plantPos);
         if (route.reachable) { unit.path = route.waypoints; unit.moveGoal = { ...team.plantPos }; }
-        else { team.target = null; team.plantPos = null; team.plantTicks = 0; team.nextPlanTick = this.state.ticks + sec(2); }
+        else { resetSapperMission(team, this.state.ticks + sec(2)); }
       }
       return true;
     }
@@ -4012,9 +4016,10 @@ export class Simulation {
     const transport = unit.transport;
     if (!transport || unit.pinned) return;
     unit.advance = true;
-    const withdrawing = transport.passengers === 0;
+    const phase = transportPhase(unit, this.state.terrain.cell);
+    const withdrawing = phase === 'withdrawing' || phase === 'departed';
     const destination = withdrawing ? transport.exit : transport.dropOff;
-    if (dist(unit.pos, destination) > this.state.terrain.cell * .75) {
+    if (phase === 'approaching' || phase === 'withdrawing') {
       if (!unit.path.length && this.state.ticks >= transport.retryTick) {
         transport.retryTick = this.state.ticks + CONFIG.tickRate;
         const step = this.state.terrain.cell * 2;
@@ -4036,12 +4041,12 @@ export class Simulation {
       return;
     }
     unit.path = []; unit.moveGoal = null; unit.advance = false;
-    if (withdrawing) {
+    if (phase === 'departed') {
       // Departure is neither a kill nor a breakthrough.
       unit.dead = true; unit.health = 0;
       return;
     }
-    if (transport.unloadTicks > 0) { transport.unloadTicks--; return; }
+    if (phase === 'unloading') { transport.unloadTicks--; return; }
     if (this.state.ticks < transport.retryTick) return;
     transport.retryTick = this.state.ticks + CONFIG.tickRate;
     const slots: Vec2[] = [];
@@ -4061,7 +4066,7 @@ export class Simulation {
     // Keep everyone aboard if six safe dismount points cannot yet be found.
     if (slots.length !== transport.passengers) return;
     const count = transport.passengers;
-    transport.passengers = 0;
+    finishTransportUnload(unit);
     for (const position of slots) {
       this.spawnEnemy('rifle', position);
       const soldier = this.state.units[this.state.units.length - 1]!;
@@ -4580,8 +4585,9 @@ export class Simulation {
         delete unit.medicalTargetId;
         unit.path = []; unit.moveGoal = null; unit.running = false;
       } else {
-        if (unit.pinned) return false;
-        if (!this.medicCanTreat(unit, patient)) {
+        const dispatch = supportDispatch(unit.medicalTargetId, unit.pinned, this.medicCanTreat(unit, patient));
+        if (dispatch.phase === 'paused') return false;
+        if (dispatch.phase === 'approaching') {
           if (!unit.path.length || !unit.moveGoal || dist(unit.moveGoal, patient.pos) > this.state.terrain.cell) {
             if (!this.routeMedic(unit, patient)) {
               delete unit.medicalTargetId;
