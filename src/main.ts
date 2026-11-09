@@ -48,6 +48,7 @@ const hud = new Hud({
   onMortarPit: () => controller.setMode({ kind: 'mortarPit' }),
   onBridge: () => controller.setMode({ kind: 'bridge' }),
   onMine: (kind) => controller.setMode({ kind: 'mine', mineKind: kind }),
+  onCancelMine: (siteId) => controller.cancelMineOrder(siteId),
   onArtillery: () => controller.setMode({ kind: 'artillery' }),
   onAirSupport: () => controller.setMode({ kind: 'airSupport' }),
   onFlare: () => controller.setMode({ kind: 'flare' }),

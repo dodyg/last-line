@@ -14,8 +14,10 @@ a preview for each soldier voice, and two Control acknowledgments. The manifest
 at `src/assets/ww2/voices/soldiers/manifest.json` lists every transcript and file.
 Speaker IDs select a consistent soldier voice; Control has its own voice.
 
-All 24 lull conversations have prerecorded openings and replies in both voices,
-adding 96 clips listed in `soldiers/banter-manifest.json`. Exchanges play off the
+All 102 lull conversations have prerecorded openings and replies in both voice slots,
+and 18 soldier recollections are recorded in both slots, for 444 clips listed in
+`soldiers/banter-manifest.json`. Recollections can start during quiet preparation
+after a wave has been cleared. Exchanges play off the
 radio, with a 250 ms pause between turns. A reply uses the other voice when two
 soldiers share a default voice assignment. Combat, pause, and mute cancel the
 active exchange and prevent its pending reply from playing later.
@@ -34,8 +36,11 @@ existing voice volume control.
 To hear the pack, open Settings > Audio > Preview American voice. It loads and
 plays a local file; the resulting status says "Played bundled American voice".
 
-The pack was synthesized once during asset authoring with Kokoro-82M and
+The original pack was synthesized once during asset authoring with Kokoro-82M and
 Kokoro.js, then trimmed, normalized, and exported as mono 24 kHz 16-bit PCM.
+The additional conversations and recollections were synthesized offline with
+Windows System.Speech using Microsoft David and Microsoft Mark, respectively.
+These recordings sound different from the original voices in the same slots.
 Those authoring dependencies and their model are not included in the project
 runtime or package dependencies. See the voice assets' SOURCES.md for provenance.
 

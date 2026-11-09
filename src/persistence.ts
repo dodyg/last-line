@@ -382,7 +382,7 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
       }
       if (!boundedNumber(u.health, 0, 1e6)) return fail('Corrupt unit health.');
       if (typeof u.dead !== 'boolean') return fail('Corrupt death flag.');
-      if (u.heardGunfire !== undefined && (!Array.isArray(u.heardGunfire) || u.heardGunfire.length > 512 || team !== 'friendly')) return fail('Corrupt heard gunfire.');
+      if (u.heardGunfire !== undefined && (!Array.isArray(u.heardGunfire) || u.heardGunfire.length > 512)) return fail('Corrupt heard gunfire.');
       const heardSourceIds = new Set<number>();
       for (const rawContact of [...(u.heardGunfire as unknown[] | undefined ?? []), ...(u.gunfirePursuit === undefined ? [] : [u.gunfirePursuit])]) {
         if (typeof rawContact !== 'object' || rawContact === null) return fail('Corrupt heard gunfire.');
@@ -917,7 +917,9 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
     if (typeof pos !== 'object' || pos === null) return fail('Corrupt bunker position.');
     const p = pos as Record<string, unknown>;
     if (!boundedNumber(p.x, 0, CONFIG.field.width) || !boundedNumber(p.y, 0, CONFIG.field.height)) return fail('Bunker out of bounds.');
-    bunkers.push({ id: bunker.id as number, pos: { x: p.x as number, y: p.y as number } });
+    if (bunker.health !== undefined && !boundedNumber(bunker.health, 1, CONFIG.bunker.health)) return fail('Corrupt bunker health.');
+    bunkers.push({ id: bunker.id as number, pos: { x: p.x as number, y: p.y as number },
+      ...(bunker.health === undefined ? {} : { health: bunker.health as number }) });
   }
 
   const barbedWireRaw = obj.barbedWire ?? [];
@@ -1079,11 +1081,11 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
   const mapsCleared = obj.mapsCleared ?? Math.max(0, (mapNumber as number) - 1);
   if (!boundedNumber(mapsCleared, 0, 1e6) || !Number.isInteger(mapsCleared)) return fail('Corrupt maps cleared.');
   const captureTicks = obj.captureTicks ?? 0;
-  const captureSeconds = obj.runMode === 'operation' ? operationSector({ mapsCleared: mapsCleared as number }).holdSeconds : CONFIG.crossing.captureSeconds;
+  const captureSeconds = obj.runMode === 'operation' || obj.runMode === 'assault' ? operationSector({ mapsCleared: mapsCleared as number, runMode: obj.runMode }).holdSeconds : CONFIG.crossing.captureSeconds;
   if (!boundedNumber(captureTicks, 0, captureSeconds * CONFIG.tickRate)) return fail('Corrupt capture objective progress.');
   if (obj.sectorCaptured !== undefined && typeof obj.sectorCaptured !== 'boolean') return fail('Corrupt capture objective state.');
   if (obj.sectorSupplyPending !== undefined && typeof obj.sectorSupplyPending !== 'boolean') return fail('Corrupt sector supply state.');
-  if (obj.runMode !== undefined && obj.runMode !== 'campaign' && obj.runMode !== 'operation') return fail('Corrupt operation mode.');
+  if (obj.runMode !== undefined && obj.runMode !== 'campaign' && obj.runMode !== 'operation' && obj.runMode !== 'assault') return fail('Corrupt operation mode.');
   const baseTerrainSeed = obj.baseTerrainSeed ?? seed;
   if (!boundedNumber(baseTerrainSeed, 0, 0xffffffff)) return fail('Corrupt base terrain seed.');
 
@@ -1162,9 +1164,24 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
     return fail('Day/night clock is missing after its wave requirement.');
   }
 
+  const animals: NonNullable<SimSnapshot['animals']> = [];
+  if (obj.animals !== undefined) {
+    if (!Array.isArray(obj.animals) || obj.animals.length > 20) return fail('Corrupt animal list.');
+    for (const raw of obj.animals) {
+      if (typeof raw !== 'object' || raw === null) return fail('Corrupt animal.');
+      const a = raw as Record<string, unknown>;
+      if (a.species !== 'cow' && a.species !== 'sheep' && a.species !== 'deer') return fail('Unknown animal species.');
+      if (typeof a.pos !== 'object' || a.pos === null) return fail('Corrupt animal position.');
+      const pos = a.pos as Record<string, unknown>;
+      if (!boundedNumber(pos.x, 0, CONFIG.field.width) || !boundedNumber(pos.y, 0, CONFIG.field.height)
+        || !boundedNumber(a.heading, -1e9, 1e9) || !boundedNumber(a.frightenedUntil, 0, Number.MAX_SAFE_INTEGER)) return fail('Corrupt animal state.');
+      animals.push({ species: a.species, pos: { x: pos.x as number, y: pos.y as number }, heading: a.heading as number, frightenedUntil: a.frightenedUntil as number });
+    }
+  }
+
   const snap: SimSnapshot = {
     schemaVersion: 30,
-    ...(obj.runMode === 'operation' || obj.runMode === 'campaign' ? { runMode: obj.runMode } : {}),
+    ...(obj.runMode === 'operation' || obj.runMode === 'campaign' || obj.runMode === 'assault' ? { runMode: obj.runMode } : {}),
     season,
     ...(isCampaignCountry(obj.campaignCountry) ? { campaignCountry: obj.campaignCountry } : {}),
     seed: seed as number,
@@ -1178,6 +1195,7 @@ export function validateSnapshot(data: unknown): { snap: SimSnapshot } | { error
     ticks: ticks as number,
     nextEntityId: nextEntityId as number,
     units,
+    animals,
     battleRecord,
     projectiles: projectiles as SimSnapshot['projectiles'],
     smokes,

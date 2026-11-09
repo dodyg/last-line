@@ -345,7 +345,7 @@ export const CONFIG: GameConfig = {
     mortarPitSeconds: 9,
     bridgeSeconds: 8,
   },
-  bunker: { occupyRadius: 24, minSpacing: 64, accuracyMult: 0.3 },
+  bunker: { occupyRadius: 24, minSpacing: 64, accuracyMult: 0.3, health: 260 },
   mortarPit: {
     occupyRadius: 18,
     minSpacing: 58,

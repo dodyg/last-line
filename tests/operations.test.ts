@@ -33,6 +33,54 @@ function march(sim: Simulation): void {
 }
 
 describe('three-sector operations', () => {
+  it.each([1, 17, 91, 2026, 9999])('places a full separated garrison on generated terrain (seed %i)', (seed) => {
+    for (let sector = 0; sector < 3; sector++) {
+      const sim = new Simulation(seed);
+      sim.state.runMode = 'assault'; sim.state.mapsCleared = sector;
+      sim.setupAssault();
+      const defenders = sim.state.units.filter((unit) => unit.team === 'enemy');
+      expect(defenders).toHaveLength([8, 12, 16][sector]!);
+      for (const [index, unit] of defenders.entries()) {
+        const col = Math.floor(unit.pos.x / sim.state.terrain.cell), row = Math.floor(unit.pos.y / sim.state.terrain.cell);
+        expect(sim.state.terrain.blocked[row * sim.state.terrain.cols + col]).toBeFalsy();
+        for (const other of defenders.slice(index + 1)) expect(Math.hypot(unit.pos.x - other.pos.x, unit.pos.y - other.pos.y)).toBeGreaterThanOrEqual(24);
+      }
+    }
+  });
+  it('sets up and preserves assault garrisons across three fortified sectors', () => {
+    const sim = new Simulation(2026);
+    sim.state.runMode = 'assault';
+    sim.setupAssault();
+    for (let sector = 0; sector < 3; sector++) {
+      const defenders = sim.state.units.filter((unit) => unit.team === 'enemy');
+      expect(defenders.length).toBe([8, 12, 16][sector]);
+      expect(sim.state.bunkers).toHaveLength(sector + 2);
+      expect(defenders.some((unit) => unit.role === 'mg_team')).toBe(true);
+      expect(defenders.some((unit) => unit.role === 'assault')).toBe(true);
+      for (const [index, unit] of defenders.entries()) {
+        for (const other of defenders.slice(index + 1)) expect(Math.hypot(unit.pos.x - other.pos.x, unit.pos.y - other.pos.y)).toBeGreaterThanOrEqual(24);
+      }
+      const positions = defenders.map((unit) => ({ ...unit.pos }));
+      sim.step();
+      expect(defenders.map((unit) => unit.pos)).toEqual(positions);
+      const parsed = validateSnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+      if ('error' in parsed) throw new Error(parsed.error);
+      const restored = Simulation.fromSnapshot(parsed.snap);
+      expect(restored.state.runMode).toBe('assault');
+      expect(restored.state.bunkers).toHaveLength(sector + 2);
+      expect(restored.state.units.filter((unit) => unit.team === 'enemy').map((unit) => unit.role)).toEqual(defenders.map((unit) => unit.role));
+      sim.state.units = sim.state.units.filter((unit) => unit.team === 'friendly');
+      sim.step();
+      expect(sim.state.scheduler.phase).toBe('advance');
+      expect(sim.state.sectorCaptured).toBe(false);
+      occupy(sim);
+      for (let tick = 0; tick < operationSector(sim.state).holdSeconds * CONFIG.tickRate; tick++) sim.step();
+      expect(sim.state.sectorCaptured).toBe(true);
+      march(sim);
+      if (sim.state.sectorSupplyPending) expect(sim.claimSectorSupply('points').ok).toBe(true);
+    }
+    expect(sim.state.phase).toBe('victory');
+  });
   it('requires capture after the first two defenses and wins after the final extraction', () => {
     const sim = operation();
     const originalIds = sim.state.units.map((unit) => unit.id);

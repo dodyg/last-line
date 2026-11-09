@@ -186,7 +186,7 @@ export class Menus {
     for (const button of required('campaign-choices').querySelectorAll<HTMLElement>('button, select')) {
       button.setAttribute('aria-pressed', String(button.dataset.country === this.selectedCountry));
     }
-    required('btn-campaign-start').textContent = `Start ${CAMPAIGNS[this.selectedCountry].name} ${required<HTMLSelectElement>('run-mode').value === 'operation' ? 'operation' : 'campaign'}`;
+    required('btn-campaign-start').textContent = `Start ${CAMPAIGNS[this.selectedCountry].name} ${required<HTMLSelectElement>('run-mode').value}`;
     let preview = this.el.campaign.querySelector<HTMLElement>('.campaign-story-preview');
     if (!preview) {
       preview = document.createElement('div');

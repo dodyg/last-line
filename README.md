@@ -1,5 +1,7 @@
 # Last Line
 
+
+Farm livestock and wild deer wander suitable ground. Nearby gunfire or explosions send them fleeing; blasts can kill them, and larger animals can set off AP mines. Soldiers do not target animals, and AT mines ignore them.
 A tactical defense game with persistent squads, destructible terrain, and country campaigns.
 
 Choose a country and a length when starting a new game:

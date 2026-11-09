@@ -2,12 +2,13 @@
 
 ## Prerecorded American soldier phrase pack
 
-- **Files:** `soldiers/*.wav`; combat transcripts are in `soldiers/manifest.json`, and the 96 banter recordings are in `soldiers/banter-manifest.json`.
+- **Files:** `soldiers/*.wav`; combat transcripts are in `soldiers/manifest.json`, and lull recordings are in `soldiers/banter-manifest.json`.
 - **Source:** Synthesized offline during asset authoring with Kokoro.js 1.2.1 and `onnx-community/Kokoro-82M-v1.0-ONNX` (Kokoro-82M v1.0).
 - **Voices:** Michael and Puck for soldiers; Fenrir for Control.
 - **Changes:** Trimmed leading/trailing silence, normalized peak level, exported as mono 24 kHz 16-bit PCM WAV. Radio processing is applied during playback.
 - **Authoring tools/model:** https://github.com/hexgrad/kokoro (Apache-2.0); https://huggingface.co/hexgrad/Kokoro-82M (Apache-2.0); https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX.
 - The game ships the audio files only. No synthesis model or inference library is loaded by the game.
+- Banter 25–102 and the 18 monologues were synthesized offline using Windows System.Speech with Microsoft David Desktop (Michael slot) and Microsoft Mark (Puck slot), and saved as WAV. They use different voices from the original Kokoro clips.
 
 ## Medic request shout
 

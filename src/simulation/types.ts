@@ -228,10 +228,10 @@ export interface SoldierAttributes {
 }
 export interface ScoutReport { unitId: number; role: UnitRole; pos: Vec2; tick: number }
 
-export type FireOrder = 'auto' | 'antiArmor' | 'stopBreakthrough' | 'holdGrenades' | 'seekGunfire';
-export const FIRE_ORDERS: readonly FireOrder[] = ['auto', 'antiArmor', 'stopBreakthrough', 'holdGrenades', 'seekGunfire'];
+export type FireOrder = 'auto' | 'antiArmor' | 'stopBreakthrough' | 'holdGrenades' | 'seekGunfire' | 'returnFire';
+export const FIRE_ORDERS: readonly FireOrder[] = ['auto', 'antiArmor', 'stopBreakthrough', 'holdGrenades', 'seekGunfire', 'returnFire'];
 export function fireOrdersForRole(role: UnitRole): readonly FireOrder[] {
-  if (role === 'gun_truck' || role === 'vehicle' || role === 'troop_transport') return ['auto', 'antiArmor', 'stopBreakthrough'];
+  if (role === 'gun_truck' || role === 'vehicle' || role === 'troop_transport') return ['auto', 'antiArmor', 'stopBreakthrough', 'returnFire'];
   return role === 'medic' || role === 'mortarman' || role === 'heavy_mg' || role === 'at_gun' ? FIRE_ORDERS.filter((order) => order !== 'seekGunfire') : FIRE_ORDERS;
 }
 export type Specialization = 'steadyAim' | 'fastReload' | 'tankHunter' | 'fieldMedic' | 'surgeon' | 'rapidBuilder' | 'heavyCharges' | 'spotter' | 'forwardObserver' | 'signalOfficer' | 'suppressor' | 'forcedMarch' | 'camouflage';
@@ -367,6 +367,8 @@ export interface Trench {
 export interface Bunker {
   id: number;
   pos: Vec2;
+  /** Missing in older saves; those bunkers start at full integrity. */
+  health?: number;
 }
 
 /** A small, roofed firing pit sized for one mortarman and his weapon. */
@@ -616,6 +618,13 @@ export type RunPhase = 'running' | 'victory' | 'defeat';
  * Terrain is excluded and regenerated from the seed; selection, particles,
  * sprites, and audio never appear here.
  */
+export interface Animal {
+  species: 'cow' | 'sheep' | 'deer';
+  pos: Vec2;
+  heading: number;
+  frightenedUntil: number;
+}
+
 export interface SimSnapshot {
   runMode?: import('../content/operations').RunMode;
   /** Fixed for this map; missing on saves written before seasons were introduced. */
@@ -639,6 +648,7 @@ export interface SimSnapshot {
   ticks: number;
   nextEntityId: number;
   units: Unit[];
+  animals?: Animal[];
   /** Requested casualties, oldest first, including those currently being treated. */
   medicalQueue?: number[];
   /** Ammunition requests, oldest first, including active deliveries. Legacy key shared by grenades, rockets, and mortar bombs. */
@@ -724,6 +734,7 @@ export interface SimState {
   ticks: number;
   nextEntityId: number;
   units: Unit[];
+  animals?: Animal[];
   /** Requested casualties, oldest first, including those currently being treated. */
   medicalQueue?: number[];
   /** Ammunition requests, oldest first, including active deliveries. Legacy key shared by grenades, rockets, and mortar bombs. */
@@ -876,7 +887,7 @@ export type SimEvent =
   | { type: 'sandbagPlaced'; pos: Vec2 }
   | { type: 'trenchBuilt'; pos: Vec2 }
   | { type: 'mineLaid'; kind: MineKind; pos: Vec2 }
-  | { type: 'mineTriggered'; kind: MineKind; pos: Vec2; radius: number; victims: number }
+  | { type: 'mineTriggered'; kind: MineKind; pos: Vec2; radius: number; victims: number; animalTriggered?: boolean }
   | { type: 'constructionCompleted'; kind: 'sandbag' | 'trench' | 'mine' | 'bunker' | 'mortarPit' | 'bridge' | 'barbedWire'; pos: Vec2 }
   /**
    * A work site nobody can finish, because the squad has no engineer left. Emitted
@@ -923,6 +934,7 @@ export type Command =
   | { type: 'mortarPit'; pos: Vec2 }
   | { type: 'bridge'; pos: Vec2 }
   | { type: 'mine'; kind: MineKind; pos: Vec2 }
+  | { type: 'cancelMine'; siteId: number }
   | { type: 'artillery'; pos: Vec2 }
   | { type: 'airSupport'; pos: Vec2 }
   | { type: 'flare'; pos: Vec2 }
@@ -1238,7 +1250,7 @@ export interface GameConfig {
     /** Each foliage cell between units shortens sighting range, capped at eight. */
     lineVisibilityMult: number;
   };
-  bunker: { occupyRadius: number; minSpacing: number; accuracyMult: number };
+  bunker: { occupyRadius: number; minSpacing: number; accuracyMult: number; health: number };
   mortarPit: { occupyRadius: number; minSpacing: number; accuracyMult: number; artilleryDamageMult: number; artillerySuppressionMult: number; reloadTimeMult: number };
   /**
    * Enemy movement policy. The Axis advance as a body of troops rather than a

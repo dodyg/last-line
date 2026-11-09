@@ -42,9 +42,9 @@ export function hasTrenchCover(trenches: readonly Trench[], target: Vec2, attack
   });
 }
 
-/** Bunkers protect friendly occupants from direct fire from every direction. */
+/** Bunkers protect occupants from direct fire from every direction. */
 export function hasBunkerCover(bunkers: readonly Bunker[], target: Unit, config: GameConfig): boolean {
-  return target.team === 'friendly' && bunkers.some((bunker) => dist(bunker.pos, target.pos) <= config.bunker.occupyRadius);
+  return bunkers.some((bunker) => dist(bunker.pos, target.pos) <= config.bunker.occupyRadius);
 }
 
 export function hasDirectionalCover(

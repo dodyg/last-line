@@ -74,7 +74,7 @@ export class RecruitmentScreen {
     this.get<HTMLSelectElement>('#recruit-weapon').disabled = choices.length < 2;
     const vehicle = role === 'gun_truck';
     const stance = this.get<HTMLSelectElement>('#recruit-stance'); stance.value = 'standing'; stance.disabled = vehicle;
-    const labels = { auto: 'Automatic targeting', antiArmor: 'Prioritize armor', stopBreakthrough: 'Stop breakthroughs', holdGrenades: 'Hold grenades', seekGunfire: 'Seek heard gunfire' };
+    const labels = { auto: 'Automatic targeting', antiArmor: 'Prioritize armor', stopBreakthrough: 'Stop breakthroughs', holdGrenades: 'Hold grenades', seekGunfire: 'Seek heard gunfire', returnFire: 'Return fire only' };
     const orders = this.get<HTMLSelectElement>('#recruit-fire-order');
     orders.replaceChildren(...fireOrdersForRole(role).map((order) => {
       const option = document.createElement('option'); option.value = order; option.textContent = labels[order]; return option;

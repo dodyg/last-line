@@ -1248,6 +1248,9 @@ test.describe('Last Line smoke', () => {
     await expect(page.locator('#sel-action')).toHaveText('Gunfire order · engaging');
     await page.screenshot({ path: testInfo.outputPath('gunfire-order-engaging.png') });
     await page.locator('#btn-fire-order').click(); await call<void>(page, 'step', 0);
+    await expect(page.locator('#btn-fire-order')).toHaveAttribute('aria-label', 'Fire order: Return fire only');
+    expect((await getState(page))!.units[0]!.gunfirePursuit).toBeUndefined();
+    await page.locator('#btn-fire-order').click(); await call<void>(page, 'step', 0);
     await expect(page.locator('#btn-fire-order')).toHaveAttribute('aria-label', 'Fire order: Auto');
     expect((await getState(page))!.units[0]!.gunfirePursuit).toBeUndefined(); expect(errors).toEqual([]);
   });
@@ -2484,6 +2487,34 @@ test.describe('Last Line smoke', () => {
     await call<void>(page, 'step', Math.ceil(CONFIG.weaponUpgrades.upgradeSeconds * CONFIG.tickRate) + 4);
     await expect(page.locator('#sel-action')).not.toContainText('Working on weapon');
     expect((await getState(page))!.units.find((u) => u.id === id)!.upgradeTimer ?? 0).toBe(0);
+  });
+
+  test('selected engineers show mine queue progress and allow cancelling an order', async ({ page }) => {
+    await startRun(page, 2026);
+    await page.clock.install({ time: new Date('2026-10-21T10:00:00Z') });
+    await page.clock.pauseAt(new Date('2026-10-21T10:00:01Z'));
+    await call<void>(page, 'givePoints', 60);
+    expect(await call<boolean>(page, 'recruit', 'engineer', 480, 580)).toBe(true);
+    expect(await call<boolean>(page, 'orderMine', 'ap', 480, 500)).toBe(true);
+    expect(await call<boolean>(page, 'orderMine', 'at', 540, 500)).toBe(true);
+    await call<void>(page, 'step', 2);
+    const engineer = (await getState(page))!.units.find((unit) => unit.role === 'engineer' && unit.team === 'friendly')!;
+    await page.locator(`.roster-soldier[data-unit-id="${engineer.id}"]`).click();
+    await call<void>(page, 'step', 0);
+    const queue = page.locator('#sel-mine-queue');
+    await expect(queue).toBeVisible();
+    await expect(queue).toContainText('2 remaining');
+    await expect(queue.locator('li').nth(0)).toContainText('Planting');
+    await expect(queue.locator('li').nth(1)).toContainText('Queued');
+    await expect(queue.locator('progress')).toHaveCount(2);
+    const before = (await getState(page))!.points;
+    await queue.getByRole('button', { name: /Cancel AT mine order/ }).click();
+    await call<void>(page, 'step', 0);
+    await expect(queue).toContainText('1 remaining');
+    expect((await getState(page))!.points).toBe(before + CONFIG.mineKinds.at.cost);
+    await queue.getByRole('button', { name: /Cancel AP mine order/ }).click();
+    await call<void>(page, 'step', 0);
+    await expect(queue).toBeHidden();
   });
 
   test('an engineer killed mid-build leaves no half-built marker behind', async ({ page }) => {

@@ -958,5 +958,2441 @@
     "kind": "banter",
     "exchange": 24,
     "part": "reply"
+  },
+  {
+    "id": "michael-banter-25-line",
+    "file": "michael-banter-25-line.wav",
+    "text": "I wrote home about the mud.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-25-reply",
+    "file": "michael-banter-25-reply.wav",
+    "text": "Did you include a sample, or just mail your boots?",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-26-line",
+    "file": "michael-banter-26-line.wav",
+    "text": "The sergeant says to sleep with one eye open.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-26-reply",
+    "file": "michael-banter-26-reply.wav",
+    "text": "You snore with both of them shut.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-27-line",
+    "file": "michael-banter-27-line.wav",
+    "text": "My rifle and I have an understanding.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-27-reply",
+    "file": "michael-banter-27-reply.wav",
+    "text": "You carry it, and it does all the work?",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-28-line",
+    "file": "michael-banter-28-line.wav",
+    "text": "I used to complain about the rain back home.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-28-reply",
+    "file": "michael-banter-28-reply.wav",
+    "text": "Well, now you have international experience.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-29-line",
+    "file": "michael-banter-29-line.wav",
+    "text": "I found a dry spot in the trench.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-29-reply",
+    "file": "michael-banter-29-reply.wav",
+    "text": "Keep it secret or the officers will requisition it.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-30-line",
+    "file": "michael-banter-30-line.wav",
+    "text": "That last shell landed close enough to part my hair.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-30-reply",
+    "file": "michael-banter-30-reply.wav",
+    "text": "Ask it to do something about the rest of your face.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-31-line",
+    "file": "michael-banter-31-line.wav",
+    "text": "The mail is late again.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-31-reply",
+    "file": "michael-banter-31-reply.wav",
+    "text": "Maybe your sweetheart finally learned to spell goodbye.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-32-line",
+    "file": "michael-banter-32-line.wav",
+    "text": "I dreamed about a hot bath last night.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-32-reply",
+    "file": "michael-banter-32-reply.wav",
+    "text": "I dreamed you took one too. Best dream all week.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-33-line",
+    "file": "michael-banter-33-line.wav",
+    "text": "The lieutenant says this position is temporary.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-33-reply",
+    "file": "michael-banter-33-reply.wav",
+    "text": "So is the army. Just takes longer than advertised.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-34-line",
+    "file": "michael-banter-34-line.wav",
+    "text": "I saved half my chocolate for later.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-34-reply",
+    "file": "michael-banter-34-reply.wav",
+    "text": "That explains the empty wrapper in my pocket.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-35-line",
+    "file": "michael-banter-35-line.wav",
+    "text": "My mother told me to keep my head down.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-35-reply",
+    "file": "michael-banter-35-reply.wav",
+    "text": "Smart woman. Did she say anything about your mouth?",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-36-line",
+    "file": "michael-banter-36-line.wav",
+    "text": "I could use a fresh pair of socks.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-36-reply",
+    "file": "michael-banter-36-reply.wav",
+    "text": "I could use a fresh pair of feet.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-37-line",
+    "file": "michael-banter-37-line.wav",
+    "text": "The cook found something green in the stew.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-37-reply",
+    "file": "michael-banter-37-reply.wav",
+    "text": "Tell him to leave it alone. It might be a vegetable.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-38-line",
+    "file": "michael-banter-38-line.wav",
+    "text": "I had a garden before the war.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-38-reply",
+    "file": "michael-banter-38-reply.wav",
+    "text": "Good. You can tell us what this mud is supposed to grow.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-39-line",
+    "file": "michael-banter-39-line.wav",
+    "text": "Do you ever think about going home?",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-39-reply",
+    "file": "michael-banter-39-reply.wav",
+    "text": "Only when I am awake. The rest of the time I dream about it.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-40-line",
+    "file": "michael-banter-40-line.wav",
+    "text": "The captain called this a quiet sector.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-40-reply",
+    "file": "michael-banter-40-reply.wav",
+    "text": "He should come down and tell the shells.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-41-line",
+    "file": "michael-banter-41-line.wav",
+    "text": "I lost my lucky coin yesterday.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-41-reply",
+    "file": "michael-banter-41-reply.wav",
+    "text": "Then it worked longer than we had any right to expect.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-42-line",
+    "file": "michael-banter-42-line.wav",
+    "text": "I used to work on the railroad.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-42-reply",
+    "file": "michael-banter-42-reply.wav",
+    "text": "Then you know all about waiting for a train that never comes.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-43-line",
+    "file": "michael-banter-43-line.wav",
+    "text": "My boots are older than the replacement lieutenant.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-43-reply",
+    "file": "michael-banter-43-reply.wav",
+    "text": "And twice as likely to know which way to go.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-44-line",
+    "file": "michael-banter-44-line.wav",
+    "text": "You ever get tired of digging?",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-44-reply",
+    "file": "michael-banter-44-reply.wav",
+    "text": "No. I save my complaints for filling the holes back in.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-45-line",
+    "file": "michael-banter-45-line.wav",
+    "text": "They promised us a change of scenery.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-45-reply",
+    "file": "michael-banter-45-reply.wav",
+    "text": "Turn around. The mud looks different from this side.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-46-line",
+    "file": "michael-banter-46-line.wav",
+    "text": "I can smell coffee.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-46-reply",
+    "file": "michael-banter-46-reply.wav",
+    "text": "That is the gun barrel cooling down.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-47-line",
+    "file": "michael-banter-47-line.wav",
+    "text": "My girl says she misses my cooking.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-47-reply",
+    "file": "michael-banter-47-reply.wav",
+    "text": "That is love. Or a very serious head injury.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-48-line",
+    "file": "michael-banter-48-line.wav",
+    "text": "The sergeant says I have a natural talent.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-48-reply",
+    "file": "michael-banter-48-reply.wav",
+    "text": "Sleeping through an inspection is a useful skill.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-49-line",
+    "file": "michael-banter-49-line.wav",
+    "text": "I used to fish every Sunday.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-49-reply",
+    "file": "michael-banter-49-reply.wav",
+    "text": "Now you just wait in the rain and hope nothing bites.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-50-line",
+    "file": "michael-banter-50-line.wav",
+    "text": "There is a hole in my blanket.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-50-reply",
+    "file": "michael-banter-50-reply.wav",
+    "text": "At least you can see the stars without getting up.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-51-line",
+    "file": "michael-banter-51-line.wav",
+    "text": "I asked the quartermaster for a new helmet.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-51-reply",
+    "file": "michael-banter-51-reply.wav",
+    "text": "Did he tell you to grow a smaller head?",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-52-line",
+    "file": "michael-banter-52-line.wav",
+    "text": "You look like you slept in a ditch.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-52-reply",
+    "file": "michael-banter-52-reply.wav",
+    "text": "I did. You were snoring in the good ditch.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-53-line",
+    "file": "michael-banter-53-line.wav",
+    "text": "I miss my dog something fierce.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-53-reply",
+    "file": "michael-banter-53-reply.wav",
+    "text": "He probably misses you too. The mailman less so.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-54-line",
+    "file": "michael-banter-54-line.wav",
+    "text": "The coffee tastes like burnt rope.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-54-reply",
+    "file": "michael-banter-54-reply.wav",
+    "text": "That is the special blend. Yesterday was plain rope.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-55-line",
+    "file": "michael-banter-55-line.wav",
+    "text": "My brother always borrowed my clothes.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-55-reply",
+    "file": "michael-banter-55-reply.wav",
+    "text": "Send him these. That should settle the debt.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-56-line",
+    "file": "michael-banter-56-line.wav",
+    "text": "I thought I heard the dinner bell.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-56-reply",
+    "file": "michael-banter-56-reply.wav",
+    "text": "That was a shovel hitting a helmet. Same effect.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-57-line",
+    "file": "michael-banter-57-line.wav",
+    "text": "I have been saving a cigarette for a special occasion.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-57-reply",
+    "file": "michael-banter-57-reply.wav",
+    "text": "The cook serving something edible would qualify.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-58-line",
+    "file": "michael-banter-58-line.wav",
+    "text": "That new map says there is a road here.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-58-reply",
+    "file": "michael-banter-58-reply.wav",
+    "text": "There was. We have been wearing it on our boots.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-59-line",
+    "file": "michael-banter-59-line.wav",
+    "text": "The sergeant wants this trench straight.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-59-reply",
+    "file": "michael-banter-59-reply.wav",
+    "text": "Tell him to ask the enemy to stand in a straight line.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-60-line",
+    "file": "michael-banter-60-line.wav",
+    "text": "I used to be a barber.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-60-reply",
+    "file": "michael-banter-60-reply.wav",
+    "text": "Good. When this is over you can shave a week off my face.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-61-line",
+    "file": "michael-banter-61-line.wav",
+    "text": "My watch stopped at three.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-61-reply",
+    "file": "michael-banter-61-reply.wav",
+    "text": "Lucky watch. Mine has to stay here with us.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-62-line",
+    "file": "michael-banter-62-line.wav",
+    "text": "I wonder what the folks back home are doing.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-62-reply",
+    "file": "michael-banter-62-reply.wav",
+    "text": "Probably sleeping. No need to hold it against them.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-63-line",
+    "file": "michael-banter-63-line.wav",
+    "text": "I have a picture of my old car.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-63-reply",
+    "file": "michael-banter-63-reply.wav",
+    "text": "Does it run better than the one the army gave us?",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-64-line",
+    "file": "michael-banter-64-line.wav",
+    "text": "The rain finally stopped.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-64-reply",
+    "file": "michael-banter-64-reply.wav",
+    "text": "Keep your voice down or it will hear you.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-65-line",
+    "file": "michael-banter-65-line.wav",
+    "text": "I could eat a whole pie right now.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-65-reply",
+    "file": "michael-banter-65-reply.wav",
+    "text": "You would have to fight me for the tin.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-66-line",
+    "file": "michael-banter-66-line.wav",
+    "text": "The corporal says we should look sharp.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-66-reply",
+    "file": "michael-banter-66-reply.wav",
+    "text": "Tell him my shovel is doing its best.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-67-line",
+    "file": "michael-banter-67-line.wav",
+    "text": "My sister sent me a wool scarf.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-67-reply",
+    "file": "michael-banter-67-reply.wav",
+    "text": "Put it on before the sergeant mistakes it for a sandbag.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-68-line",
+    "file": "michael-banter-68-line.wav",
+    "text": "I saw a bird land on the wire.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-68-reply",
+    "file": "michael-banter-68-reply.wav",
+    "text": "Smart bird. It left before the briefing.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-69-line",
+    "file": "michael-banter-69-line.wav",
+    "text": "I used to hate getting up early.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-69-reply",
+    "file": "michael-banter-69-reply.wav",
+    "text": "The army fixed that. Now you hate staying up late too.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-70-line",
+    "file": "michael-banter-70-line.wav",
+    "text": "My feet are so cold I cannot feel them.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-70-reply",
+    "file": "michael-banter-70-reply.wav",
+    "text": "That is good. They cannot feel these boots either.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-71-line",
+    "file": "michael-banter-71-line.wav",
+    "text": "I promised to bring home a souvenir.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-71-reply",
+    "file": "michael-banter-71-reply.wav",
+    "text": "Take the mud. There is enough for the whole family.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-72-line",
+    "file": "michael-banter-72-line.wav",
+    "text": "You think this rain will ever end?",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-72-reply",
+    "file": "michael-banter-72-reply.wav",
+    "text": "Sure. Right after we finish building the roof.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-01",
+    "file": "michael-monologue-01.wav",
+    "text": "I worked the night shift at a mill before all this. Walking home at dawn, I could hear the first streetcars and smell bread from the bakery. I used to think that was a hard way to spend a night. I would give plenty to hear those streetcars again.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-02",
+    "file": "michael-monologue-02.wav",
+    "text": "The first time we came under fire, I tried to remember every word they taught us. Mostly I remember the man beside me pulling me down into a ditch. Afterward he shared his last cigarette and never said a word about it. I try to do the same for the new fellows.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-03",
+    "file": "michael-monologue-03.wav",
+    "text": "My father showed me how to mend a fence when I was a boy. He said you start with the posts, because a good line needs something solid to hold it up. I keep thinking about that when we dig in. Funny what comes back to you out here.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-04",
+    "file": "michael-monologue-04.wav",
+    "text": "We passed through a little village once, after the fighting had moved on. A woman was sweeping broken glass from her doorstep, as if she could put the whole street right by supper. I helped her for a while. I still think about that broom whenever things get quiet.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-05",
+    "file": "michael-monologue-05.wav",
+    "text": "I had a letter from my brother before we moved out. He wrote about the harvest, the weather, and a tractor that would not start. Nothing grand, just the ordinary things. I have read it so many times the folds are coming apart.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-06",
+    "file": "michael-monologue-06.wav",
+    "text": "On my first march I packed everything I thought a soldier ought to carry. By the second day I was handing half of it away. An old hand showed me how to look after my feet and keep my matches dry. I have remembered both lessons ever since.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-25-line",
+    "file": "puck-banter-25-line.wav",
+    "text": "I wrote home about the mud.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-25-reply",
+    "file": "puck-banter-25-reply.wav",
+    "text": "Did you include a sample, or just mail your boots?",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-26-line",
+    "file": "puck-banter-26-line.wav",
+    "text": "The sergeant says to sleep with one eye open.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-26-reply",
+    "file": "puck-banter-26-reply.wav",
+    "text": "You snore with both of them shut.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-27-line",
+    "file": "puck-banter-27-line.wav",
+    "text": "My rifle and I have an understanding.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-27-reply",
+    "file": "puck-banter-27-reply.wav",
+    "text": "You carry it, and it does all the work?",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-28-line",
+    "file": "puck-banter-28-line.wav",
+    "text": "I used to complain about the rain back home.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-28-reply",
+    "file": "puck-banter-28-reply.wav",
+    "text": "Well, now you have international experience.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-29-line",
+    "file": "puck-banter-29-line.wav",
+    "text": "I found a dry spot in the trench.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-29-reply",
+    "file": "puck-banter-29-reply.wav",
+    "text": "Keep it secret or the officers will requisition it.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-30-line",
+    "file": "puck-banter-30-line.wav",
+    "text": "That last shell landed close enough to part my hair.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-30-reply",
+    "file": "puck-banter-30-reply.wav",
+    "text": "Ask it to do something about the rest of your face.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-31-line",
+    "file": "puck-banter-31-line.wav",
+    "text": "The mail is late again.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-31-reply",
+    "file": "puck-banter-31-reply.wav",
+    "text": "Maybe your sweetheart finally learned to spell goodbye.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-32-line",
+    "file": "puck-banter-32-line.wav",
+    "text": "I dreamed about a hot bath last night.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-32-reply",
+    "file": "puck-banter-32-reply.wav",
+    "text": "I dreamed you took one too. Best dream all week.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-33-line",
+    "file": "puck-banter-33-line.wav",
+    "text": "The lieutenant says this position is temporary.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-33-reply",
+    "file": "puck-banter-33-reply.wav",
+    "text": "So is the army. Just takes longer than advertised.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-34-line",
+    "file": "puck-banter-34-line.wav",
+    "text": "I saved half my chocolate for later.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-34-reply",
+    "file": "puck-banter-34-reply.wav",
+    "text": "That explains the empty wrapper in my pocket.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-35-line",
+    "file": "puck-banter-35-line.wav",
+    "text": "My mother told me to keep my head down.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-35-reply",
+    "file": "puck-banter-35-reply.wav",
+    "text": "Smart woman. Did she say anything about your mouth?",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-36-line",
+    "file": "puck-banter-36-line.wav",
+    "text": "I could use a fresh pair of socks.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-36-reply",
+    "file": "puck-banter-36-reply.wav",
+    "text": "I could use a fresh pair of feet.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-37-line",
+    "file": "puck-banter-37-line.wav",
+    "text": "The cook found something green in the stew.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-37-reply",
+    "file": "puck-banter-37-reply.wav",
+    "text": "Tell him to leave it alone. It might be a vegetable.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-38-line",
+    "file": "puck-banter-38-line.wav",
+    "text": "I had a garden before the war.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-38-reply",
+    "file": "puck-banter-38-reply.wav",
+    "text": "Good. You can tell us what this mud is supposed to grow.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-39-line",
+    "file": "puck-banter-39-line.wav",
+    "text": "Do you ever think about going home?",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-39-reply",
+    "file": "puck-banter-39-reply.wav",
+    "text": "Only when I am awake. The rest of the time I dream about it.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-40-line",
+    "file": "puck-banter-40-line.wav",
+    "text": "The captain called this a quiet sector.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-40-reply",
+    "file": "puck-banter-40-reply.wav",
+    "text": "He should come down and tell the shells.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-41-line",
+    "file": "puck-banter-41-line.wav",
+    "text": "I lost my lucky coin yesterday.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-41-reply",
+    "file": "puck-banter-41-reply.wav",
+    "text": "Then it worked longer than we had any right to expect.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-42-line",
+    "file": "puck-banter-42-line.wav",
+    "text": "I used to work on the railroad.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-42-reply",
+    "file": "puck-banter-42-reply.wav",
+    "text": "Then you know all about waiting for a train that never comes.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-43-line",
+    "file": "puck-banter-43-line.wav",
+    "text": "My boots are older than the replacement lieutenant.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-43-reply",
+    "file": "puck-banter-43-reply.wav",
+    "text": "And twice as likely to know which way to go.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-44-line",
+    "file": "puck-banter-44-line.wav",
+    "text": "You ever get tired of digging?",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-44-reply",
+    "file": "puck-banter-44-reply.wav",
+    "text": "No. I save my complaints for filling the holes back in.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-45-line",
+    "file": "puck-banter-45-line.wav",
+    "text": "They promised us a change of scenery.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-45-reply",
+    "file": "puck-banter-45-reply.wav",
+    "text": "Turn around. The mud looks different from this side.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-46-line",
+    "file": "puck-banter-46-line.wav",
+    "text": "I can smell coffee.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-46-reply",
+    "file": "puck-banter-46-reply.wav",
+    "text": "That is the gun barrel cooling down.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-47-line",
+    "file": "puck-banter-47-line.wav",
+    "text": "My girl says she misses my cooking.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-47-reply",
+    "file": "puck-banter-47-reply.wav",
+    "text": "That is love. Or a very serious head injury.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-48-line",
+    "file": "puck-banter-48-line.wav",
+    "text": "The sergeant says I have a natural talent.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-48-reply",
+    "file": "puck-banter-48-reply.wav",
+    "text": "Sleeping through an inspection is a useful skill.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-49-line",
+    "file": "puck-banter-49-line.wav",
+    "text": "I used to fish every Sunday.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-49-reply",
+    "file": "puck-banter-49-reply.wav",
+    "text": "Now you just wait in the rain and hope nothing bites.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-50-line",
+    "file": "puck-banter-50-line.wav",
+    "text": "There is a hole in my blanket.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-50-reply",
+    "file": "puck-banter-50-reply.wav",
+    "text": "At least you can see the stars without getting up.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-51-line",
+    "file": "puck-banter-51-line.wav",
+    "text": "I asked the quartermaster for a new helmet.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-51-reply",
+    "file": "puck-banter-51-reply.wav",
+    "text": "Did he tell you to grow a smaller head?",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-52-line",
+    "file": "puck-banter-52-line.wav",
+    "text": "You look like you slept in a ditch.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-52-reply",
+    "file": "puck-banter-52-reply.wav",
+    "text": "I did. You were snoring in the good ditch.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-53-line",
+    "file": "puck-banter-53-line.wav",
+    "text": "I miss my dog something fierce.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-53-reply",
+    "file": "puck-banter-53-reply.wav",
+    "text": "He probably misses you too. The mailman less so.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-54-line",
+    "file": "puck-banter-54-line.wav",
+    "text": "The coffee tastes like burnt rope.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-54-reply",
+    "file": "puck-banter-54-reply.wav",
+    "text": "That is the special blend. Yesterday was plain rope.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-55-line",
+    "file": "puck-banter-55-line.wav",
+    "text": "My brother always borrowed my clothes.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-55-reply",
+    "file": "puck-banter-55-reply.wav",
+    "text": "Send him these. That should settle the debt.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-56-line",
+    "file": "puck-banter-56-line.wav",
+    "text": "I thought I heard the dinner bell.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-56-reply",
+    "file": "puck-banter-56-reply.wav",
+    "text": "That was a shovel hitting a helmet. Same effect.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-57-line",
+    "file": "puck-banter-57-line.wav",
+    "text": "I have been saving a cigarette for a special occasion.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-57-reply",
+    "file": "puck-banter-57-reply.wav",
+    "text": "The cook serving something edible would qualify.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-58-line",
+    "file": "puck-banter-58-line.wav",
+    "text": "That new map says there is a road here.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-58-reply",
+    "file": "puck-banter-58-reply.wav",
+    "text": "There was. We have been wearing it on our boots.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-59-line",
+    "file": "puck-banter-59-line.wav",
+    "text": "The sergeant wants this trench straight.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-59-reply",
+    "file": "puck-banter-59-reply.wav",
+    "text": "Tell him to ask the enemy to stand in a straight line.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-60-line",
+    "file": "puck-banter-60-line.wav",
+    "text": "I used to be a barber.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-60-reply",
+    "file": "puck-banter-60-reply.wav",
+    "text": "Good. When this is over you can shave a week off my face.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-61-line",
+    "file": "puck-banter-61-line.wav",
+    "text": "My watch stopped at three.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-61-reply",
+    "file": "puck-banter-61-reply.wav",
+    "text": "Lucky watch. Mine has to stay here with us.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-62-line",
+    "file": "puck-banter-62-line.wav",
+    "text": "I wonder what the folks back home are doing.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-62-reply",
+    "file": "puck-banter-62-reply.wav",
+    "text": "Probably sleeping. No need to hold it against them.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-63-line",
+    "file": "puck-banter-63-line.wav",
+    "text": "I have a picture of my old car.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-63-reply",
+    "file": "puck-banter-63-reply.wav",
+    "text": "Does it run better than the one the army gave us?",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-64-line",
+    "file": "puck-banter-64-line.wav",
+    "text": "The rain finally stopped.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-64-reply",
+    "file": "puck-banter-64-reply.wav",
+    "text": "Keep your voice down or it will hear you.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-65-line",
+    "file": "puck-banter-65-line.wav",
+    "text": "I could eat a whole pie right now.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-65-reply",
+    "file": "puck-banter-65-reply.wav",
+    "text": "You would have to fight me for the tin.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-66-line",
+    "file": "puck-banter-66-line.wav",
+    "text": "The corporal says we should look sharp.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-66-reply",
+    "file": "puck-banter-66-reply.wav",
+    "text": "Tell him my shovel is doing its best.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-67-line",
+    "file": "puck-banter-67-line.wav",
+    "text": "My sister sent me a wool scarf.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-67-reply",
+    "file": "puck-banter-67-reply.wav",
+    "text": "Put it on before the sergeant mistakes it for a sandbag.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-68-line",
+    "file": "puck-banter-68-line.wav",
+    "text": "I saw a bird land on the wire.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-68-reply",
+    "file": "puck-banter-68-reply.wav",
+    "text": "Smart bird. It left before the briefing.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-69-line",
+    "file": "puck-banter-69-line.wav",
+    "text": "I used to hate getting up early.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-69-reply",
+    "file": "puck-banter-69-reply.wav",
+    "text": "The army fixed that. Now you hate staying up late too.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-70-line",
+    "file": "puck-banter-70-line.wav",
+    "text": "My feet are so cold I cannot feel them.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-70-reply",
+    "file": "puck-banter-70-reply.wav",
+    "text": "That is good. They cannot feel these boots either.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-71-line",
+    "file": "puck-banter-71-line.wav",
+    "text": "I promised to bring home a souvenir.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-71-reply",
+    "file": "puck-banter-71-reply.wav",
+    "text": "Take the mud. There is enough for the whole family.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-72-line",
+    "file": "puck-banter-72-line.wav",
+    "text": "You think this rain will ever end?",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-72-reply",
+    "file": "puck-banter-72-reply.wav",
+    "text": "Sure. Right after we finish building the roof.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-01",
+    "file": "puck-monologue-01.wav",
+    "text": "I worked the night shift at a mill before all this. Walking home at dawn, I could hear the first streetcars and smell bread from the bakery. I used to think that was a hard way to spend a night. I would give plenty to hear those streetcars again.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-02",
+    "file": "puck-monologue-02.wav",
+    "text": "The first time we came under fire, I tried to remember every word they taught us. Mostly I remember the man beside me pulling me down into a ditch. Afterward he shared his last cigarette and never said a word about it. I try to do the same for the new fellows.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-03",
+    "file": "puck-monologue-03.wav",
+    "text": "My father showed me how to mend a fence when I was a boy. He said you start with the posts, because a good line needs something solid to hold it up. I keep thinking about that when we dig in. Funny what comes back to you out here.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-04",
+    "file": "puck-monologue-04.wav",
+    "text": "We passed through a little village once, after the fighting had moved on. A woman was sweeping broken glass from her doorstep, as if she could put the whole street right by supper. I helped her for a while. I still think about that broom whenever things get quiet.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-05",
+    "file": "puck-monologue-05.wav",
+    "text": "I had a letter from my brother before we moved out. He wrote about the harvest, the weather, and a tractor that would not start. Nothing grand, just the ordinary things. I have read it so many times the folds are coming apart.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-06",
+    "file": "puck-monologue-06.wav",
+    "text": "On my first march I packed everything I thought a soldier ought to carry. By the second day I was handing half of it away. An old hand showed me how to look after my feet and keep my matches dry. I have remembered both lessons ever since.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-73-line",
+    "file": "michael-banter-73-line.wav",
+    "text": "The cook says there is chicken in the stew.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-73-reply",
+    "file": "michael-banter-73-reply.wav",
+    "text": "Then the chicken made a clean getaway.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-74-line",
+    "file": "michael-banter-74-line.wav",
+    "text": "I asked the sergeant when we get leave.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-74-reply",
+    "file": "michael-banter-74-reply.wav",
+    "text": "Did he stop laughing long enough to answer?",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-75-line",
+    "file": "michael-banter-75-line.wav",
+    "text": "My helmet has a dent in it.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-75-reply",
+    "file": "michael-banter-75-reply.wav",
+    "text": "That is where your bright idea tried to get out.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-76-line",
+    "file": "michael-banter-76-line.wav",
+    "text": "I used to sell shoes back home.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-76-reply",
+    "file": "michael-banter-76-reply.wav",
+    "text": "Then you know a bad fit when the army hands you one.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-77-line",
+    "file": "michael-banter-77-line.wav",
+    "text": "I found a feather in my bedroll.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-77-reply",
+    "file": "michael-banter-77-reply.wav",
+    "text": "Luxury. Mine still has the bird attached.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-78-line",
+    "file": "michael-banter-78-line.wav",
+    "text": "The lieutenant says to use our initiative.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-78-reply",
+    "file": "michael-banter-78-reply.wav",
+    "text": "Careful. Last man who did that got promoted.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-79-line",
+    "file": "michael-banter-79-line.wav",
+    "text": "I can hear the mess truck coming.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-79-reply",
+    "file": "michael-banter-79-reply.wav",
+    "text": "That is your stomach. The truck broke down yesterday.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-80-line",
+    "file": "michael-banter-80-line.wav",
+    "text": "My girl wants a man in uniform.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-80-reply",
+    "file": "michael-banter-80-reply.wav",
+    "text": "Write and tell her you have several standing right here.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-81-line",
+    "file": "michael-banter-81-line.wav",
+    "text": "I never thought I would miss the factory whistle.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-81-reply",
+    "file": "michael-banter-81-reply.wav",
+    "text": "Give the sergeant a kettle and he will make you feel at home.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-82-line",
+    "file": "michael-banter-82-line.wav",
+    "text": "The corporal says we need more discipline.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-82-reply",
+    "file": "michael-banter-82-reply.wav",
+    "text": "We could start by making him share his chocolate.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-83-line",
+    "file": "michael-banter-83-line.wav",
+    "text": "I washed my shirt in the stream.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-83-reply",
+    "file": "michael-banter-83-reply.wav",
+    "text": "Did the fish complain upstream or downstream?",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-84-line",
+    "file": "michael-banter-84-line.wav",
+    "text": "This shovel has seen better days.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-84-reply",
+    "file": "michael-banter-84-reply.wav",
+    "text": "So have I, and nobody has offered to replace me.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-85-line",
+    "file": "michael-banter-85-line.wav",
+    "text": "I asked for a hot meal.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-85-reply",
+    "file": "michael-banter-85-reply.wav",
+    "text": "The cook heard you. He left your tin in the sun.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-86-line",
+    "file": "michael-banter-86-line.wav",
+    "text": "Back home I could sleep through anything.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-86-reply",
+    "file": "michael-banter-86-reply.wav",
+    "text": "We know. Your snoring has been keeping us awake.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-87-line",
+    "file": "michael-banter-87-line.wav",
+    "text": "My uncle once met a general.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-87-reply",
+    "file": "michael-banter-87-reply.wav",
+    "text": "Did he apologize, or was it not his fault?",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-88-line",
+    "file": "michael-banter-88-line.wav",
+    "text": "I have a talent for finding cover.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-88-reply",
+    "file": "michael-banter-88-reply.wav",
+    "text": "Especially when the sergeant is looking for volunteers.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-89-line",
+    "file": "michael-banter-89-line.wav",
+    "text": "I think my boots are shrinking.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-89-reply",
+    "file": "michael-banter-89-reply.wav",
+    "text": "Your feet are trying to desert without you.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-90-line",
+    "file": "michael-banter-90-line.wav",
+    "text": "The map says there is a bridge up ahead.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-90-reply",
+    "file": "michael-banter-90-reply.wav",
+    "text": "Good. Maybe it can carry the rest of this conversation.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-91-line",
+    "file": "michael-banter-91-line.wav",
+    "text": "I wrote a poem about the rain.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-91-reply",
+    "file": "michael-banter-91-reply.wav",
+    "text": "Make it short. We have enough water in the trench.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-92-line",
+    "file": "michael-banter-92-line.wav",
+    "text": "The barber at camp gave me a close shave.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-92-reply",
+    "file": "michael-banter-92-reply.wav",
+    "text": "That was not the barber. That was the artillery.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-93-line",
+    "file": "michael-banter-93-line.wav",
+    "text": "I sent my sweetheart a pressed flower.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-93-reply",
+    "file": "michael-banter-93-reply.wav",
+    "text": "She will be pleased you finally found something clean to press.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-94-line",
+    "file": "michael-banter-94-line.wav",
+    "text": "They say an army marches on its stomach.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-94-reply",
+    "file": "michael-banter-94-reply.wav",
+    "text": "That explains why we have been going around in circles.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-95-line",
+    "file": "michael-banter-95-line.wav",
+    "text": "I used to make clocks.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-95-reply",
+    "file": "michael-banter-95-reply.wav",
+    "text": "Then you can tell us why every watch ends ten minutes late.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-96-line",
+    "file": "michael-banter-96-line.wav",
+    "text": "The sergeant says I have a good head on my shoulders.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-96-reply",
+    "file": "michael-banter-96-reply.wav",
+    "text": "Keep it down there and he might say it again tomorrow.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-97-line",
+    "file": "michael-banter-97-line.wav",
+    "text": "I brought a deck of cards from home.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-97-reply",
+    "file": "michael-banter-97-reply.wav",
+    "text": "Good. Deal me a ticket back.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-98-line",
+    "file": "michael-banter-98-line.wav",
+    "text": "I asked the medic for something for my nerves.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-98-reply",
+    "file": "michael-banter-98-reply.wav",
+    "text": "He said to stop listening to your stories.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-99-line",
+    "file": "michael-banter-99-line.wav",
+    "text": "This coffee is strong enough to walk.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-99-reply",
+    "file": "michael-banter-99-reply.wav",
+    "text": "Then send it on patrol and let us get some sleep.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-100-line",
+    "file": "michael-banter-100-line.wav",
+    "text": "My brother always said I would go places.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-100-reply",
+    "file": "michael-banter-100-reply.wav",
+    "text": "Did he mention most of them would be ditches?",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-101-line",
+    "file": "michael-banter-101-line.wav",
+    "text": "The rain has soaked everything I own.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-101-reply",
+    "file": "michael-banter-101-reply.wav",
+    "text": "At least your letters home will be easier to seal.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-102-line",
+    "file": "michael-banter-102-line.wav",
+    "text": "I finally found the end of the ration line.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-banter-102-reply",
+    "file": "michael-banter-102-reply.wav",
+    "text": "Hang on to it. They will need it again tomorrow.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-07",
+    "file": "michael-monologue-07.wav",
+    "text": "I grew up above my parents' grocery store. On Sundays my mother would put the bruised fruit aside for a pie, and my father would pretend not to notice the missing sugar. I thought that little shop would always be there. When I get home, I want to help open it in the morning.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-08",
+    "file": "michael-monologue-08.wav",
+    "text": "We were moving through a field at dusk when one of the men lost his glasses. Half the squad got down on their knees to look, even though we were tired and wanted to keep moving. We found them under his pack. He laughed so hard he had to sit down.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-09",
+    "file": "michael-monologue-09.wav",
+    "text": "I used to drive a delivery truck through the hills. There was one bend where you could see the whole valley, farms and church steeples and smoke from the kitchens. I always slowed down there, even when I was late. I hope somebody still takes that road slowly.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-10",
+    "file": "michael-monologue-10.wav",
+    "text": "At training I could not hit much of anything for the first week. An instructor stayed after the others left and showed me how to settle my breathing. He never raised his voice, just waited while I tried again. I remember his patience better than any speech they gave us.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-11",
+    "file": "michael-monologue-11.wav",
+    "text": "We sheltered in a barn during a storm once, packed shoulder to shoulder with our gear. Somebody found an old deck of cards and dealt by the light of a covered lamp. Nobody had anything worth betting, so we played for chores. I lost, but it was the best night we had in weeks.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-12",
+    "file": "michael-monologue-12.wav",
+    "text": "My sister taught me to dance in the kitchen before I left. She stood on my shoes at first, then made me practice until I stopped stepping on hers. I promised her the first dance when I came back. I keep that promise in mind on the long days.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-13",
+    "file": "michael-monologue-13.wav",
+    "text": "We had a fellow in my first squad who could fix almost anything with a bit of wire. He repaired a radio strap, two watches, and the cook's stove in one afternoon. He said he learned from his grandfather. I still carry the little piece of wire he gave me.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-14",
+    "file": "michael-monologue-14.wav",
+    "text": "I remember our first winter in camp. The pipes froze and the stove smoked, and every morning somebody had to break the ice in the wash basin. We complained about it constantly. Looking back, we were lucky to have a roof and time enough to complain.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-15",
+    "file": "michael-monologue-15.wav",
+    "text": "Before I enlisted I worked in a garage with my cousin. We would take an engine apart on Saturday and argue over every bolt until it ran again. He wrote that the garage is still open, though he has nobody left to argue with. I told him to keep a wrench ready for me.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-16",
+    "file": "michael-monologue-16.wav",
+    "text": "Once, after a long march, a farmer offered us water from his well. We could barely understand each other, but he brought out enough cups for everyone and waited until the last man had drunk. I think about that kindness more often than I can explain.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-17",
+    "file": "michael-monologue-17.wav",
+    "text": "I used to take my little brother fishing by the river. He could never sit still, so we rarely caught much, but he always brought home a story about the one that got away. In his last letter he said he still goes there. I hope he saves me a place on the bank.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "michael-monologue-18",
+    "file": "michael-monologue-18.wav",
+    "text": "After one fight I found a photograph in the mud near our position. I could not tell whose family was in it, but I cleaned it as best I could and passed it around until someone recognized the faces. The owner kept it inside his jacket after that. Some things deserve a safer pocket.",
+    "voice": "michael",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-73-line",
+    "file": "puck-banter-73-line.wav",
+    "text": "The cook says there is chicken in the stew.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-73-reply",
+    "file": "puck-banter-73-reply.wav",
+    "text": "Then the chicken made a clean getaway.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-74-line",
+    "file": "puck-banter-74-line.wav",
+    "text": "I asked the sergeant when we get leave.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-74-reply",
+    "file": "puck-banter-74-reply.wav",
+    "text": "Did he stop laughing long enough to answer?",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-75-line",
+    "file": "puck-banter-75-line.wav",
+    "text": "My helmet has a dent in it.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-75-reply",
+    "file": "puck-banter-75-reply.wav",
+    "text": "That is where your bright idea tried to get out.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-76-line",
+    "file": "puck-banter-76-line.wav",
+    "text": "I used to sell shoes back home.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-76-reply",
+    "file": "puck-banter-76-reply.wav",
+    "text": "Then you know a bad fit when the army hands you one.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-77-line",
+    "file": "puck-banter-77-line.wav",
+    "text": "I found a feather in my bedroll.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-77-reply",
+    "file": "puck-banter-77-reply.wav",
+    "text": "Luxury. Mine still has the bird attached.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-78-line",
+    "file": "puck-banter-78-line.wav",
+    "text": "The lieutenant says to use our initiative.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-78-reply",
+    "file": "puck-banter-78-reply.wav",
+    "text": "Careful. Last man who did that got promoted.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-79-line",
+    "file": "puck-banter-79-line.wav",
+    "text": "I can hear the mess truck coming.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-79-reply",
+    "file": "puck-banter-79-reply.wav",
+    "text": "That is your stomach. The truck broke down yesterday.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-80-line",
+    "file": "puck-banter-80-line.wav",
+    "text": "My girl wants a man in uniform.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-80-reply",
+    "file": "puck-banter-80-reply.wav",
+    "text": "Write and tell her you have several standing right here.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-81-line",
+    "file": "puck-banter-81-line.wav",
+    "text": "I never thought I would miss the factory whistle.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-81-reply",
+    "file": "puck-banter-81-reply.wav",
+    "text": "Give the sergeant a kettle and he will make you feel at home.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-82-line",
+    "file": "puck-banter-82-line.wav",
+    "text": "The corporal says we need more discipline.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-82-reply",
+    "file": "puck-banter-82-reply.wav",
+    "text": "We could start by making him share his chocolate.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-83-line",
+    "file": "puck-banter-83-line.wav",
+    "text": "I washed my shirt in the stream.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-83-reply",
+    "file": "puck-banter-83-reply.wav",
+    "text": "Did the fish complain upstream or downstream?",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-84-line",
+    "file": "puck-banter-84-line.wav",
+    "text": "This shovel has seen better days.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-84-reply",
+    "file": "puck-banter-84-reply.wav",
+    "text": "So have I, and nobody has offered to replace me.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-85-line",
+    "file": "puck-banter-85-line.wav",
+    "text": "I asked for a hot meal.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-85-reply",
+    "file": "puck-banter-85-reply.wav",
+    "text": "The cook heard you. He left your tin in the sun.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-86-line",
+    "file": "puck-banter-86-line.wav",
+    "text": "Back home I could sleep through anything.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-86-reply",
+    "file": "puck-banter-86-reply.wav",
+    "text": "We know. Your snoring has been keeping us awake.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-87-line",
+    "file": "puck-banter-87-line.wav",
+    "text": "My uncle once met a general.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-87-reply",
+    "file": "puck-banter-87-reply.wav",
+    "text": "Did he apologize, or was it not his fault?",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-88-line",
+    "file": "puck-banter-88-line.wav",
+    "text": "I have a talent for finding cover.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-88-reply",
+    "file": "puck-banter-88-reply.wav",
+    "text": "Especially when the sergeant is looking for volunteers.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-89-line",
+    "file": "puck-banter-89-line.wav",
+    "text": "I think my boots are shrinking.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-89-reply",
+    "file": "puck-banter-89-reply.wav",
+    "text": "Your feet are trying to desert without you.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-90-line",
+    "file": "puck-banter-90-line.wav",
+    "text": "The map says there is a bridge up ahead.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-90-reply",
+    "file": "puck-banter-90-reply.wav",
+    "text": "Good. Maybe it can carry the rest of this conversation.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-91-line",
+    "file": "puck-banter-91-line.wav",
+    "text": "I wrote a poem about the rain.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-91-reply",
+    "file": "puck-banter-91-reply.wav",
+    "text": "Make it short. We have enough water in the trench.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-92-line",
+    "file": "puck-banter-92-line.wav",
+    "text": "The barber at camp gave me a close shave.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-92-reply",
+    "file": "puck-banter-92-reply.wav",
+    "text": "That was not the barber. That was the artillery.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-93-line",
+    "file": "puck-banter-93-line.wav",
+    "text": "I sent my sweetheart a pressed flower.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-93-reply",
+    "file": "puck-banter-93-reply.wav",
+    "text": "She will be pleased you finally found something clean to press.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-94-line",
+    "file": "puck-banter-94-line.wav",
+    "text": "They say an army marches on its stomach.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-94-reply",
+    "file": "puck-banter-94-reply.wav",
+    "text": "That explains why we have been going around in circles.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-95-line",
+    "file": "puck-banter-95-line.wav",
+    "text": "I used to make clocks.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-95-reply",
+    "file": "puck-banter-95-reply.wav",
+    "text": "Then you can tell us why every watch ends ten minutes late.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-96-line",
+    "file": "puck-banter-96-line.wav",
+    "text": "The sergeant says I have a good head on my shoulders.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-96-reply",
+    "file": "puck-banter-96-reply.wav",
+    "text": "Keep it down there and he might say it again tomorrow.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-97-line",
+    "file": "puck-banter-97-line.wav",
+    "text": "I brought a deck of cards from home.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-97-reply",
+    "file": "puck-banter-97-reply.wav",
+    "text": "Good. Deal me a ticket back.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-98-line",
+    "file": "puck-banter-98-line.wav",
+    "text": "I asked the medic for something for my nerves.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-98-reply",
+    "file": "puck-banter-98-reply.wav",
+    "text": "He said to stop listening to your stories.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-99-line",
+    "file": "puck-banter-99-line.wav",
+    "text": "This coffee is strong enough to walk.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-99-reply",
+    "file": "puck-banter-99-reply.wav",
+    "text": "Then send it on patrol and let us get some sleep.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-100-line",
+    "file": "puck-banter-100-line.wav",
+    "text": "My brother always said I would go places.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-100-reply",
+    "file": "puck-banter-100-reply.wav",
+    "text": "Did he mention most of them would be ditches?",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-101-line",
+    "file": "puck-banter-101-line.wav",
+    "text": "The rain has soaked everything I own.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-101-reply",
+    "file": "puck-banter-101-reply.wav",
+    "text": "At least your letters home will be easier to seal.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-102-line",
+    "file": "puck-banter-102-line.wav",
+    "text": "I finally found the end of the ration line.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-banter-102-reply",
+    "file": "puck-banter-102-reply.wav",
+    "text": "Hang on to it. They will need it again tomorrow.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-07",
+    "file": "puck-monologue-07.wav",
+    "text": "I grew up above my parents' grocery store. On Sundays my mother would put the bruised fruit aside for a pie, and my father would pretend not to notice the missing sugar. I thought that little shop would always be there. When I get home, I want to help open it in the morning.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-08",
+    "file": "puck-monologue-08.wav",
+    "text": "We were moving through a field at dusk when one of the men lost his glasses. Half the squad got down on their knees to look, even though we were tired and wanted to keep moving. We found them under his pack. He laughed so hard he had to sit down.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-09",
+    "file": "puck-monologue-09.wav",
+    "text": "I used to drive a delivery truck through the hills. There was one bend where you could see the whole valley, farms and church steeples and smoke from the kitchens. I always slowed down there, even when I was late. I hope somebody still takes that road slowly.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-10",
+    "file": "puck-monologue-10.wav",
+    "text": "At training I could not hit much of anything for the first week. An instructor stayed after the others left and showed me how to settle my breathing. He never raised his voice, just waited while I tried again. I remember his patience better than any speech they gave us.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-11",
+    "file": "puck-monologue-11.wav",
+    "text": "We sheltered in a barn during a storm once, packed shoulder to shoulder with our gear. Somebody found an old deck of cards and dealt by the light of a covered lamp. Nobody had anything worth betting, so we played for chores. I lost, but it was the best night we had in weeks.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-12",
+    "file": "puck-monologue-12.wav",
+    "text": "My sister taught me to dance in the kitchen before I left. She stood on my shoes at first, then made me practice until I stopped stepping on hers. I promised her the first dance when I came back. I keep that promise in mind on the long days.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-13",
+    "file": "puck-monologue-13.wav",
+    "text": "We had a fellow in my first squad who could fix almost anything with a bit of wire. He repaired a radio strap, two watches, and the cook's stove in one afternoon. He said he learned from his grandfather. I still carry the little piece of wire he gave me.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-14",
+    "file": "puck-monologue-14.wav",
+    "text": "I remember our first winter in camp. The pipes froze and the stove smoked, and every morning somebody had to break the ice in the wash basin. We complained about it constantly. Looking back, we were lucky to have a roof and time enough to complain.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-15",
+    "file": "puck-monologue-15.wav",
+    "text": "Before I enlisted I worked in a garage with my cousin. We would take an engine apart on Saturday and argue over every bolt until it ran again. He wrote that the garage is still open, though he has nobody left to argue with. I told him to keep a wrench ready for me.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-16",
+    "file": "puck-monologue-16.wav",
+    "text": "Once, after a long march, a farmer offered us water from his well. We could barely understand each other, but he brought out enough cups for everyone and waited until the last man had drunk. I think about that kindness more often than I can explain.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-17",
+    "file": "puck-monologue-17.wav",
+    "text": "I used to take my little brother fishing by the river. He could never sit still, so we rarely caught much, but he always brought home a story about the one that got away. In his last letter he said he still goes there. I hope he saves me a place on the bank.",
+    "voice": "puck",
+    "kind": "banter"
+  },
+  {
+    "id": "puck-monologue-18",
+    "file": "puck-monologue-18.wav",
+    "text": "After one fight I found a photograph in the mud near our position. I could not tell whose family was in it, but I cleaned it as best I could and passed it around until someone recognized the faces. The owner kept it inside his jacket after that. Some things deserve a safer pocket.",
+    "voice": "puck",
+    "kind": "banter"
   }
 ]

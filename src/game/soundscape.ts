@@ -1,8 +1,8 @@
 import { CONFIG } from '../content/config';
 import type { Preferences } from '../persistence';
-import type { SimState, WeatherKind } from '../simulation/types';
+import type { Animal, SimState, WeatherKind } from '../simulation/types';
 
-export interface AtmosphereContext { pressure: number; night: boolean; sheltered: boolean; ducked?: boolean; secured?: boolean }
+export interface AtmosphereContext { pressure: number; night: boolean; sheltered: boolean; ducked?: boolean; secured?: boolean; animals?: readonly Animal[] }
 
 export function battlePressure(state: SimState): number {
   const allies = state.units.filter((u) => u.team === 'friendly' && !u.dead && !u.crossed && u.health > 0);
@@ -22,6 +22,8 @@ export class Soundscape {
   private rainFilter: BiquadFilterNode;
   private nextDetail = 0;
   private nextNote = 0;
+  private nextAnimal = 0;
+  private animalIndex = 0;
   private noteIndex = 0;
   private active = false;
   private lastWeather: WeatherKind | null = null;
@@ -65,7 +67,13 @@ export class Soundscape {
       this.windFilter.frequency.setTargetAtTime(context.night ? 380 : 600, now, 1);
     }
     if (!active) { this.active = false; return; }
-    if (!this.active) { this.nextNote = now + .15; this.nextDetail = now + 2; this.active = true; }
+    if (!this.active) { this.nextNote = now + .15; this.nextDetail = now + 2; this.nextAnimal = now + 4; this.active = true; }
+    if (prefs.ambientVolume > 0 && context.animals?.length && now >= this.nextAnimal) {
+      const animal = context.animals[this.animalIndex++ % context.animals.length]!;
+      const pan = Math.max(-.8, Math.min(.8, (animal.pos.x / CONFIG.field.width * 2 - 1) * .8));
+      this.animalCall(animal.species, pan);
+      this.nextAnimal = now + 10 + Math.random() * 8;
+    }
     if (prefs.musicVolume > 0 && now >= this.nextNote) {
       const scale = context.secured ? [146.83, 174.61, 220, 293.66] : pressure > .5 ? [73.42, 77.78, 110, 146.83] : [73.42, 110, 130.81, 146.83, 164.81, 110];
       const note = scale[this.noteIndex++ % scale.length]!;
@@ -90,6 +98,18 @@ export class Soundscape {
         source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); panner.disconnect(); };
         source.start(now, Math.random() * 3, 3);
       }
+    }
+  }
+
+  private animalCall(species: Animal['species'], pan: number): void {
+    if (species === 'cow') {
+      this.tone(115, 1.2, .12, this.ambience, pan, 0, 90);
+      this.tone(230, 1.1, .045, this.ambience, pan, 0, 180);
+    } else if (species === 'sheep') {
+      for (let i = 0; i < 4; i++) this.tone(380 + (i % 2) * 45, .16, .07, this.ambience, pan, i * .14, 320 + (i % 2) * 45);
+    } else {
+      this.tone(520, .25, .065, this.ambience, pan, 0, 310);
+      this.tone(470, .3, .05, this.ambience, pan, .34, 270);
     }
   }
 

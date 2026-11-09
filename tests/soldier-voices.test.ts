@@ -2,16 +2,25 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SOLDIER_VOICE_CLIPS, selectSoldierClip, soldierVoice, clearLegacyVoiceCache } from '../src/game/soldier-voices';
 import type { RadioCue } from '../src/game/radio';
 import { LULL_BANTER } from '../src/content/lull-banter';
+import { LULL_MONOLOGUES } from '../src/content/lull-monologues';
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('bundled soldier phrases', () => {
   it('ships a real audio asset for every catalog entry', () => {
-    expect(SOLDIER_VOICE_CLIPS).toHaveLength(98 + LULL_BANTER.length * 4);
+    expect(LULL_BANTER).toHaveLength(102);
+    expect(LULL_MONOLOGUES).toHaveLength(18);
+    expect(SOLDIER_VOICE_CLIPS).toHaveLength(98 + LULL_BANTER.length * 4 + LULL_MONOLOGUES.length * 2);
     expect(new Set(SOLDIER_VOICE_CLIPS.map((clip) => clip.id)).size).toBe(SOLDIER_VOICE_CLIPS.length);
     for (const clip of SOLDIER_VOICE_CLIPS) {
       expect(clip.url, clip.id).toMatch(/\.wav/);
       expect(clip.text.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('records every monologue in both soldier voices', () => {
+    for (const text of LULL_MONOLOGUES) for (const speaker of [0, 1]) {
+      expect(selectSoldierClip(text, 'ambient', speaker, 0, true)?.text).toBe(text);
     }
   });
 

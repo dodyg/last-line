@@ -480,6 +480,44 @@ describe('mines', () => {
     expect(sim.state.constructionSites).toHaveLength(queued);
   });
 
+  it('queues distant mine orders, sends the engineer, and refunds cancelled orders', () => {
+    const sim = withEngineer(73, 100);
+    sim.state.scheduler.phase = 'prep';
+    sim.state.scheduler.prepTicksLeft = 1_000_000;
+    const engineer = sim.state.units[0]!;
+    const first = { x: 480, y: 300 };
+    const second = { x: 540, y: 300 };
+    expect(sim.command({ type: 'mine', kind: 'ap', pos: first }).ok).toBe(true);
+    expect(sim.command({ type: 'mine', kind: 'at', pos: second }).ok).toBe(true);
+    const [one, two] = sim.state.constructionSites;
+    expect(one!.builderId).toBe(engineer.id);
+    expect(two!.builderId).toBe(engineer.id);
+    const saved = Simulation.fromSnapshot(JSON.parse(JSON.stringify(sim.snapshot())) as SimSnapshot);
+    expect(saved.state.constructionSites.map((site) => site.id)).toEqual([one!.id, two!.id]);
+    const before = sim.state.points;
+    expect(sim.command({ type: 'cancelMine', siteId: two!.id }).ok).toBe(true);
+    expect(sim.state.points).toBe(before + CONFIG.mineKinds.at.cost);
+    expect(sim.command({ type: 'cancelMine', siteId: two!.id }).ok).toBe(false);
+    sim.step();
+    expect(engineer.moveGoal).not.toBeNull();
+    expect(one!.ticksRemaining).toBe(one!.totalTicks);
+    for (let i = 0; i < sec(40) && sim.state.mines.length === 0; i++) sim.step();
+    expect(sim.state.mines.map((mine) => mine.id)).toEqual([one!.id]);
+  });
+
+  it('finishes queued mine orders in order after a save is restored', () => {
+    const sim = withEngineer(73, 100);
+    sim.state.scheduler.phase = 'prep';
+    sim.state.scheduler.prepTicksLeft = 1_000_000;
+    expect(sim.command({ type: 'mine', kind: 'ap', pos: { x: 480, y: 420 } }).ok).toBe(true);
+    expect(sim.command({ type: 'mine', kind: 'at', pos: { x: 540, y: 420 } }).ok).toBe(true);
+    const ids = sim.state.constructionSites.map((site) => site.id);
+    const restored = Simulation.fromSnapshot(JSON.parse(JSON.stringify(sim.snapshot())) as SimSnapshot);
+    for (let i = 0; i < sec(30) && restored.state.mines.length < 2; i++) restored.step();
+    expect(restored.state.mines.map((mine) => mine.id)).toEqual(ids);
+    expect(restored.state.constructionSites).toHaveLength(0);
+  });
+
   it('charges its own price and lay time per type', () => {
     const ap = withEngineer(73, 40);
     ap.command({ type: 'mine', kind: 'ap', pos: LAY_AT });

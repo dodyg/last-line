@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CONFIG } from '../src/content/config';
 import { LULL_BANTER } from '../src/content/lull-banter';
+import { LULL_MONOLOGUES } from '../src/content/lull-monologues';
 import { RadioDirector } from '../src/game/radio';
 import { Simulation } from '../src/simulation/simulation';
 import type { SimEvent, WavePhase } from '../src/simulation/types';
@@ -71,5 +72,20 @@ describe('lull soldier banter', () => {
     expect(radio.takeBanterInterruption()).toBe(false);
     expect(warning?.text).toContain('Contact!'); expect(warning?.reply).toBeUndefined();
     expect(consider(7)).toBeNull();
+  });
+
+  it('allows a solo monologue only during preparation after a wave and interrupts it when the next wave starts', () => {
+    const { sim, radio } = fixture();
+    sim.state.units = sim.state.units.slice(0, 1);
+    const say = (seconds: number, phase: WavePhase, wave: number, events: SimEvent[] = []) =>
+      radio.consider(events, sim.state.units, seconds * CONFIG.tickRate, 'clear', undefined, phase, wave);
+    say(0, 'prep', 0);
+    expect(LULL_MONOLOGUES).not.toContain(say(6, 'prep', 0)?.text);
+    say(50, 'active', 1); say(60, 'prep', 1);
+    const story = say(66, 'prep', 1)!;
+    expect(LULL_MONOLOGUES).toContain(story.text);
+    expect(story.reply).toBeUndefined();
+    say(67, 'spawning', 1);
+    expect(radio.takeBanterInterruption()).toBe(true);
   });
 });

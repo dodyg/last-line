@@ -44,4 +44,18 @@ describe('adaptive audio lifecycle', () => {
     expect(nodes.length).toBe(initial);
     soundscape.dispose(); expect(nodes.filter((node) => node.stop.mock.calls.length > 0)).toHaveLength(3);
   });
+
+  it('calls only animals present, with a distinct voice for each species', () => {
+    const { soundscape, ctx, nodes } = audioFixture();
+    const animals = (['cow', 'sheep', 'deer'] as const).map((species) => ({ species, pos: { x: 480, y: 0 }, heading: 0, frightenedUntil: 0 }));
+    const context = { pressure: 0, night: false, sheltered: false, animals };
+    const prefs = { ...DEFAULT_PREFS, ambientVolume: .5, musicVolume: 0 };
+    soundscape.update('clear', true, prefs, context);
+    for (const time of [4, 25, 45]) { ctx.currentTime = time; soundscape.update('clear', true, prefs, context); }
+    const frequencies = nodes.flatMap((node) => node.frequency.setValueAtTime.mock.calls.map((call) => call[0]));
+    expect(frequencies).toEqual(expect.arrayContaining([115, 380, 520]));
+    const count = nodes.length;
+    ctx.currentTime = 70; soundscape.update('clear', false, prefs, context);
+    expect(nodes).toHaveLength(count);
+  });
 });

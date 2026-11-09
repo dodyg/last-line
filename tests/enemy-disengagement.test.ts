@@ -21,3 +21,18 @@ it.each(['rifle', 'gun_truck'] as const)('wounded %s resumes the advance after l
   expect(enemy.advance).toBe(true);
   expect(enemy.pos.y).toBeGreaterThan(startY + 10);
 });
+
+
+it('wounded attackers resume advancing without contact even when comrades remain', () => {
+  const terrain = generateTerrain(4242, false, 2);
+  terrain.terrain.blocked.fill(0); terrain.terrain.baseBlocked?.fill(0); terrain.kinds.fill(0);
+  terrain.zones = { river: null, bridges: [], rapids: [], mud: [] };
+  const sim = new Simulation(4242, undefined, terrain, false);
+  sim.state.units = []; sim.state.scheduler.prepTicksLeft = 100_000;
+  sim.spawnEnemy('rifle', { x: 400, y: 300 });
+  const wounded = sim.state.units[0]!; wounded.health = 1;
+  sim.spawnEnemy('rifle', { x: 600, y: 300 });
+  const start = wounded.pos.y;
+  for (let i = 0; i < 90; i++) sim.step();
+  expect(wounded.pos.y).toBeGreaterThan(start + 10);
+});

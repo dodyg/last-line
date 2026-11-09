@@ -27,6 +27,39 @@ function fixture(night = false) {
   return { sim, unit, data, enemy, hear, order, tick };
 }
 
+describe('return fire order', () => {
+  it('holds shots and grenades until targeted, survives saves, and can be reissued', () => {
+    const { sim, unit, enemy } = fixture();
+    const attacker = enemy(300, 500);
+    unit.grenades = 4; unit.reloadTimer = 0;
+    expect(sim.command({ type: 'fireOrder', unitIds: [unit.id], order: 'returnFire' }).ok).toBe(true);
+    for (let i = 0; i < 20; i++) {
+      const events = sim.step();
+      expect(events.some((event) => (event.type === 'shot' && event.shooterId === unit.id) || (event.type === 'grenadeThrown' && event.unitId === unit.id))).toBe(false);
+    }
+    expect(unit.grenades).toBe(4);
+    const parsed = validateSnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+    if ('error' in parsed) throw new Error(parsed.error);
+    const restored = Simulation.fromSnapshot(parsed.snap);
+    const soldier = restored.state.units.find((candidate) => candidate.id === unit.id)!;
+    const shooter = restored.state.units.find((candidate) => candidate.id === attacker.id)!;
+    expect(soldier.fireOrder).toBe('returnFire');
+    expect(restored.fireShot(shooter, soldier, restored.weaponOf(shooter)!)).toBe(true);
+    expect(soldier.fireOrder).toBe('auto');
+    expect(restored.command({ type: 'fireOrder', unitIds: [soldier.id], order: 'returnFire' }).ok).toBe(true);
+    expect(soldier.fireOrder).toBe('returnFire');
+  });
+
+  it('does not release other soldiers when one is targeted', () => {
+    const { sim, unit, enemy } = fixture();
+    const ally = sim.spawnFriendly('rifleman', { x: 340, y: 612 });
+    const attacker = enemy(300, 500);
+    sim.command({ type: 'fireOrder', unitIds: [unit.id, ally.id], order: 'returnFire' });
+    sim.fireShot(attacker, unit, sim.weaponOf(attacker)!);
+    expect(unit.fireOrder).toBe('auto'); expect(ally.fireOrder).toBe('returnFire');
+  });
+});
+
 describe('run to gunfire fire order', () => {
   it.each([false, true])('runs toward the nearest personal audible shot, night=%s', (night) => {
     const { sim, unit, enemy, hear, order } = fixture(night);

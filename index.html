@@ -128,6 +128,10 @@
                 </div>
 
                 <p id="sel-xp" class="subtle"></p>
+                <section id="sel-mine-queue" class="mine-queue" aria-label="Engineer mine orders" hidden>
+                  <strong class="mine-queue-title"></strong>
+                  <ol class="mine-queue-list"></ol>
+                </section>
                 <details id="weapon-issue" class="weapon-issue" open>
                   <summary>Weapon issue</summary>
                   <p id="weapon-current" class="subtle"></p>
@@ -378,7 +382,7 @@
           <p class="subtle">Fight through sectors in one country. Each has its own landscapes, local building names, and street signs.</p>
 
           <label class="run-mode-label" for="run-mode">Length</label>
-          <select id="run-mode"><option value="campaign">Campaign · 100 sectors, 15 waves each</option><option value="operation">Operation · 3 sectors, 13 waves total, varied objectives</option></select>
+          <select id="run-mode"><option value="campaign">Campaign · 100 sectors, 15 waves each</option><option value="operation">Operation · 3 sectors, 13 waves total, varied objectives</option><option value="assault">Assault · 3 fortified positions</option></select>
           <p class="subtle">Operation: take a bridgehead, secure a crossroads, then defend the extraction. Every sector ends with a squad march north. Progress saves automatically.</p>
           <div id="campaign-choices" class="campaign-choices" role="group" aria-label="Campaign country"></div>
 
@@ -554,7 +558,7 @@
                 <li><strong>Enemy sapper teams.</strong> From wave 8, a marked demolition specialist advances with two rifle escorts. They target bunkers, occupied buildings and bridges. Planting takes 4 seconds: pin the sapper to pause it, or kill him to cancel. An armed charge has an 8-second fuse that keeps burning after the team dies. Evacuate the red blast ring! The charge demolishes its targeted bunker or bridge and heavily damages its targeted building. Demolished bridges become water crossings; engineers can build replacement pontoons.</li>
                 <li><strong>Barbed wire.</strong> A Combat Support Engineer builds a 72-pixel east–west segment for 4 points in 4 seconds. All infantry cross at 30% speed; vehicles pass freely. Leave gaps to channel attackers into clear lanes. Enemy engineers arrive from wave 5 and stop firing to cut wire. Suppression that pins a cutter pauses the work; eliminate him before the 6-second breach is complete. Cutting progress persists if interrupted. Wire provides no cover and does not block bullets.</li>
 
-                <li><strong>Fortifications.</strong> Sandbags cost 3 points and take 2.5 seconds to build; they give soldiers immediately behind them (south side) cover from fire arriving from the north, reducing incoming hit chance to 45%. Trenches cost 6 points and take 6 seconds; they protect a longer stretch from northern fire, reducing hit chance to 25%, and Machine Gunners fire more effectively from them. Bunkers cost 10 points and take 12 seconds; soldiers within 24 pixels get all-direction protection from direct fire, reducing hit chance to 30%, but artillery still damages them. Use sandbags for quick, inexpensive cover, trenches to hold a line, and bunkers where enemies may flank.</li>
+                <li><strong>Fortifications.</strong> Sandbags cost 3 points and take 2.5 seconds to build; they give soldiers immediately behind them (south side) cover from fire arriving from the north, reducing incoming hit chance to 45%. Trenches cost 6 points and take 6 seconds; they protect a longer stretch from northern fire, reducing hit chance to 25%, and Machine Gunners fire more effectively from them. Bunkers cost 10 points and take 12 seconds; soldiers within 24 pixels get all-direction protection from direct fire, reducing hit chance to 30%, but artillery still damages them. Explosions damage bunkers, and enemy sappers can demolish them; inspect a bunker to see its integrity. Use sandbags for quick, inexpensive cover, trenches to hold a line, and bunkers where enemies may flank.</li>
 
                 <li><strong>Mortar pits.</strong> Combat Support Engineers build one for 8 points in 9 seconds. A mortarman within 18 pixels has a 78% lower chance of being hit by bullets, takes 65% less artillery damage, and reloads 30% faster (11.2 seconds instead of 16). Other soldiers do not gain the protection or faster reload.</li>
 
@@ -588,7 +592,7 @@
 
                 <li><strong>Enemy smoke-screen assaults.</strong> From wave 4, assault troops can throw one smoke grenade to cover a nearby infantry squad. An amber marker identifies the thrower and a ground ring warns of the screen 1.5 seconds before it deploys. Pin or kill the thrower to disrupt it. The attackers then advance at normal speed under eight seconds of smoke, which blocks small arms for both sides. Move around the screen or counter with bazookas, mortars, or artillery.</li>
 
-                <li><strong>Fire orders.</strong> Select soldiers and cycle automatic, anti-armor, stop breakthroughs, hold grenades, and run to gunfire. Run to gunfire sends armed infantry toward the nearest heard enemy shot, day or night; they stop to engage a located enemy and walk when stamina runs out. Direct move, patrol, and building orders cancel pursuit. Medics, mortarmen, and vehicles cannot use this order; vehicles also cannot hold grenades.</li>
+                <li><strong>Fire orders.</strong> Select soldiers and cycle automatic, anti-armor, stop breakthroughs, hold grenades, run to gunfire, and return fire only. Return fire only holds weapons and grenades until that unit is shot at or takes damage, then switches it to automatic fire; reissue the order to hold fire again. Run to gunfire sends armed infantry toward the nearest heard enemy shot, day or night; they stop to engage a located enemy and walk when stamina runs out. Direct move, patrol, and building orders cancel pursuit. Medics, mortarmen, and vehicles cannot use run to gunfire; vehicles also cannot hold grenades.</li>
 
                 <li><strong>Veteran specializations.</strong> At 3 XP, choose one permanent perk. Every role can choose Forced March (+20% movement speed) or Camouflage (enemies and observers first detect the soldier at 25% shorter range). Role perks improve combat, medicine, engineering, or artillery. Radio Engineers can cut artillery cooldown by 20% as a Signal Officer or reduce call-in time by 30% as a Forward Observer. Medics earn XP by healing and engineers by finishing construction.</li>
 

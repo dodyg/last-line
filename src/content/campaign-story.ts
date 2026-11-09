@@ -120,6 +120,8 @@ export interface FieldDispatch {
 
 export function dispatchHandover(dispatch: FieldDispatch): string {
   const strength = `${dispatch.squad} soldier${dispatch.squad === 1 ? '' : 's'}`;
+  if (dispatch.runMode === 'assault' && dispatch.arrival === 'deployment') return `Headquarters assigns ${strength} to attack the fortified position ahead.`;
+  if (dispatch.runMode === 'assault' && dispatch.arrival === 'withdrawal') return `${strength} withdrew before the position was secured. The next strongpoint must still be taken to earn progress.`;
   switch (dispatch.arrival) {
     case 'deployment': return `Headquarters assigns ${strength} to the first blocking position. Establish the line before the enemy arrives.`;
     case 'secured': return `The previous sector is secure. ${strength} reached this position; the supply detail has caught up. Refit here before the next attack.`;

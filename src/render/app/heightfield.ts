@@ -5,11 +5,11 @@ import type { Terrain } from '../../simulation/types';
 import { simulationToWorld, WORLD_UNITS_PER_PIXEL } from './coordinates';
 
 /** Height, triangles, and UVs share the simulation's exact sampling convention. */
-export function heightfieldGeometry(terrain?: Terrain, bounds?: { x: number; y: number; width: number; height: number }): THREE.BufferGeometry {
+export function heightfieldGeometry(terrain?: Terrain, bounds?: { x: number; y: number; width: number; height: number }, sampleSpacing = 12): THREE.BufferGeometry {
   const grid = terrain?.elevation;
   const width = bounds?.width ?? CONFIG.field.width, height = bounds?.height ?? CONFIG.field.height;
-  const cols = bounds ? Math.max(2, Math.ceil(width / 12) + 1) : grid?.cols ?? 2;
-  const rows = bounds ? Math.max(2, Math.ceil(height / 12) + 1) : grid?.rows ?? 2;
+  const cols = bounds ? Math.max(2, Math.ceil(width / sampleSpacing) + 1) : grid?.cols ?? 2;
+  const rows = bounds ? Math.max(2, Math.ceil(height / sampleSpacing) + 1) : grid?.rows ?? 2;
   const positions: number[] = [], uv: number[] = [], colors: number[] = [], indices: number[] = [];
   for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
     const x = (bounds?.x ?? 0) + col / (cols - 1) * width, y = (bounds?.y ?? 0) + row / (rows - 1) * height;
@@ -35,9 +35,10 @@ export function heightfieldGeometry(terrain?: Terrain, bounds?: { x: number; y: 
 }
 
 /** Large range/strike markers follow slopes rather than disappearing into hills. */
-export function drapedRingGeometry(terrain: Terrain | null, center: { x: number; y: number }, inner: number, outer: number, offset = .045): THREE.BufferGeometry {
+export function drapedRingGeometry(terrain: Terrain | null, center: { x: number; y: number }, inner: number, outer: number, offset = .045, thetaLength = Math.PI * 2): THREE.BufferGeometry {
   const segments = Math.max(64, Math.ceil(2 * Math.PI * outer / (2 * WORLD_UNITS_PER_PIXEL)));
-  const geometry = new THREE.RingGeometry(inner, outer, segments);
+  const radialSegments = Math.max(1, Math.ceil((outer - inner) / (2 * WORLD_UNITS_PER_PIXEL)));
+  const geometry = new THREE.RingGeometry(inner, outer, segments, radialSegments, 0, thetaLength);
   geometry.rotateX(-Math.PI / 2);
   const [x, , z] = simulationToWorld(center.x, center.y);
   geometry.translate(x, 0, z);

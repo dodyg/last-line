@@ -79,6 +79,83 @@ describe('tracer frame animation', () => {
     } finally { renderer.destroy(); }
   });
 
+  it('drapes the trench placement marker over uneven ground', () => {
+    const sim = new Simulation(2026);
+    const cols = 81, rows = 61, cell = 12;
+    sim.state.terrain.elevation = { cols, rows, cell, heights: Float32Array.from({ length: cols * rows }, (_, i) =>
+      Math.max(0, 30 - Math.abs(i % cols * cell - 480))) };
+    const renderer = new BattleRenderer3D(document.createElement('canvas'), 960, 720);
+    try {
+      renderer.rebuildStatic(sim.state, sim.terrainData());
+      renderer.frame(sim.state, 1, { kind: 'trench', pos: { x: 480, y: 360 }, valid: true }, [], 0);
+      const marker = renderer.scene.getObjectByName('trench-placement-preview') as THREE.Mesh;
+      expect(marker).toBeDefined();
+      marker.updateWorldMatrix(true, false);
+      const positions = marker.geometry.getAttribute('position');
+      expect(positions.count).toBeGreaterThan(4);
+      const heights: number[] = [];
+      for (let i = 0; i < positions.count; i++) {
+        const point = new THREE.Vector3().fromBufferAttribute(positions, i).applyMatrix4(marker.matrixWorld);
+        const x = point.x / WORLD_UNITS_PER_PIXEL + CONFIG.field.width / 2;
+        const y = point.z / WORLD_UNITS_PER_PIXEL + CONFIG.field.height / 2;
+        expect(point.y).toBeCloseTo(elevationAt(sim.state.terrain, x, y) * WORLD_UNITS_PER_PIXEL + .08, 5);
+        heights.push(point.y);
+      }
+      expect(Math.max(...heights) - Math.min(...heights)).toBeGreaterThan(.1);
+      for (let x = 445; x <= 515; x += 1.3) {
+        const [wx, , wz] = simulationToWorld(x, 361.3);
+        const hit = new THREE.Raycaster(new THREE.Vector3(wx, 20, wz), new THREE.Vector3(0, -1, 0)).intersectObject(marker)[0];
+        expect(hit).toBeDefined();
+        expect(hit!.point.y).toBeGreaterThan(elevationAt(sim.state.terrain, x, 361.3) * WORLD_UNITS_PER_PIXEL);
+      }
+      const disposed = vi.spyOn(marker.geometry, 'dispose');
+      renderer.frame(sim.state, 1, null, [], 0);
+      expect(disposed).toHaveBeenCalledOnce();
+    } finally { renderer.destroy(); }
+  });
+
+  it('drapes placement, selection, smoke and fuse indicators over a ridge', () => {
+    const sim = new Simulation(2026), pos = { x: 480, y: 360 };
+    const cols = 81, rows = 61, cell = 12;
+    sim.state.terrain.elevation = { cols, rows, cell, heights: Float32Array.from({ length: cols * rows }, (_, i) =>
+      Math.max(0, 36 - Math.abs(i % cols * cell - 480) * 1.5)) };
+    const unit = sim.state.units[0]!;
+    unit.pos = { ...pos }; unit.prevPos = { ...pos };
+    sim.state.satchelCharges.push({ id: sim.state.nextEntityId++, unitId: unit.id, pos, ticksRemaining: 150 });
+    sim.state.constructionSites.push({ id: sim.state.nextEntityId++, kind: 'barbedWire', pos, builderId: unit.id, totalTicks: 100, ticksRemaining: 50 });
+    sim.state.enemySmokeAssaults = [{ id: sim.state.nextEntityId++, leaderId: unit.id, unitIds: [unit.id], pos,
+      deployTick: 45, endTick: 285, deployed: false }];
+    const renderer = new BattleRenderer3D(document.createElement('canvas'), 960, 720);
+    const check = (mesh: THREE.Mesh, offset: number) => {
+      expect(mesh).toBeDefined();
+      mesh.updateWorldMatrix(true, false);
+      const vertices = mesh.geometry.getAttribute('position');
+      for (let i = 0; i < vertices.count; i++) {
+        const point = new THREE.Vector3().fromBufferAttribute(vertices, i).applyMatrix4(mesh.matrixWorld);
+        const x = point.x / WORLD_UNITS_PER_PIXEL + CONFIG.field.width / 2;
+        const y = point.z / WORLD_UNITS_PER_PIXEL + CONFIG.field.height / 2;
+        expect(point.y).toBeCloseTo(elevationAt(sim.state.terrain, x, y) * WORLD_UNITS_PER_PIXEL + offset, 4);
+      }
+    };
+    try {
+      renderer.rebuildStatic(sim.state, sim.terrainData());
+      for (const kind of ['recruit', 'barbedWire', 'sandbag', 'trench', 'bunker', 'mortarPit', 'bridge'] as const) {
+        renderer.frame(sim.state, 1, { kind, pos, valid: true }, [unit.id], 0);
+        const name = kind === 'recruit' ? 'placement-preview' : `${kind === 'barbedWire' ? 'wire' : kind}-placement-preview`;
+        check(renderer.scene.getObjectByName(name) as THREE.Mesh, .08);
+      }
+      check(renderer.scene.getObjectByName('wire-construction') as THREE.Mesh, .08);
+      check(renderer.scene.getObjectByName('enemy-smoke-warning') as THREE.Mesh, .055);
+      check(renderer.scene.getObjectByName('satchel-fuse-countdown') as THREE.Mesh, .055);
+      let selection: THREE.Mesh | undefined;
+      renderer.scene.traverse((object) => { if (object.userData.selectionRing) selection = object as THREE.Mesh; });
+      check(selection!, .055);
+      unit.pos = { x: 492, y: 360 }; unit.prevPos = { ...unit.pos };
+      renderer.frame(sim.state, 1, null, [unit.id], 0);
+      check(selection!, .055);
+    } finally { renderer.destroy(); }
+  });
+
   it('keeps range outlines above ridges between their endpoints', () => {
     const sim = new Simulation(2026);
     const cols = 81, rows = 61, cell = 12;

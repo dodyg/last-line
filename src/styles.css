@@ -850,3 +850,14 @@ button:focus-visible, input:focus-visible {
 #run-mode { width: 100%; padding: .55rem; color: var(--ink); background: #252c1e; border: 1px solid var(--panel-edge); font: inherit; }
 .run-mode-label { display: block; margin-bottom: .3rem; }
 @media (pointer: coarse) { .unit-marker { width: 36px; height: 36px; } }
+
+/* Mine orders stay visible with the selected engineer and show each task's progress. */
+.mine-queue { margin: .5rem 0; padding: .5rem; border: 1px solid var(--panel-edge); background: #22291e; border-radius: 3px; }
+.mine-queue-title { color: var(--accent); font-size: .8rem; }
+.mine-queue-list { margin: .4rem 0 0; padding-left: 1.25rem; }
+.mine-queue-list li { display: list-item; padding: .3rem 0; font-size: .75rem; }
+.mine-queue-label, .mine-queue-status { display: block; }
+.mine-queue-status { color: var(--ink-dim); margin: .15rem 0; }
+.mine-queue-list progress { width: calc(100% - 4.5rem); height: .45rem; vertical-align: middle; accent-color: #aab77b; }
+.mine-queue-list button { margin-left: .4rem; padding: .15rem .35rem; font: inherit; color: var(--ink); background: #343c27; border: 1px solid var(--panel-edge); border-radius: 3px; cursor: pointer; }
+.mine-queue-list button:focus-visible { outline: 1px solid var(--accent); }

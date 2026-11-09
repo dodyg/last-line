@@ -1,4 +1,5 @@
 import { LULL_BANTER } from '../content/lull-banter';
+import { LULL_MONOLOGUES } from '../content/lull-monologues';
 import { CONFIG } from '../content/config';
 import type { CampaignCountry, SimEvent, Team, Unit, UnitRole, WavePhase, WeatherKind } from '../simulation/types';
 import { CAMPAIGNS } from '../content/campaigns';
@@ -246,7 +247,7 @@ export class RadioDirector {
     const interrupted = this.interruptedBanter; this.interruptedBanter = false; return interrupted;
   }
 
-  consider(events: readonly SimEvent[], units: readonly Unit[], tick: number, weather?: WeatherKind, country?: CampaignCountry, wavePhase?: WavePhase): ChatterResult | null {
+  consider(events: readonly SimEvent[], units: readonly Unit[], tick: number, weather?: WeatherKind, country?: CampaignCountry, wavePhase?: WavePhase, waveIndex = 0): ChatterResult | null {
     const combat = events.some((event) => ['shot', 'explosion', 'artilleryImpact', 'enemyBarrageIncoming', 'grenadeThrown', 'scoutContact', 'breakthrough', 'unitDied', 'buildingDestroyed'].includes(event.type)
       || (event.type === 'wavePhase' && event.phase === 'spawning'));
     const quiet = !combat && (wavePhase === undefined || wavePhase === 'prep' || wavePhase === 'advance')
@@ -334,7 +335,13 @@ export class RadioDirector {
           const partner = partners[Math.floor(Math.random() * partners.length)];
           const jokes = LULL_BANTER.filter((joke) => !this.recentLines.includes(joke.line));
           const joke = jokes[Math.floor(Math.random() * jokes.length)];
-          if (partner && joke) candidates.push({ team: 'friendly', cue: 'ambient', priority: 0, speakerId: speaker.id, text: joke.line, reply: { text: joke.reply, speakerId: partner.id }, banter: true });
+          const stories = LULL_MONOLOGUES.filter((story) => !this.recentLines.includes(story));
+          const story = wavePhase === 'prep' && waveIndex > 0 && Math.random() < 0.3
+            ? stories[Math.floor(Math.random() * stories.length)] : undefined;
+          if (story) {
+            this.nextAmbientAt = tick + 35 * CONFIG.tickRate;
+            candidates.push({ team: 'friendly', cue: 'ambient', priority: 0, speakerId: speaker.id, text: story, banter: true });
+          } else if (partner && joke) candidates.push({ team: 'friendly', cue: 'ambient', priority: 0, speakerId: speaker.id, text: joke.line, reply: { text: joke.reply, speakerId: partner.id }, banter: true });
           else {
             const roll = Math.random();
             const ambientLines = roll < 0.5 && weather !== undefined ? WEATHER_CHATTER[weather][speaker.team]

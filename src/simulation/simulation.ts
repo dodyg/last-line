@@ -73,6 +73,7 @@ import { earlyWaveReward, buildSpawnQueue, currentWaveDef, endlessWaveNumber } f
 import { dayNightAtTick } from './daynight';
 import { FIRE_ORDERS, fireOrdersForRole, MAX_GROUND_IMPACTS } from './types';
 import type {
+  Animal,
   Command,
   CommandResult,
   ConstructionSite,
@@ -191,6 +192,7 @@ export class Simulation {
       ticks: 0,
       nextEntityId: 1,
       units: [],
+      animals: this.generateAnimals(terrain, seed),
       medicalQueue: [],
       grenadeSupplyQueue: [],
       battleRecord: { enemyKills: 0, casualties: 0, breakthroughs: 0 },
@@ -330,6 +332,7 @@ export class Simulation {
     s.nextEntityId = snap.nextEntityId;
     s.battleRecord = { ...snap.battleRecord };
     s.units = snap.units.map(cloneUnit);
+    s.animals = structuredClone(snap.animals ?? []);
     s.medicalQueue = [...(snap.medicalQueue ?? s.units.flatMap((u) => u.medicalTargetId === undefined ? [] : [u.medicalTargetId]))];
     s.grenadeSupplyQueue = [...(snap.grenadeSupplyQueue ?? [])];
     s.projectiles = snap.projectiles.map((p) => ({ ...p, pos: { ...p.pos }, target: { ...p.target } }));
@@ -452,6 +455,7 @@ export class Simulation {
       nextEntityId: s.nextEntityId,
       battleRecord: { ...s.battleRecord },
       units: s.units.map(cloneUnit),
+      animals: structuredClone(s.animals ?? []),
       medicalQueue: [...(s.medicalQueue ?? [])],
       grenadeSupplyQueue: [...(s.grenadeSupplyQueue ?? [])],
       projectiles: s.projectiles.map((p) => ({ ...p, pos: { ...p.pos }, target: { ...p.target } })),
@@ -564,6 +568,7 @@ export class Simulation {
     this.updateUnits();
     recordVehicleTracks(s, this.zones);
     // After movement, so a mine bites the unit that actually stepped on it.
+    this.updateAnimals();
     this.updateMines();
     this.updateConstruction();
     this.updateAutomaticSupportRequests();
@@ -964,6 +969,7 @@ export class Simulation {
     s.terrain = terrainData.terrain;
     s.terrain.bridges = terrainData.zones.bridges;
     this.terrainKinds = terrainData.kinds;
+    s.animals = this.generateAnimals(terrainData, s.seed);
     // New map, new water, mud, and a fresh set of buildings. Nothing carries over:
     // you are not fighting in the same town, and a ruin you made is behind you.
     this.zones = terrainData.zones;
@@ -981,6 +987,7 @@ export class Simulation {
       cleanStreak: s.scheduler.cleanStreak ?? 0,
     };
     this.deployArrivals(squad);
+    if (s.runMode === 'assault' && !s.endless && s.mapsCleared < campaignGoal(s)) this.setupAssault();
     this.emit({
       type: 'mapCleared',
       mapsCleared: s.mapsCleared,
@@ -999,7 +1006,7 @@ export class Simulation {
   private updateCampaignObjective(): void {
     const s = this.state;
     if (s.phase !== 'running' || s.scheduler.phase === 'crossing' || s.sectorCaptured || s.endless) return;
-    if (s.runMode === 'operation') {
+    if (s.runMode === 'operation' || s.runMode === 'assault') {
       const sector = operationSector(s);
       if (s.scheduler.phase !== 'advance' || !sector.holdSeconds) return;
       const target = operationTarget(s);
@@ -1024,6 +1031,52 @@ export class Simulation {
     } else {
       s.captureTicks = Math.max(0, s.captureTicks - 2);
     }
+  }
+
+  /** Populate the current sector with a garrison before the squad advances. */
+  setupAssault(): void {
+    const s = this.state;
+    const target = operationTarget(s);
+    // Bunker crews anchor the position; infantry on both flanks and in depth
+    // prevent one concentrated attack from rolling up a single row of defenders.
+    const layouts: { x: number; y: number; role: EnemyArchetype; bunker?: boolean }[][] = [
+      [
+        { x: -90, y: 0, role: 'mg_team', bunker: true }, { x: 90, y: 0, role: 'rifle', bunker: true },
+        { x: -160, y: 45, role: 'rifle' }, { x: -45, y: 55, role: 'rifle' }, { x: 45, y: 55, role: 'assault' }, { x: 160, y: 45, role: 'rifle' },
+        { x: -55, y: -65, role: 'rifle' }, { x: 55, y: -65, role: 'assault' },
+      ],
+      [
+        { x: -140, y: 0, role: 'mg_team', bunker: true }, { x: 0, y: 0, role: 'rifle', bunker: true }, { x: 140, y: 0, role: 'mg_team', bunker: true },
+        { x: -210, y: 55, role: 'rifle' }, { x: -90, y: 65, role: 'assault' }, { x: 0, y: 65, role: 'rifle' }, { x: 90, y: 65, role: 'assault' }, { x: 210, y: 55, role: 'rifle' },
+        { x: -150, y: -75, role: 'rifle' }, { x: -50, y: -75, role: 'sharpshooter' }, { x: 50, y: -75, role: 'rifle' }, { x: 150, y: -75, role: 'rifle' },
+      ],
+      [
+        { x: -195, y: 0, role: 'mg_team', bunker: true }, { x: -65, y: 0, role: 'rifle', bunker: true }, { x: 65, y: 0, role: 'mg_team', bunker: true }, { x: 195, y: 0, role: 'rifle', bunker: true },
+        { x: -250, y: 65, role: 'rifle' }, { x: -150, y: 65, role: 'assault' }, { x: -50, y: 65, role: 'rifle' }, { x: 50, y: 65, role: 'assault' }, { x: 150, y: 65, role: 'rifle' }, { x: 250, y: 65, role: 'assault' },
+        { x: -200, y: -75, role: 'rifle' }, { x: -120, y: -75, role: 'sharpshooter' }, { x: -40, y: -75, role: 'rifle' }, { x: 40, y: -75, role: 'field_officer' }, { x: 120, y: -75, role: 'at_infantry' }, { x: 200, y: -75, role: 'rifle' },
+      ],
+    ];
+    const occupied: Vec2[] = [];
+    for (const defender of layouts[Math.min(s.mapsCleared, layouts.length - 1)]!) {
+      const desired = { x: target.x + defender.x, y: target.y + defender.y };
+      let pos: Vec2 | null = null, bestDistance = Infinity;
+      for (let row = 2; row < s.terrain.rows - 2; row++) for (let col = 1; col < s.terrain.cols - 1; col++) {
+        const candidate = { x: (col + .5) * s.terrain.cell, y: (row + .5) * s.terrain.cell };
+        const distance = dist(candidate, desired);
+        if (distance >= bestDistance || occupied.some((other) => dist(other, candidate) < 24)
+          || (defender.bunker && s.bunkers.some((bunker) => dist(bunker.pos, candidate) < CONFIG.bunker.minSpacing))) continue;
+        if (!nearestOpenCell(s.terrain, candidate, 0)) continue;
+        pos = candidate; bestDistance = distance;
+      }
+      if (!pos) continue;
+      occupied.push(pos);
+      if (defender.bunker) s.bunkers.push({ id: s.nextEntityId++, pos: { ...pos }, health: CONFIG.bunker.health });
+      this.spawnEnemy(defender.role, pos);
+    }
+    s.scheduler.phase = 'active';
+    s.scheduler.spawnQueue = [];
+    s.scheduler.prepTicksLeft = 0;
+    s.scheduler.rewardGranted = false;
   }
 
   private updateSmoke(): void {
@@ -1220,6 +1273,7 @@ export class Simulation {
   }
 
   private emit(event: SimEvent): void {
+    if (event.type === 'shot') this.frightenAnimals(event.from, 150);
     this.pendingEvents.push(event);
   }
 
@@ -1314,6 +1368,8 @@ export class Simulation {
         return this.commandBridge(cmd.pos);
       case 'mine':
         return this.commandMine(cmd.kind, cmd.pos);
+      case 'cancelMine':
+        return this.cancelMineOrder(cmd.siteId);
       case 'artillery':
         return this.commandArtillery(cmd.pos);
       case 'airSupport':
@@ -1713,7 +1769,7 @@ export class Simulation {
       - Number(a.buildingPosition!.level === position.level) || a.id - b.id)[0]!;
     unit.targetId = target.id;
     unit.path = []; unit.moveGoal = null;
-    if (unit.pinned || (unit.upgradeTimer ?? 0) > 0 || unit.reloadTimer > 0 || unit.shotTimer > 0) return true;
+    if (unit.fireOrder === 'returnFire' || unit.pinned || (unit.upgradeTimer ?? 0) > 0 || unit.reloadTimer > 0 || unit.shotTimer > 0) return true;
     const equipped = this.weaponOf(unit);
     // Heavy weapons stay stowed indoors; their operators fight with a personal rifle.
     const weapon = equipped?.kind === 'hitscan' && equipped !== this.content.weapons.flamethrower && !crewTuning(unit) && unit.role !== 'at_infantry'
@@ -1726,6 +1782,7 @@ export class Simulation {
     const hit = rngNext(this.state.rng) < chance;
     unit.revealedUntil = this.state.ticks + sec(4);
     recordNightGunfire(this.state, unit, this.terrainKinds, weapon);
+    if (unit.team === 'enemy') this.releaseReturnFire(target);
     if (hit && this.damageUnit(target, this.weaponDamage(unit, weapon.damage), 1).killed) this.killUnit(target, unit.id);
     if (!target.dead) applySuppression(target, weapon.suppressionAmount * (hit ? 1 : .5), CONFIG);
     this.emit({ type: 'shot', shooterId: unit.id, shooterTeam: unit.team, targetId: target.id,
@@ -2391,8 +2448,8 @@ export class Simulation {
   private commandMine(kind: MineKind, pos: Vec2): CommandResult {
     const reason = this.minePlacementError(kind, pos);
     if (reason !== null) return { ok: false, reason };
-    const builder = this.nearestAvailableEngineer(pos);
-    if (builder === null) return { ok: false, reason: 'No available engineer nearby.' };
+    const builder = this.mineOrderEngineer(pos);
+    if (builder === null) return { ok: false, reason: 'No engineer can reach that location.' };
     this.state.points -= CONFIG.mineKinds[kind].cost;
     this.startConstruction('mine', pos, builder.id, kind);
     return { ok: true };
@@ -2406,8 +2463,8 @@ export class Simulation {
   private minePlacementError(kind: MineKind, pos: Vec2): string | null {
     const s = this.state;
     const def = CONFIG.mineKinds[kind];
-    const engineerError = this.engineerRequirementError(pos);
-    if (engineerError !== null) return engineerError;
+    if (this.livingEngineers().length === 0) return 'Deploy a Combat Support Engineer to lay mines.';
+    if (s.constructionSites.length >= 100) return 'Too many construction orders.';
     if (s.points < def.cost) return `${def.label}s cost ${def.cost} points.`;
     if (!this.inBounds(pos, 10)) return 'Lay mines inside the battlefield.';
     if (pos.y < CONFIG.terrain.protectedTopRows * CONFIG.terrain.cell + 8) return 'Too close to the enemy approach.';
@@ -2422,7 +2479,34 @@ export class Simulation {
     if (s.trenches.some((trench) => dist(trench.pos, pos) < CONFIG.trench.halfLength)) return 'Too close to a trench.';
     if (s.bunkers.some((bunker) => dist(bunker.pos, pos) < CONFIG.bunker.occupyRadius + 10)) return 'Too close to a bunker.';
     if (s.mortarPits.some((pit) => dist(pit.pos, pos) < CONFIG.mortarPit.occupyRadius + 10)) return 'Too close to a mortar pit.';
+    if (this.mineOrderEngineer(pos) === null) return 'No engineer can reach that location.';
     return null;
+  }
+
+  private mineOrderEngineer(pos: Vec2): Unit | null {
+    const dest = nearestOpenCell(this.state.terrain, pos, 3);
+    if (!dest) return null;
+    return this.livingEngineers().filter((unit) => !unit.dead && !unit.crossed
+      && !this.state.constructionSites.some((site) => site.builderId === unit.id && site.kind !== 'mine')
+      && this.findUnitPath(unit, this.buildingExit(unit) ?? unit.pos, dest).reachable)
+      .sort((a, b) => {
+        const count = (unit: Unit) => this.state.constructionSites.filter((site) => site.kind === 'mine' && site.builderId === unit.id).length;
+        return count(a) - count(b) || dist(a.pos, pos) - dist(b.pos, pos) || a.id - b.id;
+      })[0] ?? null;
+  }
+
+  private cancelMineOrder(siteId: number): CommandResult {
+    const index = this.state.constructionSites.findIndex((site) => site.id === siteId && site.kind === 'mine');
+    if (index < 0) return { ok: false, reason: 'That mine order is no longer active.' };
+    const site = this.state.constructionSites[index]!;
+    const active = this.state.constructionSites.find((item) => item.kind === 'mine' && item.builderId === site.builderId);
+    if (active?.id === site.id) {
+      const builder = this.findUnit(site.builderId);
+      if (builder) { builder.path = []; builder.moveGoal = null; builder.running = false; }
+    }
+    this.state.constructionSites.splice(index, 1);
+    this.state.points += this.constructionCostOf(site);
+    return { ok: true };
   }
 
   private startConstruction(kind: ConstructionSite['kind'], pos: Vec2, builderId: number, mineKind?: MineKind): void {
@@ -2525,6 +2609,53 @@ export class Simulation {
    * most of a naive centre-to-centre radius, so a centre-only test lets a tank
    * roll through a minefield untouched.
    */
+  private generateAnimals(data: TerrainData, seed: number): Animal[] {
+    const rng = deriveRng(seed, 0x61a71);
+    const animals: Animal[] = [];
+    const terrain = data.terrain;
+    const farm: number[] = [], wild: number[] = [];
+    for (let i = 0; i < data.kinds.length; i++) {
+      if (terrain.blocked[i]) continue;
+      const kind = data.kinds[i];
+      if (kind === TERRAIN_KIND.farmyard || kind === TERRAIN_KIND.crops) farm.push(i);
+      else if (kind === TERRAIN_KIND.tallGrass || kind === TERRAIN_KIND.wildflower || kind === TERRAIN_KIND.open) wild.push(i);
+    }
+    for (const [cells, count, species] of [[farm, 3, 'sheep'], [wild, 2, 'deer']] as const) {
+      if (!cells.length) continue;
+      for (let i = 0; i < count; i++) {
+        const cell = cells[rngInt(rng, 0, cells.length - 1)]!;
+        animals.push({ species: species === 'sheep' && i === 0 ? 'cow' : species,
+          pos: { x: (cell % terrain.cols + .5) * terrain.cell, y: (Math.floor(cell / terrain.cols) + .5) * terrain.cell },
+          heading: rngNext(rng) * Math.PI * 2, frightenedUntil: 0 });
+      }
+    }
+    return animals;
+  }
+
+  private frightenAnimals(pos: Vec2, radius: number): void {
+    for (const animal of this.state.animals ?? []) {
+      if (dist(animal.pos, pos) > radius) continue;
+      animal.heading = Math.atan2(animal.pos.y - pos.y, animal.pos.x - pos.x);
+      animal.frightenedUntil = this.state.ticks + sec(5);
+    }
+  }
+
+  private updateAnimals(): void {
+    const terrain = this.state.terrain;
+    for (const animal of this.state.animals ?? []) {
+      const scared = animal.frightenedUntil > this.state.ticks;
+      const speed = (scared ? 48 : 6) / CONFIG.tickRate;
+      const x = animal.pos.x + Math.cos(animal.heading) * speed;
+      const y = animal.pos.y + Math.sin(animal.heading) * speed;
+      const col = Math.floor(x / terrain.cell), row = Math.floor(y / terrain.cell);
+      const kind = this.terrainKinds[row * terrain.cols + col];
+      if (col < 0 || row < 0 || col >= terrain.cols || row >= terrain.rows || terrain.blocked[row * terrain.cols + col] || kind === TERRAIN_KIND.river) {
+        animal.heading += Math.PI * .65;
+      } else { animal.pos.x = x; animal.pos.y = y; }
+      if (!scared && this.state.ticks % sec(8) === 0) animal.heading += .8;
+    }
+  }
+
   private updateMines(): void {
     const s = this.state;
     if (s.mines.length === 0) return;
@@ -2542,10 +2673,11 @@ export class Simulation {
         const dy = unit.pos.y - laid.pos.y;
         if (dx * dx + dy * dy <= reach * reach) { tripped = true; break; }
       }
-      if (!tripped) continue;
+      const animalTriggered = !tripped && laid.kind === 'ap' && (s.animals ?? []).some((animal) => dist(animal.pos, laid.pos) <= def.triggerRadius + 3);
+      if (!tripped && !animalTriggered) continue;
       s.mines.splice(i, 1);
       const victims = this.explodeAt(laid.pos, def.radius, def.damage * (laid.damageMult ?? 1), def.armorMult, def.suppression, null, CONFIG.mine.friendlyFire);
-      this.emit({ type: 'mineTriggered', kind: laid.kind, pos: { ...laid.pos }, radius: def.radius, victims });
+      this.emit({ type: 'mineTriggered', kind: laid.kind, pos: { ...laid.pos }, radius: def.radius, victims, animalTriggered });
     }
   }
 
@@ -2555,6 +2687,25 @@ export class Simulation {
     for (let i = s.constructionSites.length - 1; i >= 0; i--) {
       const site = s.constructionSites[i]!;
       let builder = s.units.find((unit) => unit.id === site.builderId && unit.team === 'friendly' && unit.role === 'engineer' && unit.health > 0 && unit.crossed !== true && !unit.pinned);
+      if (site.kind === 'mine') {
+        const assigned = s.units.find((unit) => unit.id === site.builderId && unit.team === 'friendly' && unit.role === 'engineer' && unit.health > 0 && !unit.dead && !unit.crossed);
+        if (!assigned) {
+          const replacement = this.mineOrderEngineer(site.pos);
+          if (replacement) site.builderId = replacement.id;
+          else if (this.livingEngineers().length === 0) {
+            s.constructionSites.splice(i, 1);
+            const refund = this.constructionCostOf(site); s.points += refund;
+            this.emit({ type: 'constructionAbandoned', kind: site.kind, pos: { ...site.pos }, refund });
+          }
+          continue;
+        }
+        if (s.constructionSites.find((item) => item.kind === 'mine' && item.builderId === site.builderId)?.id !== site.id || !builder) continue;
+        if (dist(builder.pos, site.pos) > CONFIG.construction.engineerRange) {
+          if (!builder.moveGoal || dist(builder.moveGoal, site.pos) > CONFIG.construction.engineerRange) this.commandMove(builder.id, site.pos);
+          continue;
+        }
+        if (builder.moveGoal && dist(builder.moveGoal, site.pos) <= CONFIG.construction.engineerRange) { builder.path = []; builder.moveGoal = null; builder.running = false; }
+      }
       if (builder === undefined || dist(builder.pos, site.pos) > CONFIG.construction.engineerRange) {
         builder = this.nearestAvailableEngineer(site.pos, site.id) ?? undefined;
         if (builder === undefined || dist(builder.pos, site.pos) > CONFIG.construction.engineerRange) {
@@ -2587,7 +2738,7 @@ export class Simulation {
       } else if (site.kind === 'trench') {
         s.trenches.push({ id: site.id, pos: { ...site.pos } });
       } else if (site.kind === 'bunker') {
-        s.bunkers.push({ id: site.id, pos: { ...site.pos } });
+        s.bunkers.push({ id: site.id, pos: { ...site.pos }, health: CONFIG.bunker.health });
       } else if (site.kind === 'mortarPit') {
         s.mortarPits.push({ id: site.id, pos: { ...site.pos } });
       } else if (site.kind === 'bridge') {
@@ -3202,7 +3353,7 @@ export class Simulation {
       const authored = sectorWaves(s);
       if (!s.endless && sched.waveIndex >= authored - 1) {
         s.score += s.integrity * CONFIG.rewards.integrityBonusScore;
-        s.sectorCaptured = s.runMode !== 'operation' || operationSector(s).holdSeconds === 0;
+        s.sectorCaptured = (s.runMode !== 'operation' && s.runMode !== 'assault') || operationSector(s).holdSeconds === 0;
         sched.phase = 'advance';
         sched.spawnQueue = [];
         this.emit({ type: 'advanceAvailable' });
@@ -3244,14 +3395,13 @@ export class Simulation {
     // the preparation period, and an abandoned map does not shell anyone.
     if (s.scheduler.phase !== 'spawning' && s.scheduler.phase !== 'active') return;
 
-    const targets = this.livingFriendlies();
-    if (targets.length === 0) return;
-    const observer = s.units.find((unit) => unit.team === 'enemy' && unit.role === 'observer' && unit.health > 0 && !unit.dead && !unit.pinned);
-    if (observer === undefined || !targets.some((target) => {
+    const observers = s.units.filter((unit) => unit.team === 'enemy' && unit.role === 'observer' && unit.health > 0 && !unit.dead && !unit.pinned);
+    const targets = this.livingFriendlies().filter((target) => observers.some((observer) => {
       const concealment = target.specialization === 'camouflage' && !nightContactFor(s, observer, target) ? CONFIG.specialization.camouflageRangeMult : 1;
       return dist(observer.pos, target.pos) <= tuning.observationRange * this.visibilityMultiplierFor(observer, target) * concealment
-        && hasLineOfSight(s.terrain, observer.pos, target.pos);
-    })) return;
+        && hasLineOfSight(s.terrain, observer.pos, target.pos, unitEyeHeight(s.terrain, observer), unitEyeHeight(s.terrain, target));
+    }));
+    if (targets.length === 0) return;
 
     // Endless play counts every endless wave cleared across maps, so marching
     // north does not put the battery back to sleep; authored play uses the wave
@@ -3531,6 +3681,8 @@ export class Simulation {
   ): number {
     const s = this.state;
     let victims = 0;
+    this.frightenAnimals(pos, radius + 150);
+    s.animals = (s.animals ?? []).filter((animal) => dist(animal.pos, pos) > radius);
     const terrain = s.terrain;
     for (let row = Math.max(0, Math.floor((pos.y - radius) / terrain.cell)); row <= Math.min(terrain.rows - 1, Math.floor((pos.y + radius) / terrain.cell)); row++) {
       for (let col = Math.max(0, Math.floor((pos.x - radius) / terrain.cell)); col <= Math.min(terrain.cols - 1, Math.floor((pos.x + radius) / terrain.cell)); col++) {
@@ -3549,6 +3701,14 @@ export class Simulation {
       if (!this.circleOverlapsBox(pos, radius, box)) continue;
       victims += 1;
       this.damageBuilding(building, damage);
+    }
+    for (const bunker of [...s.bunkers]) {
+      if (dist(pos, bunker.pos) > radius + CONFIG.bunker.occupyRadius || damage <= 0) continue;
+      bunker.health = Math.max(0, (bunker.health ?? CONFIG.bunker.health) - damage);
+      if (bunker.health === 0) {
+        s.bunkers = s.bunkers.filter((candidate) => candidate.id !== bunker.id);
+        this.emit({ type: 'structureDemolished', kind: 'bunker', pos: { ...bunker.pos } });
+      }
     }
     for (const unit of [...s.units]) {
       if (unit.health <= 0) continue;
@@ -3663,6 +3823,7 @@ export class Simulation {
       // Target retention: keep a valid target; re-acquire only when invalid.
       let target = unit.targetId !== null ? enemies.find((e) => e.id === unit.targetId) ?? null : null;
       const wasEngaged = target !== null;
+      const previousTarget = target;
       if (weapon && target !== null && !targetIsValid(this.content, s.terrain, s.sandbags, unit, target, weapon, CONFIG, s.trenches, s.smokes, visibility)) {
         target = null;
       }
@@ -3688,6 +3849,10 @@ export class Simulation {
         if (unit.team === 'friendly' && unit.role === 'medic') this.medicBehavior(unit);
         if (unit.team === 'friendly' && unit.role === 'supply_officer') this.supplyBehavior(unit);
         if (unit.team === 'enemy' && target === null && (s.ticks + unit.id) % 90 === 0) this.leaveBuilding(unit);
+      } else if (unit.team === 'enemy' && s.runMode === 'assault' && !s.endless) {
+        unit.path = [];
+        unit.moveGoal = null;
+        unit.advance = false;
       } else if (unit.team === 'enemy') {
         const team = s.enemySapperTeams.find((candidate) => candidate.sapperId === unit.id || candidate.escortIds.includes(unit.id));
         const onMission = team !== undefined && this.demolitionTeamBehavior(unit, team);
@@ -3698,7 +3863,7 @@ export class Simulation {
         }
         if (!onMission) {
           if (!s.enemySmokeAssaults?.some((plan) => plan.unitIds.includes(unit.id)) && this.seekEnemyBuilding(unit)) continue;
-          this.enemyBehavior(unit, target, weapon, target !== null && !wasEngaged, supportingPinnedComrade);
+          this.enemyBehavior(unit, target, weapon, target !== null && !wasEngaged, supportingPinnedComrade, previousTarget);
         }
       } else {
         if (!this.dodgeIncomingArtillery(unit)) this.friendlyBehavior(unit, target, weapon);
@@ -3729,12 +3894,13 @@ export class Simulation {
       // cover - and the upgrade itself is already banked, so the only thing at
       // risk is the next few seconds of fire.
       const upgrading = (unit.upgradeTimer ?? 0) > 0;
-      if (unit.roleDuty?.kind === 'suppress' && weapon && crewReady && !moved && !upgrading && !unit.pinned) this.fireSuppressionArea(unit, weapon);
-      if (((unit.team === 'friendly' && unit.role === 'mortarman') || unit.role === 'mortar_team') && !unit.pinned && !moved && !upgrading) {
+      const holdingFire = unit.team === 'friendly' && unit.fireOrder === 'returnFire';
+      if (!holdingFire && unit.roleDuty?.kind === 'suppress' && weapon && crewReady && !moved && !upgrading && !unit.pinned) this.fireSuppressionArea(unit, weapon);
+      if (!holdingFire && ((unit.team === 'friendly' && unit.role === 'mortarman') || unit.role === 'mortar_team') && !unit.pinned && !moved && !upgrading) {
         this.tryMortarFire(unit, enemies);
       }
       const canFireWhileMoving = unit.role === 'gun_truck' || unit.role === 'vehicle';
-      if (crewReady && (unit.role !== 'at_infantry' || unit.aim?.ticks === 0) && !unit.pinned && unit.tankCrew?.behavior !== 'retreat' && (!moved || canFireWhileMoving) && !upgrading && unit.roleDuty?.kind !== 'suppress' && unit.roleDuty?.kind !== 'observe' && unit.roleDuty?.kind !== 'repair' && ((weapon && target) || unit.grenades > 0)) {
+      if (!holdingFire && crewReady && (unit.role !== 'at_infantry' || unit.aim?.ticks === 0) && !unit.pinned && unit.tankCrew?.behavior !== 'retreat' && (!moved || canFireWhileMoving) && !upgrading && unit.roleDuty?.kind !== 'suppress' && unit.roleDuty?.kind !== 'observe' && unit.roleDuty?.kind !== 'repair' && ((weapon && target) || unit.grenades > 0)) {
         const threw = !unit.ambush && !moved && (unit.fireOrder ?? 'auto') !== 'holdGrenades' && this.tryThrowGrenade(unit, enemies);
         if (!threw && weapon && target) this.tryFire(unit, target, weapon, moved);
       }
@@ -4140,16 +4306,19 @@ export class Simulation {
       if (unit.flankUntilTick) { unit.path = []; unit.moveGoal = null; delete unit.flankUntilTick; }
       return false;
     }
-    if ((unit.flankUntilTick ?? 0) > s.ticks && unit.path.length) { unit.advance = true; return true; }
+    const covering = () => s.units.some((ally) => ally.team === 'enemy' && ally.id !== unit.id && !ally.dead && ally.health > 0
+      && !ally.pinned && !ally.advance && ally.targetId === target.id && dist(ally.pos, unit.pos) <= tuning.supportRadius
+      && this.weaponOf(ally)?.kind === 'hitscan');
+    if ((unit.flankUntilTick ?? 0) > s.ticks && unit.path.length && covering()) { unit.advance = true; return true; }
+    if (unit.flankUntilTick) { unit.path = []; unit.moveGoal = null; }
     delete unit.flankUntilTick;
     if (s.ticks < (unit.nextTacticTick ?? 0)) return false;
     unit.nextTacticTick = s.ticks + sec(tuning.decisionSeconds) + unit.id % CONFIG.tickRate;
     if (unit.id % (experience >= 12 ? 2 : 4) !== 0) return false;
-    const cover = s.units.some((ally) => ally.team === 'enemy' && ally.id !== unit.id && !ally.dead && ally.health > 0
-      && !ally.pinned && !ally.advance && ally.targetId === target.id && dist(ally.pos, unit.pos) <= tuning.supportRadius
-      && this.weaponOf(ally)?.kind === 'hitscan');
-    if (!cover) return false;
+    if (!covering()) return false;
     const side = unit.pos.x < target.pos.x ? -1 : 1;
+    const options: Array<{ goal: Vec2; waypoints: Vec2[]; score: number }> = [];
+    const threats = this.visibleEnemyThreats(unit);
     for (const direction of [side, -side]) {
       const goal = nearestOpenCell(s.terrain, {
         x: Math.max(24, Math.min(CONFIG.field.width - 24, target.pos.x + direction * tuning.flankWidth)),
@@ -4158,14 +4327,19 @@ export class Simulation {
       if (!goal || dist(unit.pos, goal) < 60) continue;
       const route = this.findEnemyPath(unit.pos, goal, unit);
       if (!route.reachable || route.waypoints.length === 0) continue;
-      unit.path = route.waypoints; unit.moveGoal = goal; unit.laneX = goal.x;
-      unit.flankUntilTick = s.ticks + sec(tuning.flankSeconds); unit.advance = true;
-      return true;
+      const exposure = this.enemyRouteExposure(unit.pos, route.waypoints, threats);
+      const coveredTarget = hasDirectionalCover(s.sandbags, target.pos, goal, CONFIG, s.trenches, s.terrain);
+      options.push({ goal, waypoints: route.waypoints, score: exposure + dist(unit.pos, goal) * .002 + (coveredTarget ? 2 : 0) });
     }
-    return false;
+    options.sort((a, b) => a.score - b.score);
+    const best = options[0];
+    if (!best) return false;
+    unit.path = best.waypoints; unit.moveGoal = best.goal; unit.laneX = best.goal.x;
+    unit.flankUntilTick = s.ticks + sec(tuning.flankSeconds); unit.advance = true;
+    return true;
   }
 
-  private enemyBehavior(unit: Unit, target: Unit | null, weapon: WeaponStats | null, justAcquired = false, supportingPinnedComrade = false): void {
+  private enemyBehavior(unit: Unit, target: Unit | null, weapon: WeaponStats | null, justAcquired = false, supportingPinnedComrade = false, previousTarget: Unit | null = null): void {
     if (tankImmobilized(unit)) { unit.path = []; unit.moveGoal = null; unit.advance = false; return; }
     if (unit.role === 'troop_transport') { this.transportBehavior(unit); return; }
     if (unit.pinned) {
@@ -4205,14 +4379,21 @@ export class Simulation {
       }
     }
 
-    const nearbyThreats = this.livingFriendlies().filter((ally) => dist(unit.pos, ally.pos) <= 190);
+    const nearbyThreats = this.visibleEnemyThreats(unit).filter((ally) => dist(unit.pos, ally.pos) <= 190);
+    if (unit.suppression > CONFIG.suppression.recoverThreshold) {
+      for (const contact of unit.heardGunfire ?? []) {
+        const source = this.state.units.find((candidate) => candidate.id === contact.sourceId && candidate.team === 'friendly' && candidate.health > 0);
+        if (source && contact.expiresTick > this.state.ticks && dist(unit.pos, contact.pos) <= 190
+          && !nearbyThreats.some((threat) => threat.id === source.id)) nearbyThreats.push({ ...source, pos: contact.pos });
+      }
+      if (previousTarget && dist(unit.pos, previousTarget.pos) <= 190
+        && !nearbyThreats.some((threat) => threat.id === previousTarget.id)) nearbyThreats.push(previousTarget);
+    }
     const badlyShaken = unit.morale <= CONFIG.morale.rattledThreshold;
     const badlyWounded = unit.health <= this.content.enemy[unit.role as EnemyArchetype].health * 0.35;
-    // A lone survivor with no remaining contact must keep the assault moving.
-    // Otherwise a wounded attacker can halt forever and prevent wave cleanup.
-    const isolatedSurvivor = (badlyShaken || badlyWounded) && target === null && nearbyThreats.length === 0
-      && !this.state.units.some((other) => other.team === 'enemy' && other.id !== unit.id && !other.dead && other.health > 0);
-    const breakingOff = (badlyShaken || badlyWounded) && !isolatedSurvivor;
+    // Wounded attackers resume the assault once contact is lost. Waiting for
+    // every other attacker to die can leave several stragglers stalled forever.
+    const breakingOff = (badlyShaken || badlyWounded) && (target !== null || nearbyThreats.length > 0);
     const protectedNow = this.enemyHasCover(unit, nearbyThreats);
     if (protectedNow && (breakingOff || target !== null || unit.suppression > CONFIG.suppression.recoverThreshold)) {
       // Fight from cover under pressure. Bounding out of it and immediately
@@ -4268,8 +4449,8 @@ export class Simulation {
     // Bounding overwatch: covering fire only means something once a target is in
     // reach, so the pair alternates from that moment on. The half that is not
     // walking is the half shooting, and the pair always keeps working forward, so
-    // an attack can never deadlock in a standoff. Which half moves is derived
-    // from the unit id and the clock, so nothing extra is saved.
+    // an attack can never deadlock in a standoff. Nearby attackers pair against
+    // their shared contact; the clock alternates each pair without saved state.
     if (!hasTarget) {
       unit.advance = true;
     } else if (justAcquired) {
@@ -4287,7 +4468,25 @@ export class Simulation {
       const cycle = bounding.windowTicks * 2;
       const share = inPosition ? bounding.standoffAdvanceFraction : 0.5;
       const advanceTicks = Math.max(1, Math.min(cycle - 1, Math.round(cycle * share)));
-      const offset = unit.advanceFlip ? 0 : Math.floor(cycle / 2);
+      // Pair nearby attackers on the same contact in a stable order, so each
+      // covering element is assigned to at most one moving partner.
+      const group = this.state.units.filter((ally) => ally.team === 'enemy' && !ally.dead && ally.health > 0
+        && !ally.pinned && (ally.id === unit.id || ally.targetId === target.id)
+        && this.weaponOf(ally)?.kind === 'hitscan').sort((a, b) => a.id - b.id);
+      const assigned = new Set<number>();
+      let partner: Unit | undefined;
+      for (const member of group) {
+        if (assigned.has(member.id)) continue;
+        const match = group.filter((other) => other.id !== member.id && !assigned.has(other.id)
+          && dist(member.pos, other.pos) <= CONFIG.enemy.tactics.supportRadius)
+          .sort((a, b) => dist(member.pos, a.pos) - dist(member.pos, b.pos) || a.id - b.id)[0];
+        if (!match) continue;
+        assigned.add(member.id); assigned.add(match.id);
+        if (member.id === unit.id) partner = match;
+        else if (match.id === unit.id) partner = member;
+      }
+      const offset = partner ? (unit.id < partner.id ? 0 : Math.floor(cycle / 2))
+        : (unit.advanceFlip ? 0 : Math.floor(cycle / 2));
       unit.advance = (this.state.ticks + offset) % cycle < advanceTicks;
     } else {
       // Overwatch disabled: the force closes as a body, then holds and fires.
@@ -4398,9 +4597,36 @@ export class Simulation {
     return false;
   }
 
+  /** Defenders must be observable by this attacker before influencing its decisions. */
+  private visibleEnemyThreats(unit: Unit): Unit[] {
+    const weapon = this.weaponOf(unit) ?? this.content.weapons.enemy_rifle!;
+    return this.livingFriendlies().filter((target) => targetIsValid(this.content, this.state.terrain, this.state.sandbags, unit, target,
+      weapon, CONFIG, this.state.trenches, this.state.smokes, (candidate) => this.visibilityMultiplierFor(unit, candidate)));
+  }
+
+  /** Average exposure along the actual path, weighted by each observed weapon's reach. */
+  private enemyRouteExposure(start: Vec2, waypoints: readonly Vec2[], threats: readonly Unit[]): number {
+    let total = 0, length = 0, previous = start;
+    for (const end of waypoints) {
+      const segment = dist(previous, end), samples = Math.max(1, Math.ceil(segment / 48));
+      for (let i = 1; i <= samples; i++) {
+        const t = (i - .5) / samples;
+        const point = { x: previous.x + (end.x - previous.x) * t, y: previous.y + (end.y - previous.y) * t };
+        for (const threat of threats) {
+          const range = this.weaponOf(threat)?.range ?? 150;
+          if (dist(point, threat.pos) > range || this.buildingOnSegment(threat.pos, point)
+            || hasDirectionalCover(this.state.sandbags, point, threat.pos, CONFIG, this.state.trenches, this.state.terrain)) continue;
+          total += (this.content.friendly[threat.role as FriendlyRole]?.threat ?? 1) * segment / samples;
+        }
+      }
+      length += segment; previous = end;
+    }
+    return length ? total / length : 0;
+  }
+
   /** Whether a nearby friendly's fire crosses a building or low fence first. */
   private enemyHasCover(unit: Unit, threats: readonly Unit[]): boolean {
-    return threats.some((threat) => this.buildingOnSegment(threat.pos, unit.pos) !== null
+    return threats.length > 0 && threats.every((threat) => this.buildingOnSegment(threat.pos, unit.pos) !== null
       || hasDirectionalCover(this.state.sandbags, unit.pos, threat.pos, CONFIG, this.state.trenches, this.state.terrain));
   }
 
@@ -4408,7 +4634,7 @@ export class Simulation {
   private moveEnemyToCover(unit: Unit, threats: readonly Unit[]): boolean {
     if (threats.length === 0 || this.enemyHasCover(unit, threats)) return false;
     const currentGoal = unit.moveGoal;
-    if (unit.path.length > 0 && currentGoal !== null && threats.some((threat) =>
+    if (unit.path.length > 0 && currentGoal !== null && threats.every((threat) =>
       this.buildingOnSegment(threat.pos, currentGoal) !== null
       || hasDirectionalCover(this.state.sandbags, currentGoal, threat.pos, CONFIG, this.state.trenches, this.state.terrain))) {
       // Finish the chosen route while its destination still provides cover.
@@ -4426,7 +4652,10 @@ export class Simulation {
         + Math.floor(goal.x / this.state.terrain.cell);
       if (estimate > 180 || seen.has(key)) return;
       seen.add(key);
-      candidates.push({ goal, estimate });
+      const protectedCount = threats.filter((threat) => this.buildingOnSegment(threat.pos, goal) !== null
+        || hasDirectionalCover(this.state.sandbags, goal, threat.pos, CONFIG, this.state.trenches, this.state.terrain)).length;
+      const firingLines = threats.filter((threat) => this.buildingOnSegment(goal, threat.pos) === null).length;
+      candidates.push({ goal, estimate: estimate + (threats.length - protectedCount) * 80 - firingLines * 15 - (goal.y - unit.pos.y) * .15 });
     };
 
     for (const building of this.state.buildings) {
@@ -4463,15 +4692,16 @@ export class Simulation {
     }
 
     candidates.sort((a, b) => a.estimate - b.estimate);
+    let best: { goal: Vec2; waypoints: Vec2[]; score: number } | undefined;
     for (const candidate of candidates.slice(0, 10)) {
       const route = this.findEnemyPath(unit.pos, candidate.goal, unit);
       if (!route.reachable) continue;
-      unit.path = route.waypoints;
-      unit.moveGoal = candidate.goal;
-      unit.advance = true;
-      return true;
+      const score = candidate.estimate + this.enemyRouteExposure(unit.pos, route.waypoints, threats) * 30;
+      if (!best || score < best.score) best = { goal: candidate.goal, waypoints: route.waypoints, score };
     }
-    return false;
+    if (!best) return false;
+    unit.path = best.waypoints; unit.moveGoal = best.goal; unit.advance = true;
+    return true;
   }
 
   /** Return fire against defenders near a pinned Axis soldier, when reachable. */
@@ -4488,7 +4718,9 @@ export class Simulation {
         && dist(unit.pos, ally.pos) <= supportRadius)
       .sort((a, b) => b.suppression - a.suppression || dist(unit.pos, a.pos) - dist(unit.pos, b.pos) || a.id - b.id);
     for (const ally of pinnedComrades) {
-      const likelySuppressors = defenders.filter((defender) => dist(defender.pos, ally.pos) <= supportRadius);
+      const recent = (ally.heardGunfire ?? []).filter((contact) => contact.expiresTick > this.state.ticks);
+      const recorded = defenders.filter((defender) => recent.some((contact) => contact.sourceId === defender.id));
+      const likelySuppressors = recorded.length ? recorded : defenders.filter((defender) => dist(defender.pos, ally.pos) <= supportRadius);
       if (likelySuppressors.length === 0) continue;
       const target = acquireTarget(
         this.content,
@@ -4505,6 +4737,13 @@ export class Simulation {
         (candidate) => nightContactFor(this.state, unit, candidate) !== undefined,
       );
       if (target !== null) return target;
+      if (recorded.length) {
+        const fallback = acquireTarget(this.content, this.state.terrain, this.state.sandbags, unit,
+          defenders.filter((defender) => dist(defender.pos, ally.pos) <= supportRadius), weapon, CONFIG,
+          this.state.trenches, 'auto', this.state.smokes, visibility,
+          (candidate) => nightContactFor(this.state, unit, candidate) !== undefined);
+        if (fallback !== null) return fallback;
+      }
     }
     return null;
   }
@@ -4782,6 +5021,7 @@ export class Simulation {
    * so the firing path (including positional bonuses) can be exercised directly.
    */
   fireShot(unit: Unit, target: Unit, weapon: WeaponStats, moving = false): boolean {
+    if (unit.team === 'friendly' && unit.fireOrder === 'returnFire') return false;
     if (crewTuning(unit) && (!unit.deployment || unit.deployment.ticks > 0 || unit.deployment.packingTicks > 0 || !crewArcContains(unit, target.pos) || moving)) return false;
     if (unit.role === 'at_infantry' && (unit.aim?.targetId !== target.id || unit.aim.ticks > 0)) return false;
     if (unit.team === 'enemy' && unit.role === 'vehicle'
@@ -4881,6 +5121,8 @@ export class Simulation {
       return true;
     }
 
+    if (unit.team === 'enemy') this.releaseReturnFire(target);
+
     if (specialistShot && unit.role === 'flamethrower') {
       const direction = Math.atan2(target.pos.y - unit.pos.y, target.pos.x - unit.pos.x);
       for (const victim of [...s.units]) {
@@ -4911,6 +5153,14 @@ export class Simulation {
       }
       // Nearby shots suppress the victim's comrades whether they hit or not. A
       // braced gun beats a wider zone, which is what makes the position matter.
+      if (target.team === 'enemy') {
+        const radius = weapon.suppressionRadius * (emplacement?.suppressionRadiusMult ?? 1);
+        for (const victim of s.units) {
+          if (victim.team !== 'enemy' || victim.dead || victim.health <= 0 || victim.crossed || dist(victim.pos, target.pos) > radius) continue;
+          victim.heardGunfire = [...(victim.heardGunfire ?? []).filter((contact) => contact.sourceId !== unit.id && contact.expiresTick > s.ticks),
+            { sourceId: unit.id, pos: { ...unit.pos }, noticedTick: s.ticks, expiresTick: s.ticks + sec(CONFIG.gunfireOrder.memorySeconds) }];
+        }
+      }
       suppressNear(
         s.units,
         target.team,
@@ -4957,6 +5207,7 @@ export class Simulation {
 
   private damageUnit(target: Unit, damage: number, armorMult: number): ReturnType<typeof applyDamageToUnit> {
     const applied = applyDamageToUnit(this.content, target, damage, armorMult);
+    if (applied.damageDealt > 0) this.releaseReturnFire(target);
     if (applied.killed) return applied;
     const component = damageTankComponent(target, applied.damageDealt, armorMult, this.state.rng);
     if (component) {
@@ -4966,6 +5217,12 @@ export class Simulation {
       if (TANK_COMPONENTS.every((part) => target.tankDamage?.[part])) { target.health = 0; applied.killed = true; }
     }
     return applied;
+  }
+
+  private releaseReturnFire(unit: Unit): void {
+    if (unit.team !== 'friendly' || unit.fireOrder !== 'returnFire') return;
+    unit.fireOrder = 'auto';
+    this.emit({ type: 'fireOrderChanged', unitId: unit.id, order: 'auto' });
   }
 
   private killUnit(unit: Unit, killerId: number | null, escaped = false): void {
@@ -5096,7 +5353,12 @@ export class Simulation {
     const step = Math.max(s.terrain.cell * 2, 48);
     const edge = s.terrain.cell * 1.5;
     const objectiveY = CONFIG.breakthroughY + 8;
-    const defenders = s.units.filter((unit) => unit.team === 'friendly' && unit.health > 0 && unit.crossed !== true);
+    const observedIds = new Set<number>();
+    for (const observer of s.units) {
+      if (observer.team !== 'enemy' || observer.dead || observer.health <= 0 || observer.pinned) continue;
+      for (const target of this.visibleEnemyThreats(observer)) observedIds.add(target.id);
+    }
+    const defenders = s.units.filter((unit) => unit.team === 'friendly' && unit.health > 0 && unit.crossed !== true && observedIds.has(unit.id));
     const attackers = s.units.filter((unit) => unit.team === 'enemy' && unit.health > 0 && unit.crossed !== true);
     let bestLane = Math.max(edge, Math.min(CONFIG.field.width - edge, spawnX));
     let bestScore = Infinity;
@@ -5114,19 +5376,7 @@ export class Simulation {
         previous = point;
       }
 
-      let defenderPressure = 0;
-      for (const defender of defenders) {
-        const projectedY = Math.max(0, Math.min(CONFIG.breakthroughY, defender.pos.y));
-        const routeDistance = Math.hypot(defender.pos.x - x, defender.pos.y - projectedY);
-        const range = Math.max(100, (this.weaponOf(defender)?.range ?? 150) * 0.7);
-        const coverage = Math.max(0, 1 - routeDistance / range);
-        if (coverage <= 0) continue;
-        const def = this.content.friendly[defender.role as FriendlyRole];
-        const threat = def?.threat ?? 1;
-        const behindCover = hasBunkerCover(s.bunkers, defender, CONFIG)
-          || hasDirectionalCover(s.sandbags, defender.pos, { x, y: 0 }, CONFIG, s.trenches, s.terrain);
-        defenderPressure += threat * coverage * (behindCover ? 1.45 : 1);
-      }
+      const defenderPressure = this.enemyRouteExposure({ x: spawnX, y: 0 }, route.waypoints, defenders);
 
       const enemyTraffic = attackers.reduce((total, attacker) => {
         const spacing = Math.abs(attacker.laneX - x);

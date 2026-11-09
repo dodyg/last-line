@@ -36,6 +36,30 @@ function fixture() {
 }
 
 describe('enemy sapper teams', () => {
+  it('builds a bunker that takes blast damage, retains it across saves, and loses cover when destroyed', () => {
+    const { sim, bunker } = fixture();
+    sim.state.bunkers = [];
+    sim.state.points = 100;
+    sim.spawnFriendly('engineer', { x: bunker.pos.x, y: bunker.pos.y + 30 });
+    expect(sim.command({ type: 'bunker', pos: bunker.pos }).ok).toBe(true);
+    sim.state.constructionSites[0]!.ticksRemaining = 1;
+    sim.step();
+    const built = sim.state.bunkers[0]!;
+    expect(built.health).toBe(CONFIG.bunker.health);
+    sim.artilleryStrikeFor(1, built.pos);
+    sim.step();
+    expect(built.health).toBe(CONFIG.bunker.health - CONFIG.artillery.damage);
+
+    const validated = validateSnapshot(JSON.parse(JSON.stringify(sim.snapshot())));
+    if ('error' in validated) throw new Error(validated.error);
+    const restored = Simulation.fromSnapshot(validated.snap);
+    expect(restored.state.bunkers[0]?.health).toBe(built.health);
+    restored.artilleryStrikeFor(1, built.pos);
+    const events = restored.step();
+    expect(restored.state.bunkers).toHaveLength(0);
+    expect(events.filter((event) => event.type === 'structureDemolished' && event.kind === 'bunker')).toHaveLength(1);
+  });
+
   it('spawns one demolition specialist and two rifle escorts, with a team warning', () => {
     const { sim, spawn, tick } = fixture();
     const { team } = spawn();

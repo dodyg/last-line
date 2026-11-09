@@ -83,6 +83,8 @@ export class BattleRenderer3D implements RendererPort {
   private vehicleTracksKey = '';
   private terrainZones: TerrainData['zones'] | null = null;
   private readonly unitGroup = new THREE.Group();
+  private readonly animalGroup = new THREE.Group();
+  private readonly animalViews: THREE.Group[] = [];
   private readonly unitBatches = new UnitBatches();
   private readonly weatherGroup = new THREE.Group();
   private readonly stateFxGroup = new THREE.Group();
@@ -144,7 +146,7 @@ export class BattleRenderer3D implements RendererPort {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.scene.add(this.field);
     this.field.add(this.movementEffects.mesh);
-    this.field.add(this.terrainGroup, this.groundImpactGroup, this.buildingsGroup, this.propsGroup, this.damagedTreeGroup, this.structureGroup, this.unitGroup, this.unitBatches.group, this.weatherGroup, this.stateFxGroup, this.retainedFxGroup, this.effectGroup, this.zoneGroup, this.overlayGroup);
+    this.field.add(this.terrainGroup, this.groundImpactGroup, this.buildingsGroup, this.propsGroup, this.damagedTreeGroup, this.structureGroup, this.unitGroup, this.animalGroup, this.unitBatches.group, this.weatherGroup, this.stateFxGroup, this.retainedFxGroup, this.effectGroup, this.zoneGroup, this.overlayGroup);
     this.fieldMaterial = this.material(COLORS.ground, 0.98);
     this.sharedMaterials.push(this.fortificationMaterial);
     this.buildGround();
@@ -818,11 +820,16 @@ export class BattleRenderer3D implements RendererPort {
     for (const bridge of state.terrain.bridges ?? []) this.deck(bridge);
     for (const mine of state.mines) { const [x, , z] = this.groundWorld(mine.pos.x, mine.pos.y); const m = new THREE.Mesh(this.geometry(new THREE.CylinderGeometry(.09, .1, .035, 8)), this.material(mine.kind === 'at' ? 0x726f5a : 0x77704d)); this.placeOnGround(m, x, .025, z); this.structureGroup.add(m); }
     for (const site of state.constructionSites) {
-      const [x, , z] = this.groundWorld(site.pos.x, site.pos.y); const ghost: THREE.Mesh<THREE.BufferGeometry> = new THREE.Mesh(this.geometry(new THREE.CylinderGeometry(.3, .3, .035, 18)), this.material(0xd5b865, .8, true)); this.placeOnGround(ghost, x, .025, z); ghost.userData.siteId = site.id; this.structureGroup.add(ghost);
-      if (site.kind === 'barbedWire') {
-        ghost.geometry = this.geometry(new THREE.BoxGeometry(CONFIG.barbedWire.halfLength * 2 * WORLD_UNITS_PER_PIXEL, .045, CONFIG.barbedWire.halfDepth * 2 * WORLD_UNITS_PER_PIXEL));
-        ghost.name = 'wire-construction';
-      }
+      const [x, , z] = this.groundWorld(site.pos.x, site.pos.y);
+      const width = CONFIG.barbedWire.halfLength * 2, depth = CONFIG.barbedWire.halfDepth * 2;
+      const geometry = site.kind === 'barbedWire'
+        ? heightfieldGeometry(state.terrain, { x: site.pos.x - width / 2, y: site.pos.y - depth / 2, width, height: depth }, 2).translate(-x, 0, -z)
+        : drapedRingGeometry(state.terrain, site.pos, 0, .3).translate(-x, 0, -z);
+      const ghost = new THREE.Mesh(geometry, this.material(0xd5b865, .8, true));
+      ghost.position.set(x, 0, z); ghost.userData.siteId = site.id;
+      ghost.userData.groundRingCenter = { ...site.pos }; ghost.userData.groundRingOffset = .08;
+      ghost.name = site.kind === 'barbedWire' ? 'wire-construction' : 'construction-site-marker';
+      this.updateGroundRing(ghost, 1); this.structureGroup.add(ghost);
     }
   }
 
@@ -1185,13 +1192,36 @@ export class BattleRenderer3D implements RendererPort {
     }
     // Selection rings are rebuilt only when selection changes.
     for (const [id, root] of this.unitViews) {
-      if (root.userData.selected === selected.has(id)) continue;
+      const changed = root.userData.selected !== selected.has(id);
       root.userData.selected = selected.has(id);
       const old = root.children.find((o) => o.userData.selectionRing === true);
-      if (old) { root.remove(old); const mesh = old as THREE.Mesh; mesh.geometry.dispose(); (mesh.material as THREE.Material).dispose(); }
-      if (selected.has(id)) {
+      if (changed && old) { root.remove(old); const mesh = old as THREE.Mesh; mesh.geometry.dispose(); (mesh.material as THREE.Material).dispose(); }
+      if (changed && selected.has(id)) {
         const ring = new THREE.Mesh(new THREE.RingGeometry(.4, this.prefs.strongOutlines ? .48 : .445, 32), new THREE.MeshBasicMaterial({ color: this.prefs.friendlyColor, transparent: true, opacity: 1, depthTest: !this.prefs.strongOutlines, depthWrite: false, toneMapped: false }));
-        ring.rotation.x = -Math.PI / 2; ring.position.y = .03; ring.renderOrder = 100; ring.userData.selectionRing = true; root.add(ring);
+        ring.geometry.rotateX(-Math.PI / 2); ring.renderOrder = 100; ring.userData.selectionRing = true;
+        ring.userData.flatPositions = new Float32Array((ring.geometry.getAttribute('position') as THREE.BufferAttribute).array); root.add(ring);
+      }
+      const ring = root.children.find((o) => o.userData.selectionRing === true) as THREE.Mesh | undefined;
+      const unit = unitsById.get(id);
+      if (ring && unit) {
+        const positions = ring.geometry.getAttribute('position');
+        const flat = ring.userData.flatPositions as Float32Array;
+        // Building and bridge occupants use the raised surface beneath their feet.
+        const raised = unit.buildingPosition || unit.bridgePosition?.level === 'deck';
+        root.updateWorldMatrix(true, false);
+        const inverse = root.matrixWorld.clone().invert();
+        const center = root.getWorldPosition(new THREE.Vector3());
+        for (let i = 0; i < positions.count; i++) {
+          const dx = flat[i * 3]!, dz = flat[i * 3 + 2]!;
+          if (raised) positions.setXYZ(i, dx, .03, dz);
+          else {
+            const sx = (center.x + dx) / WORLD_UNITS_PER_PIXEL + CONFIG.field.width / 2;
+            const sy = (center.z + dz) / WORLD_UNITS_PER_PIXEL + CONFIG.field.height / 2;
+            const local = new THREE.Vector3(center.x + dx, this.groundHeight(sx, sy) + .055, center.z + dz).applyMatrix4(inverse);
+            positions.setXYZ(i, local.x, local.y, local.z);
+          }
+        }
+        positions.needsUpdate = true; ring.geometry.computeBoundingSphere();
       }
     }
   }
@@ -1268,7 +1298,7 @@ export class BattleRenderer3D implements RendererPort {
   }
 
   private drawZones(state: SimState): void {
-    if (state.runMode === 'operation' && !state.endless && !state.sectorCaptured && operationSector(state).holdSeconds) {
+    if ((state.runMode === 'operation' || state.runMode === 'assault') && !state.endless && !state.sectorCaptured && operationSector(state).holdSeconds) {
       const target = operationTarget(state);
       const radius = OPERATION_RADIUS * WORLD_UNITS_PER_PIXEL;
       const ring = new THREE.Mesh(drapedRingGeometry(state.terrain, target, radius - .06, radius), this.basicMaterial(0xffd36b, .9));
@@ -1729,17 +1759,16 @@ export class BattleRenderer3D implements RendererPort {
       const danger = new THREE.Mesh(drapedRingGeometry(state.terrain, charge.pos, radius - .025, radius), this.material(0xd65c43, .65, true));
       danger.name = `${name}-blast-radius`; danger.userData.chargeId = charge.id; this.stateFxGroup.add(danger);
       const fraction = charge.ticksRemaining / (def.fuseSeconds * CONFIG.tickRate);
-      const countdown = new THREE.Mesh(new THREE.RingGeometry(.26, .31, 40, 1, 0, Math.PI * 2 * fraction), this.material(0xffbc65, .95, true));
+      const countdown = new THREE.Mesh(drapedRingGeometry(state.terrain, charge.pos, .26, .31, .055, Math.PI * 2 * fraction), this.material(0xffbc65, .95, true));
       countdown.name = `${name}-fuse-countdown`; countdown.userData.ticksRemaining = charge.ticksRemaining;
-      countdown.rotation.x = -Math.PI / 2; this.placeOnGround(countdown, x, .04, z); this.stateFxGroup.add(countdown);
+      this.stateFxGroup.add(countdown);
     }
     for (const plan of state.enemySmokeAssaults ?? []) if (!plan.deployed) {
       const radius = CONFIG.smoke.radius * WORLD_UNITS_PER_PIXEL;
-      const ring = new THREE.Mesh(this.cachedGeometry('enemy-smoke-warning', () => new THREE.RingGeometry(radius - .035, radius, 36)),
+      const ring = new THREE.Mesh(drapedRingGeometry(state.terrain, plan.pos, radius - .035, radius, .055),
         this.material(0xd9b36a, .8, true));
       ring.name = 'enemy-smoke-warning'; ring.userData.assaultId = plan.id;
-      ring.rotation.x = -Math.PI / 2;
-      const [x, , z] = this.groundWorld(plan.pos.x, plan.pos.y); this.placeOnGround(ring, x, .055, z); this.stateFxGroup.add(ring);
+      this.stateFxGroup.add(ring);
       const thrower = state.units.find((unit) => unit.id === plan.leaderId && !unit.dead && unit.health > 0);
       if (thrower) {
         const marker = new THREE.Mesh(this.cachedGeometry('enemy-smoke-thrower', () => new THREE.ConeGeometry(.09, .18, 4)), this.material(0xe5bf72));
@@ -1819,7 +1848,7 @@ export class BattleRenderer3D implements RendererPort {
     }
     for (const site of state.constructionSites) {
       const marker = this.structureGroup.children.find((child) => child.userData.siteId === site.id);
-      if (marker) marker.scale.setScalar(.6 + .4 * Math.max(0, Math.min(1, 1 - site.ticksRemaining / Math.max(1, site.totalTicks))));
+      if (marker instanceof THREE.Mesh) this.updateGroundRing(marker, .6 + .4 * Math.max(0, Math.min(1, 1 - site.ticksRemaining / Math.max(1, site.totalTicks))));
     }
     for (const team of state.enemySapperTeams) {
       if (!team.plantPos || team.chargeId !== null) continue;
@@ -1897,6 +1926,40 @@ export class BattleRenderer3D implements RendererPort {
     this.overlayGroup.add(line);
   }
 
+  private updateAnimals(state: SimState): void {
+    const animals = state.animals ?? [];
+    while (this.animalViews.length > animals.length) {
+      const view = this.animalViews.pop()!;
+      this.animalGroup.remove(view);
+      this.clearGroup(view, true, false);
+    }
+    for (let i = 0; i < animals.length; i++) {
+      const animal = animals[i]!;
+      let view = this.animalViews[i];
+      if (view && view.userData.species !== animal.species) {
+        this.animalGroup.remove(view); this.clearGroup(view, true, false); view = undefined;
+      }
+      if (!view) {
+        view = new THREE.Group();
+        view.userData.species = animal.species;
+        const large = animal.species === 'cow';
+        const material = this.material(large ? 0x827462 : animal.species === 'sheep' ? 0xc7bda4 : 0x987950);
+        const body = new THREE.Mesh(this.modelGeometry(new THREE.BoxGeometry(large ? .7 : .48, large ? .36 : .27, large ? .35 : .25)), material);
+        body.position.y = large ? .38 : .28; view.add(body);
+        const head = new THREE.Mesh(this.modelGeometry(new THREE.BoxGeometry(.2, .2, .2)), material);
+        head.position.set(large ? .4 : .28, large ? .48 : .35, 0); view.add(head);
+        for (const x of [-.22, .22]) for (const z of [-.11, .11]) {
+          const leg = new THREE.Mesh(this.modelGeometry(new THREE.BoxGeometry(.06, .24, .06)), material);
+          leg.position.set(x, .12, z); view.add(leg);
+        }
+        this.animalViews[i] = view; this.animalGroup.add(view);
+      }
+      const [x, , z] = this.groundWorld(animal.pos.x, animal.pos.y);
+      this.placeOnGround(view, x, 0, z);
+      view.rotation.y = -animal.heading;
+    }
+  }
+
   frame(state: SimState, alpha: number, preview: PreviewInfo | null, selection: readonly number[], dt: number, drag: DragRect | null = null): void {
     this.terrain = state.terrain;
     this.updateTacticalVisibility(state, selection);
@@ -1904,6 +1967,7 @@ export class BattleRenderer3D implements RendererPort {
     this.updateGroundImpacts(state);
     this.updateVehicleTracks(state);
     this.updateUnits(state, alpha, selection, dt);
+    this.updateAnimals(state);
     this.updateDamagedTrees(state);
     this.flushTracers();
     this.updateStateFx(state);
@@ -1993,14 +2057,14 @@ export class BattleRenderer3D implements RendererPort {
         this.drawPatrolArea(unit.patrol.area, 0x9bbf8a, unit.id);
       }
       if (preview) {
-        const [x, , z] = this.groundWorld(preview.pos.x, preview.pos.y);
         const color = preview.valid ? 0x8dbb7a : 0xc95642;
         for (const arc of preview.ambushArcs ?? []) this.drawAmbushArc(arc.origin, arc, color, true);
         if (preview.patrolArea) this.drawPatrolArea(preview.patrolArea, color);
-        const ghost: THREE.Mesh<THREE.BufferGeometry> = new THREE.Mesh(new THREE.CylinderGeometry(.31, .31, .035, 20), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .55, depthWrite: false })); this.placeOnGround(ghost, x, .05, z); this.overlayGroup.add(ghost);
+        const ghost: THREE.Mesh<THREE.BufferGeometry> = new THREE.Mesh(drapedRingGeometry(state.terrain, preview.pos, 0, .31, .08), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .55, side: THREE.DoubleSide, depthWrite: false })); ghost.name = 'placement-preview'; this.overlayGroup.add(ghost);
         if (preview.kind === 'barbedWire') {
           ghost.geometry.dispose();
-          ghost.geometry = new THREE.BoxGeometry(CONFIG.barbedWire.halfLength * 2 * WORLD_UNITS_PER_PIXEL, .05, CONFIG.barbedWire.halfDepth * 2 * WORLD_UNITS_PER_PIXEL);
+          const width = CONFIG.barbedWire.halfLength * 2, depth = CONFIG.barbedWire.halfDepth * 2;
+          ghost.geometry = heightfieldGeometry(state.terrain, { x: preview.pos.x - width / 2, y: preview.pos.y - depth / 2, width, height: depth }, 2).translate(0, .08, 0);
           ghost.name = 'wire-placement-preview';
         }
         if (preview.engineerRange && preview.engineerPos) { const range = new THREE.Mesh(drapedRingGeometry(this.terrain, preview.engineerPos, preview.engineerRange * WORLD_UNITS_PER_PIXEL - .035, preview.engineerRange * WORLD_UNITS_PER_PIXEL), new THREE.MeshBasicMaterial({ color: 0xb9bb83, transparent: true, opacity: .72, side: THREE.DoubleSide, depthWrite: false })); this.overlayGroup.add(range); }
@@ -2019,8 +2083,14 @@ export class BattleRenderer3D implements RendererPort {
         if (['sandbag', 'trench', 'bunker', 'mortarPit', 'bridge'].includes(preview.kind)) {
           const width = preview.kind === 'trench' ? CONFIG.trench.halfLength * 2 : preview.kind === 'bridge' ? (preview.bridgeHalfWidth ?? 12) * 2 : 32;
           const depth = preview.kind === 'bridge' ? (preview.bridgeHalfLength ?? 24) * 2 : preview.kind === 'trench' ? 24 : 20;
-          ghost.geometry.dispose(); ghost.geometry = new THREE.BoxGeometry(width * WORLD_UNITS_PER_PIXEL, .05, depth * WORLD_UNITS_PER_PIXEL);
-          if (preview.kind === 'bridge' && preview.bridgeAxis === 'horizontal') ghost.rotation.y = Math.PI / 2;
+          const horizontal = preview.kind === 'bridge' && preview.bridgeAxis === 'horizontal';
+          const footprintWidth = horizontal ? depth : width, footprintDepth = horizontal ? width : depth;
+          ghost.geometry.dispose();
+          ghost.geometry = heightfieldGeometry(state.terrain, {
+            x: preview.pos.x - footprintWidth / 2, y: preview.pos.y - footprintDepth / 2,
+            width: footprintWidth, height: footprintDepth,
+          }, 2).translate(0, .08, 0);
+          ghost.name = `${preview.kind}-placement-preview`;
         }
       }
       if (drag) {

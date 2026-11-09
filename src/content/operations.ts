@@ -2,23 +2,29 @@ import { CONFIG } from './config';
 import type { SimState, Terrain, Vec2 } from '../simulation/types';
 import { TERRAIN_KIND } from '../simulation/terrain';
 
-export type RunMode = 'campaign' | 'operation';
+export type RunMode = 'campaign' | 'operation' | 'assault';
 export const OPERATION_SECTORS = [
   { title: 'Bridgehead', waves: 3, holdSeconds: 10 },
   { title: 'Crossroads', waves: 4, holdSeconds: 8 },
   { title: 'Rear guard', waves: 6, holdSeconds: 0 },
 ] as const;
+export const ASSAULT_SECTORS = [
+  { title: 'Outpost', waves: 1, holdSeconds: 8 },
+  { title: 'Crossroads strongpoint', waves: 1, holdSeconds: 10 },
+  { title: 'Fortified line', waves: 1, holdSeconds: 12 },
+] as const;
 
 export function campaignGoal(state: { runMode?: RunMode }): number {
-  return state.runMode === 'operation' ? OPERATION_SECTORS.length : CONFIG.crossing.campaignMaps;
+  return state.runMode === 'operation' || state.runMode === 'assault' ? OPERATION_SECTORS.length : CONFIG.crossing.campaignMaps;
 }
 
-export function operationSector(state: Pick<SimState, 'mapsCleared'>) {
-  return OPERATION_SECTORS[Math.min(state.mapsCleared, OPERATION_SECTORS.length - 1)]!;
+export function operationSector(state: Pick<SimState, 'mapsCleared'> & Partial<Pick<SimState, 'runMode'>>) {
+  const sectors = state.runMode === 'assault' ? ASSAULT_SECTORS : OPERATION_SECTORS;
+  return sectors[Math.min(state.mapsCleared, sectors.length - 1)]!;
 }
 
 export function sectorWaves(state: Pick<SimState, 'runMode' | 'mapsCleared'>): number {
-  return state.runMode === 'operation' ? operationSector(state).waves : CONFIG.crossing.captureAfterWaves;
+  return state.runMode === 'operation' || state.runMode === 'assault' ? operationSector(state).waves : CONFIG.crossing.captureAfterWaves;
 }
 
 const targetCache = new WeakMap<Terrain, Map<number, Vec2>>();
@@ -51,6 +57,7 @@ export const OPERATION_RADIUS = 72;
 export function operationOrders(state: SimState): string {
   const sector = operationSector(state);
   if (state.sectorCaptured) return 'Sector secured. Move every survivor through the north exit.';
+  if (state.runMode === 'assault' && state.scheduler.phase !== 'advance') return `${sector.title}: attack the fortified position and eliminate its defenders.`;
   if (state.scheduler.phase === 'advance' && sector.holdSeconds) {
     return `Occupy the marked ${state.mapsCleared === 0 && state.terrain.bridges?.length ? 'bridgehead' : 'position'} with one unpinned soldier. Keep enemies out for ${sector.holdSeconds}s (${Math.floor(state.captureTicks / CONFIG.tickRate)}/${sector.holdSeconds}s).`;
   }

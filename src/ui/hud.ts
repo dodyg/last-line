@@ -112,6 +112,7 @@ export interface HudCallbacks {
   onBridge(): void;
 
   onMine(kind: 'ap' | 'at'): void;
+  onCancelMine(siteId: number): void;
 
   onArtillery(): void;
 
@@ -325,6 +326,7 @@ interface Elements {
   selMortarBombs: HTMLElement;
 
   selAction: HTMLElement;
+  selMineQueue: HTMLElement;
 
   selContact: HTMLElement;
 
@@ -368,7 +370,7 @@ const NOTICE_TTL_MS = 6000;
 
 const FIRE_ORDER_LABELS: Record<FireOrder, string> = {
 
-  auto: 'Auto', antiArmor: 'Prioritize armor', stopBreakthrough: 'Stop breakthroughs', holdGrenades: 'Hold grenades', seekGunfire: 'Run to gunfire',
+  auto: 'Auto', antiArmor: 'Prioritize armor', stopBreakthrough: 'Stop breakthroughs', holdGrenades: 'Hold grenades', seekGunfire: 'Run to gunfire', returnFire: 'Return fire only',
 
 };
 
@@ -385,6 +387,8 @@ const COMMAND_ICONS = {
     holdGrenades: '<path d="M9 5h6m-5 0V3h4v2m-6 2h8l1 2v9a3 3 0 0 1-3 3h-4a3 3 0 0 1-3-3V9l1-2Z"/><path d="m9 11 6 6m0-6-6 6"/>',
 
     seekGunfire: '<circle cx="9" cy="4" r="2"/><path d="m10 7 4 3-4 4-4 1-3 5m7-6 4 6M5 8l4-1m8-2q5 4 0 8m3-10q7 6 0 12"/>',
+
+    returnFire: '<path d="M12 2 20 5v6c0 5-3.4 8.5-8 11-4.6-2.5-8-6-8-11V5l8-3Z"/><path d="M8 12h8m-3-3 3 3-3 3"/>',
 
   },
 
@@ -708,6 +712,7 @@ export class Hud {
       selMortarBombs: required('sel-mortar-bombs'),
 
       selAction: required('sel-action'),
+      selMineQueue: required('sel-mine-queue'),
 
       selContact: required('sel-contact'),
 
@@ -824,6 +829,10 @@ export class Hud {
 
     this.el.btnBridge.addEventListener('click', () => this.cb.onBridge());
 
+    this.el.selMineQueue.addEventListener('click', (event) => {
+      const button = (event.target as Element).closest<HTMLButtonElement>('button[data-mine-site]');
+      if (button) this.cb.onCancelMine(Number(button.dataset.mineSite));
+    });
     this.el.btnMineAp.addEventListener('click', () => this.cb.onMine('ap'));
 
     this.el.btnMineAt.addEventListener('click', () => this.cb.onMine('at'));
@@ -1074,7 +1083,7 @@ export class Hud {
 
           price: def.cost,
 
-          title: `${engineer} Costs ${def.cost} points and takes ${def.laySeconds} seconds to lay. Detonates under ${mineTargets(kind)}. Does not block movement or sight, and the blast harms friendly troops too.`,
+          title: `An engineer travels to each queued mine. Costs ${def.cost} points and takes ${def.laySeconds} seconds to lay. Detonates under ${mineTargets(kind)}. Does not block movement or sight, and the blast harms friendly troops too.`,
 
         };
 
@@ -1361,6 +1370,45 @@ export class Hud {
 
 
 
+  private updateMineQueue(state: SimState, engineer: Unit): void {
+    const queue = engineer.role === 'engineer'
+      ? state.constructionSites.filter((site) => site.kind === 'mine' && site.builderId === engineer.id)
+      : [];
+    const panel = this.el.selMineQueue;
+    panel.hidden = queue.length === 0;
+    if (!queue.length) return;
+    panel.querySelector<HTMLElement>('.mine-queue-title')!.textContent = `Mine orders · ${queue.length} remaining`;
+    const list = panel.querySelector<HTMLOListElement>('.mine-queue-list')!;
+    const key = queue.map((site) => site.id).join(',');
+    if (list.dataset.queue !== key) {
+      list.replaceChildren();
+      list.dataset.queue = key;
+      for (const site of queue) {
+        const row = document.createElement('li');
+        const label = document.createElement('span'); label.className = 'mine-queue-label';
+        const status = document.createElement('span'); status.className = 'mine-queue-status';
+        const progress = document.createElement('progress'); progress.max = 100;
+        const button = document.createElement('button'); button.type = 'button'; button.dataset.mineSite = String(site.id);
+        button.textContent = 'Cancel';
+        button.setAttribute('aria-label', `Cancel ${site.mineKind === 'at' ? 'AT' : 'AP'} mine order at ${Math.round(site.pos.x)}, ${Math.round(site.pos.y)}`);
+        row.append(label, status, progress, button); list.append(row);
+      }
+    }
+    queue.forEach((site, index) => {
+      const row = list.children[index] as HTMLElement;
+      const type = site.mineKind === 'at' ? 'AT' : 'AP';
+      const phase = index > 0 ? 'Queued' : engineer.pinned ? 'Paused · pinned'
+        : Math.hypot(engineer.pos.x - site.pos.x, engineer.pos.y - site.pos.y) > CONFIG.construction.engineerRange
+          ? 'Travelling to site' : `Planting · ${Math.ceil(site.ticksRemaining / CONFIG.tickRate)}s remaining`;
+      row.querySelector<HTMLElement>('.mine-queue-label')!.textContent = `${type} mine · ${Math.round(site.pos.x)}, ${Math.round(site.pos.y)}`;
+      row.querySelector<HTMLElement>('.mine-queue-status')!.textContent = phase;
+      const progress = row.querySelector<HTMLProgressElement>('progress')!;
+      progress.value = Math.max(0, Math.min(100, (1 - site.ticksRemaining / site.totalTicks) * 100));
+      progress.setAttribute('aria-label', `${type} mine planting progress`);
+      progress.title = `${Math.round(progress.value)}% planted`;
+    });
+  }
+
   setModeUI(mode: UIMode): void {
     this.el.btnAmbush.classList.toggle('active', mode.kind === 'ambush');
 
@@ -1447,7 +1495,7 @@ export class Hud {
 
       const def = CONFIG.mineKinds[kind];
 
-      return `Place ahead of the line, within ${CONFIG.construction.engineerRange}px of an available engineer. Laying takes ${def.laySeconds}s. Detonates under ${mineTargets(kind)}.`;
+      return `Click multiple spots ahead of the line to queue mines. Engineers travel to each site; laying takes ${def.laySeconds}s. Detonates under ${mineTargets(kind)}. Esc or right-click ends placement.`;
 
     };
 
@@ -1496,7 +1544,7 @@ export class Hud {
 
     this.el.points.textContent = String(state.points);
     const objective = document.getElementById('operation-objective');
-    if (objective) { objective.hidden = state.runMode !== 'operation' || state.endless; objective.textContent = operationOrders(state); }
+    if (objective) { objective.hidden = (state.runMode !== 'operation' && state.runMode !== 'assault') || state.endless; objective.textContent = operationOrders(state); }
 
     this.el.map.textContent = state.endless
 
@@ -1588,9 +1636,11 @@ export class Hud {
 
     this.el.btnBridge.disabled = !hasEngineer || (state.points < CONFIG.costs.bridge && mode.kind !== 'bridge');
 
-    this.el.btnMineAp.disabled = !hasEngineer || (state.points < CONFIG.mineKinds.ap.cost && !isMineMode(mode, 'ap'));
+    const hasMineEngineer = state.units.some((unit) => unit.team === 'friendly' && unit.role === 'engineer' && unit.health > 0 && !unit.dead && !unit.crossed);
 
-    this.el.btnMineAt.disabled = !hasEngineer || (state.points < CONFIG.mineKinds.at.cost && !isMineMode(mode, 'at'));
+    this.el.btnMineAp.disabled = !hasMineEngineer || (state.points < CONFIG.mineKinds.ap.cost && !isMineMode(mode, 'ap'));
+
+    this.el.btnMineAt.disabled = !hasMineEngineer || (state.points < CONFIG.mineKinds.at.cost && !isMineMode(mode, 'at'));
 
     if (state.constructionSites.length === 0) {
 
@@ -1614,7 +1664,20 @@ export class Hud {
 
       this.el.constructionStatus.hidden = false;
 
-      this.el.constructionStatus.textContent = status.join(' | ');
+      this.el.constructionStatus.replaceChildren();
+      state.constructionSites.forEach((site, index) => {
+        const row = document.createElement('div');
+        if (site.kind === 'mine') {
+          const first = state.constructionSites.find((item) => item.kind === 'mine' && item.builderId === site.builderId);
+          const builder = state.units.find((unit) => unit.id === site.builderId && unit.health > 0 && !unit.dead && !unit.crossed);
+          const phase = first?.id !== site.id ? 'queued' : !builder || builder.pinned ? 'paused' : Math.hypot(builder.pos.x - site.pos.x, builder.pos.y - site.pos.y) > CONFIG.construction.engineerRange ? 'travelling' : `${Math.ceil(site.ticksRemaining / CONFIG.tickRate)}s remaining`;
+          row.append(`${site.mineKind === 'at' ? 'AT' : 'AP'} mine (${Math.round(site.pos.x)}, ${Math.round(site.pos.y)}) · ${builder ? nameOf(state, builder.id) : 'Awaiting engineer'}: ${phase} `);
+          const button = document.createElement('button'); button.type = 'button'; button.textContent = 'Cancel';
+          button.setAttribute('aria-label', `Cancel ${site.mineKind === 'at' ? 'AT' : 'AP'} mine order at ${Math.round(site.pos.x)}, ${Math.round(site.pos.y)}`);
+          button.addEventListener('click', () => this.cb.onCancelMine(site.id)); row.append(button);
+        } else row.textContent = status[index] ?? '';
+        this.el.constructionStatus.append(row);
+      });
 
     }
 
@@ -1841,7 +1904,11 @@ export class Hud {
 
       const sharedOrdersExcludeGrenades = selection.some((unit) => unit.role === 'gun_truck');
 
-      this.el.btnFireOrder.title = order === 'seekGunfire'
+      this.el.btnFireOrder.title = order === 'returnFire'
+
+        ? 'Hold weapons and grenades until this unit is shot at or takes damage, then switch to automatic fire. Click to cycle.'
+
+        : order === 'seekGunfire'
 
         ? 'Run to the nearest heard enemy gunfire, then stop and engage a located enemy. Uses stamina; works day and night. Direct move, patrol, or building orders cancel pursuit. Click to cycle.'
 
@@ -2070,6 +2137,8 @@ export class Hud {
       }
 
       const upgradedAim = selected.accuracySkill * soldierAttributeMultiplier(selected, 'marksmanship') * (1 + selected.weaponUpgrades.accuracy * CONFIG.weaponUpgrades.accuracyPerLevel);
+
+      this.updateMineQueue(state, selected);
 
       this.el.selXp.textContent = `Aim ${Math.round(upgradedAim * 100)}% · XP ${selected.xp} · ${selected.kills} kill${selected.kills === 1 ? '' : 's'}`;
 

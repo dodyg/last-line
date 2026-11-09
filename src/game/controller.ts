@@ -386,11 +386,12 @@ export class GameController {
     const terrainData = generateTerrain(runSeed, true, 4, country);
     this.sim = new Simulation(runSeed, undefined, terrainData);
     this.sim.state.runMode = runMode;
+    if (runMode === 'assault') this.sim.setupAssault();
     this.terrainData = terrainData;
     this.afterRunSetup();
-    this.hud.notice(`${country === undefined ? '' : CAMPAIGNS[country].name + ' campaign · '}Map 1 - wave 1 approaching. Deploy your defenses.`, 'info');
+    this.hud.notice(runMode === 'assault' ? operationOrders(this.sim.state) : `${country === undefined ? '' : CAMPAIGNS[country].name + ' campaign · '}Map 1 - wave 1 approaching. Deploy your defenses.`, 'info');
     const telegraph = waveTelegraph(0);
-    if (telegraph) this.hud.notice(telegraph, 'warn');
+    if (telegraph && runMode !== 'assault') this.hud.notice(telegraph, 'warn');
     if (country !== undefined) {
       this.pauseRun(false);
       this.updateCampaignDispatch('deployment');
@@ -544,7 +545,7 @@ export class GameController {
       mapsCleared: s.mapsCleared,
       mapNumber: s.mapNumber,
       runMode: s.runMode,
-      objective: s.runMode === 'operation' ? operationOrders(s) : undefined,
+      objective: s.runMode === 'operation' || s.runMode === 'assault' ? operationOrders(s) : undefined,
       sector: this.terrainData?.layout?.label ?? 'Forward position',
       squad: s.units.filter((unit) => unit.team === 'friendly' && !unit.dead && unit.health > 0 && !unit.crossed).length,
       arrival,
@@ -663,6 +664,7 @@ export class GameController {
     this.audio.setAtmosphere(sim?.state.weather ?? 'clear', sim !== null && !sim.paused && sim.state.phase === 'running' && !this.overlayOpen && !document.hidden, {
       pressure: sim ? battlePressure(sim.state) : 0, night: sim ? dayNightAtTick(sim.state.ticks, sim.state.dayNightStartTick).night : false,
       sheltered: localShelter(sim?.state.units.find((unit) => this.selectionIds.includes(unit.id))), secured: sim?.state.sectorCaptured ?? false,
+      animals: sim?.state.animals,
     });
     if (this.mapReviewActive) {
       const preview = this.mapReviewState;
@@ -903,11 +905,11 @@ export class GameController {
           this.audio.play('ui');
           break;
         case 'waveCleared':
-          this.hud.notice(`Wave ${ev.wave} cleared. +${ev.reward} points.${ev.cleanBonus ? ` Clean defense ×${ev.streak}: +${ev.cleanBonus} bonus included!` : ''}`, 'good');
+          this.hud.notice(this.sim?.state.runMode === 'assault' && !this.sim.state.endless ? `Garrison cleared. +${ev.reward} points.` : `Wave ${ev.wave} cleared. +${ev.reward} points.${ev.cleanBonus ? ` Clean defense ×${ev.streak}: +${ev.cleanBonus} bonus included!` : ''}`, 'good');
           this.audio.play('heal');
           break;
         case 'advanceAvailable':
-          this.hud.notice(this.sim?.state.runMode === 'operation' ? operationOrders(this.sim.state) : 'All 15 waves repelled. Move the squad north to advance; the next map starts at wave 1.', 'good');
+          this.hud.notice(this.sim && (this.sim.state.runMode === 'operation' || this.sim.state.runMode === 'assault') ? operationOrders(this.sim.state) : 'All 15 waves repelled. Move the squad north to advance; the next map starts at wave 1.', 'good');
           this.saveRun();
           break;
         case 'crossingBegan':
@@ -928,7 +930,7 @@ export class GameController {
             const setting = this.terrainData?.layout?.label ?? BATTLEFIELD_SETTINGS[this.terrainData?.settingId ?? 0] ?? BATTLEFIELD_SETTINGS[0];
           if (ev.credited) {
             this.hud.notice(
-              `New map ${ev.mapNumber} · ${setting}. Sector secured (${ev.mapsCleared}/${ev.goal}); ${ev.squad} veteran${ev.squad === 1 ? '' : 's'} advanced. Wave 1 follows the arrival prep.`,
+              `New map ${ev.mapNumber} · ${setting}. Sector secured (${ev.mapsCleared}/${ev.goal}); ${ev.squad} veteran${ev.squad === 1 ? '' : 's'} advanced.${this.sim?.state.runMode === 'assault' && !this.sim.state.endless ? ' Another fortified position lies ahead.' : ' Wave 1 follows the arrival prep.'}`,
               'good',
             );
           } else {
@@ -966,7 +968,7 @@ export class GameController {
           if (this.prefs.screenShake && !this.prefs.reducedMotion) this.renderer?.shake(6, 0.5);
           break;
         case 'mineTriggered':
-          this.hud.notice(ev.victims > 0 ? `Mine struck - ${ev.victims} caught in the blast.` : 'Mine detonated.', 'good');
+          this.hud.notice(ev.animalTriggered ? 'An animal triggered an AP mine.' : ev.victims > 0 ? `Mine struck - ${ev.victims} caught in the blast.` : 'Mine detonated.', ev.animalTriggered ? 'warn' : 'good');
           this.audio.play('explosion');
           // A charge going off under armour should register harder than one under
           // a man, so the shake scales with what the blast caught.
@@ -1148,11 +1150,11 @@ export class GameController {
   private updateChatter(events: readonly SimEvent[]): void {
     const sim = this.sim;
     if (sim !== null && !sim.paused && sim.state.phase === 'running' && !this.radioTransmissionPending) {
-      const chatter = this.radio.consider(events, sim.state.units, sim.state.ticks, sim.state.weather, sim.state.campaignCountry, sim.state.scheduler.phase);
+      const chatter = this.radio.consider(events, sim.state.units, sim.state.ticks, sim.state.weather, sim.state.campaignCountry, sim.state.scheduler.phase, sim.state.scheduler.waveIndex);
       if (this.radio.takeBanterInterruption()) { this.audio.cancelChatter(false); this.hud.clearChatter(); }
       if (chatter !== null) {
         const caption = chatter.reply ? `${chatter.text} — ${this.soldierLabel(chatter.reply.speakerId)}: ${chatter.reply.text}` : chatter.text;
-        this.hud.chatter(chatter.team, caption, chatter.channel, chatter.reply ? 10000 : 6200);
+        this.hud.chatter(chatter.team, caption, chatter.channel, chatter.reply ? 10000 : Math.max(6200, Math.min(25000, chatter.text.length * 75)));
         this.audio.speakChatter(chatter.text, chatter.team, chatter.delivery, chatter.speakerId, chatter.cue, chatter.confirmation, chatter.channel, chatter.reply);
       }
     }
@@ -1329,7 +1331,7 @@ export class GameController {
     const next = orders[(orders.indexOf(current) + 1) % orders.length]!;
     const result = sim.command({ type: 'fireOrder', unitIds: selected.map((unit) => unit.id), order: next });
     if (result.ok) {
-      this.hud.notice(`Fire order: ${next === 'auto' ? 'automatic' : next === 'antiArmor' ? 'prioritize armor' : next === 'stopBreakthrough' ? 'stop breakthroughs' : next === 'seekGunfire' ? 'run to the nearest heard enemy gunfire and engage' : 'hold grenades'}.`, 'info');
+      this.hud.notice(`Fire order: ${next === 'auto' ? 'automatic' : next === 'antiArmor' ? 'prioritize armor' : next === 'stopBreakthrough' ? 'stop breakthroughs' : next === 'seekGunfire' ? 'run to the nearest heard enemy gunfire and engage' : next === 'returnFire' ? 'hold fire until shot at or damaged' : 'hold grenades'}.`, 'info');
       this.saveRun();
     } else if (result.reason) this.hud.notice(result.reason, 'error');
   }
@@ -1530,6 +1532,12 @@ export class GameController {
     this.saveRun();
   }
 
+  cancelMineOrder(siteId: number): void {
+    const result = this.sim?.command({ type: 'cancelMine', siteId });
+    if (result?.ok) { this.hud.notice('Mine order cancelled and points refunded.', 'info'); this.saveRun(); }
+    else if (result?.reason) this.hud.notice(result.reason, 'error');
+  }
+
   setMode(mode: UIMode): void {
     if (mode.kind !== 'none' && this.sim !== null && this.sim.paused) {
       this.hud.notice('Orders are locked while paused - inspect only.', 'warn');
@@ -1727,9 +1735,8 @@ export class GameController {
       const def = CONFIG.mineKinds[this.mode.mineKind];
       const result = sim.command({ type: 'mine', kind: this.mode.mineKind, pos });
       if (result.ok) {
-        this.hud.notice(`Engineer is laying an ${def.label} (${def.laySeconds}s). Stay within ${CONFIG.construction.engineerRange}px.`, 'info');
+        this.hud.notice(`${def.label} ordered. Engineers will travel to the site and lay it (${def.laySeconds}s).`, 'info');
         this.saveRun();
-        this.cancelMode();
       } else if (result.reason) {
         this.hud.notice(result.reason, 'error');
       }
@@ -1861,6 +1868,12 @@ export class GameController {
         detail: `Infantry on both sides cross at ${Math.round(CONFIG.barbedWire.speedMult * 100)}% speed. Vehicles pass freely. Leave gaps for clear lanes.${wire.cutTicks > 0 ? ` Enemy cutting progress: ${Math.round(wire.cutTicks / (CONFIG.barbedWire.cutSeconds * CONFIG.tickRate) * 100)}%. Pin or eliminate the cutter to pause it.` : ''}`,
       }, worldX, worldY);
       return;
+    }
+    for (const bunker of state.bunkers) {
+      if (Math.hypot(worldX - bunker.pos.x, worldY - bunker.pos.y) <= CONFIG.bunker.occupyRadius) {
+        this.hud.showTerrainTooltip({ title: 'Bunker', detail: `Integrity: ${Math.ceil(bunker.health ?? CONFIG.bunker.health)}/${CONFIG.bunker.health}. Explosions damage the structure; enemy sappers can demolish it.` }, worldX, worldY);
+        return;
+      }
     }
     for (const pit of state.mortarPits) {
       if (Math.hypot(worldX - pit.pos.x, worldY - pit.pos.y) <= CONFIG.mortarPit.occupyRadius + 3) {
